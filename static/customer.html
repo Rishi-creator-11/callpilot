@@ -335,13 +335,193 @@ const msg=(t,fail=false)=>{$("message").textContent=t;$("message").className=fai
 function organization(){return v("org")}
 async function request(url,method="GET",data){if(!current)throw Error("Please sign in");const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired");let r=await fetch("/api/account"+url,{method,headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:data?JSON.stringify(data):undefined});let j=await r.json().catch(()=>({}));if(!r.ok){let d=j.detail;let message=Array.isArray(d)?d.map(x=>{const field=Array.isArray(x.loc)?x.loc.filter(t=>t!=="body").join("."):"field";return (field||"Input")+": "+(x.msg||"Invalid value")}).join("; "):typeof d==="string"?d:d&&typeof d==="object"?(d.message||JSON.stringify(d)):"Request failed (HTTP "+r.status+")";throw Error(message)}return j}
 async function safe(fn){try{msg("");const result=await fn();if(typeof result==="string")msg(result)}catch(e){msg(e instanceof Error?e.message:String(e),true)}}
-window.authAction=async mode=>{const email=v("email"),password=v("password");$("authmsg").textContent="Processing...";try{const r=mode==="signup"?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+"/app"}}):await sb.auth.signInWithPassword({email,password});if(r.error)throw r.error;$("authmsg").textContent=mode==="signup"?"Check your email to confirm your account, then sign in.":"Signed in.";if(mode==="signin")await render()}catch(e){$("authmsg").textContent=e.message}};
-window.signOut=async()=>{await sb.auth.signOut();current=null;await render()};
-window.section=x=>{for(let id of ["calls","workspace","knowledge","voice","simulator","appointments","billing"])$(id).style.display=id===x?"block":"none"};
-async function render(){const r=await sb.auth.getSession();current=r.data.session?.user||null;$("auth").style.display=current?"none":"block";$("dashboard").style.display=current?"block":"none";$("logout").style.display=current?"block":"none";if(current){$("welcome").textContent=current.email;await loadOrganizations()}}
-async function loadOrganizations(){let result=await request("/me");orgs=result.organizations;$("org").innerHTML=orgs.length?orgs.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):'<option value="">Create a business</option>';if(orgs.length){await window.loadWorkspace()}else{$("orgInfo").textContent="Create your first business to begin";window.section("workspace")}}
-window.createBusiness=()=>safe(async()=>{const o=await request("/organizations","POST",{name:v("bname"),industry:v("industry")||"General"});await loadOrganizations();$("org").value=o.id;await window.loadWorkspace()});
-window.loadWorkspace=async()=>{if(!organization())return;await safe(async()=>{const o=orgs.find(x=>x.id===organization());$("orgInfo").textContent=(o?.name||"Business")+" · "+(o?.industry||"General")+" · "+(o?.status||"draft");await Promise.all([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);window.section("calls");await window.loadCalls()})};
+let authView="signin",activePage="calls",recoveryMode=false;
+window.authMode=mode=>{
+ authView=mode;
+ const isSignUp=mode==="signup",isReset=mode==="reset";
+ $("authTitle").textContent=isSignUp?"Create your CallPilot account":isReset?"Reset your password":"Welcome back";
+ $("authSubtitle").textContent=isSignUp?"Create your secure workspace and start building your AI front desk.":isReset?"We'll email you a password reset link.":"Sign in to manage your business and conversations.";
+ $("passwordRow").style.display=isReset?"none":"block";
+ $("authSubmit").textContent=isSignUp?"Create account":isReset?"Send reset link":"Sign in";
+ $("authSubmit").setAttribute("onclick",isSignUp?"window.authAction('signup')":isReset?"window.sendReset(false)":"window.authAction('signin')");
+ $("authSwap").textContent=isSignUp||isReset?"Back to sign in":"Create a free account";
+ $("authSwap").setAttribute("onclick",isSignUp||isReset?"window.authMode('signin')":"window.authMode('signup')");
+ $("authForgot").style.display=isReset?"none":"inline-block";
+ $("authmsg").textContent="";
+ $("password").setAttribute("autocomplete",isSignUp?"new-password":"current-password");
+};
+window.authAction=async mode=>{
+ const email=v("email").trim(),password=v("password");
+ $("authmsg").textContent="Working...";
+ try{
+   if(!email||!email.includes("@"))throw Error("Enter a valid email address.");
+   if(password.length<8)throw Error("Use a password with at least 8 characters.");
+   const result=mode==="signup"?
+      await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+"/app"}}):
+      await sb.auth.signInWithPassword({email,password});
+   if(result.error)throw result.error;
+   $("authmsg").textContent=mode==="signup"?"Check your inbox to verify your account, then sign in.":"Signed in.";
+   if(mode==="signin")await render();
+ }catch(e){$("authmsg").textContent=e.message||"Unable to sign in"}
+};
+window.sendReset=async fromProfile=>{
+ const email=fromProfile?(current?.email||""):v("email").trim();
+ if(!email||!email.includes("@")){const e="Enter a valid email address.";if(fromProfile)msg(e,true);else $("authmsg").textContent=e;return}
+ try{
+   const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+"/app"});
+   if(error)throw error;
+   const result="If this email has an account, a reset link will arrive shortly. Check spam if you don't see it.";
+   if(fromProfile)msg(result);else $("authmsg").textContent=result;
+ }catch(e){if(fromProfile)msg(e.message,true);else $("authmsg").textContent=e.message}
+};
+window.setRecoveredPassword=async()=>{
+ const password=v("recoveryPassword");
+ if(password.length<8){$("authmsg").textContent="Use at least 8 characters.";return}
+ const {error}=await sb.auth.updateUser({password});
+ if(error){$("authmsg").textContent=error.message;return}
+ recoveryMode=false;$("authRecovery").style.display="none";$("authFields").style.display="block";
+ $("authmsg").textContent="Password updated. You're signed in.";
+ await render();
+};
+window.signOut=async()=>{await sb.auth.signOut();current=null;activePage="calls";history.replaceState(null,"",location.pathname);await render()};
+const pageMeta={
+ calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
+ knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
+ voice:["AI receptionist","Choose the identity, greeting and voice for your front desk."],
+ simulator:["Test assistant","Test approved answers before customers hear them."],
+ appointments:["Appointments","Manage appointment requests and calendar connections."],
+ billing:["Billing & plans","Subscription status, payment methods and invoices."],
+ workspace:["Business settings","Profile, team and workspace management."],
+ account:["My account","Your profile, security and sign-in settings."],
+ help:["Help & support","Answers for using CallPilot with confidence."]
+};
+window.section=(x,options={})=>{
+ if(!pageMeta[x])x="calls";
+ activePage=x;
+ for(const id of Object.keys(pageMeta)){
+   if($(id))$(id).style.display=id===x?"block":"none";
+ }
+ document.querySelectorAll(".sidebar [data-section]").forEach(button=>{
+   const active=button.dataset.section===x;
+   button.classList.toggle("cp-active",active);
+   if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
+ });
+ $("pageTitle").textContent=pageMeta[x][0];
+ $("welcome").textContent=pageMeta[x][1];
+ if(!options.noHash)history.replaceState(null,"","#"+x);
+ window.scrollTo({top:0,behavior:"instant"});
+ if(x==="account")window.fillProfile();
+ if(x==="workspace")window.fillWorkspace();
+ if(x==="billing"&&organization())loadBilling().catch(e=>msg(e.message,true));
+ if(x==="calls"&&organization())window.loadCalls();
+};
+async function render(){
+ const r=await sb.auth.getSession();
+ current=r.data.session?.user||null;
+ if(recoveryMode){
+   $("auth").style.display="block";$("dashboard").style.display="none";
+   $("authFields").style.display="none";$("authRecovery").style.display="block";
+   $("authTitle").textContent="Choose a new password";
+   $("authSubtitle").textContent="Update your password to recover account access.";
+   $("topProfile").style.display="none";$("logout").style.display="none";$("topHelp").style.display="none";
+   return;
+ }
+ $("auth").style.display=current?"none":"block";
+ $("dashboard").style.display=current?"block":"none";
+ $("logout").style.display="none";
+ $("topProfile").style.display=current?"flex":"none";
+ $("topHelp").style.display=current?"block":"none";
+ if(current){
+   const name=current.user_metadata?.full_name||current.email?.split("@")[0]||"Account";
+   $("topAvatar").textContent=name.split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("")||"CP";
+   $("topUserName").textContent=name;
+   window.fillProfile();
+   await loadOrganizations();
+ }else{
+   window.authMode("signin");
+ }
+}
+async function loadOrganizations(){
+ const result=await request("/me");
+ orgs=result.organizations;
+ const old=organization();
+ $("org").innerHTML=orgs.length?orgs.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):
+  '<option value="">Create a business</option>';
+ if(old&&orgs.some(x=>x.id===old))$("org").value=old;
+ if(orgs.length){
+   await window.loadWorkspace({preserve:!!old});
+ }else{
+   $("orgInfo").textContent="Create your first business to begin";
+   window.section("workspace");
+ }
+}
+window.createBusiness=()=>safe(async()=>{
+ const o=await request("/organizations","POST",{name:v("bname").trim(),industry:v("industry").trim()||"General"});
+ await loadOrganizations();$("org").value=o.id;await window.loadWorkspace();
+ return "Business workspace created."
+});
+window.loadWorkspace=async({preserve=false}={})=>{
+ if(!organization())return;
+ await safe(async()=>{
+   const o=orgs.find(x=>x.id===organization());
+   $("headerWorkspace").textContent=o?.name||"Your business";
+   $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
+   $("wsName").value=o?.name||"";
+   $("wsIndustry").value=o?.industry||"";
+   await Promise.all([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);
+   window.section(preserve&&pageMeta[location.hash.slice(1)]?location.hash.slice(1):"calls",{noHash:preserve});
+ });
+};
+window.fillProfile=()=>{
+ if(!current)return;
+ $("profileName").value=current.user_metadata?.full_name||"";
+ $("profileEmailRead").value=current.email||"";
+ $("profileEmail").value="";
+};
+window.saveProfile=()=>safe(async()=>{
+ const full_name=v("profileName").trim();
+ if(full_name.length<2||full_name.length>80)throw Error("Enter a name between 2 and 80 characters.");
+ const {data,error}=await sb.auth.updateUser({data:{full_name}});
+ if(error)throw error;
+ current=data.user||current;
+ $("topUserName").textContent=full_name;
+ $("topAvatar").textContent=full_name.split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("");
+ return "Profile saved.";
+});
+window.changeEmail=()=>safe(async()=>{
+ const email=v("profileEmail").trim();
+ if(!email||!email.includes("@")||email===current.email)throw Error("Enter a different valid email address.");
+ const {error}=await sb.auth.updateUser({email});
+ if(error)throw error;
+ $("profileEmail").value="";
+ return "Email change requested. Check your existing and new inboxes for confirmation.";
+});
+window.changePassword=()=>safe(async()=>{
+ const a=v("newPassword"),b=v("confirmPassword");
+ if(a.length<8)throw Error("Password must be at least 8 characters.");
+ if(a!==b)throw Error("Passwords do not match.");
+ const {error}=await sb.auth.updateUser({password:a});
+ if(error)throw error;
+ $("newPassword").value="";$("confirmPassword").value="";
+ return "Password updated successfully.";
+});
+window.fillWorkspace=async()=>{
+ const o=orgs.find(x=>x.id===organization());
+ if(!o)return;
+ $("wsName").value=o.name||"";$("wsIndustry").value=o.industry||"";
+ try{
+   const t=await request("/organizations/"+organization()+"/team");
+   $("wsTeam").textContent=t.members.length+" team member"+(t.members.length===1?"":"s")+" · "+t.members.filter(x=>x.is_you).map(x=>"Your role: "+x.role).join("");
+ }catch(e){$("wsTeam").textContent="Team information unavailable: "+e.message}
+};
+window.saveWorkspace=()=>safe(async()=>{
+ const name=v("wsName").trim(),industry=v("wsIndustry").trim();
+ if(name.length<2||industry.length<2)throw Error("Business name and industry must each have at least 2 characters.");
+ await request("/organizations/"+organization()+"/settings","PATCH",{name,industry});
+ const o=orgs.find(x=>x.id===organization());if(o){o.name=name;o.industry=industry}
+ $("org").selectedOptions[0].textContent=name;$("headerWorkspace").textContent=name;
+ return "Business details saved.";
+});
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
 async function loadFacts(){let facts=await request("/organizations/"+organization()+"/knowledge");$("facts").innerHTML=facts.map(f=>'<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p><span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+(!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+'</div>').join("")||'<p>No approved knowledge yet.</p>';$("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)))}
@@ -349,7 +529,7 @@ window.addFact=()=>safe(async()=>{const question=v("faqQ").trim(),answer=v("faqA
 window.approveFact=id=>safe(async()=>{await request("/organizations/"+organization()+"/knowledge/"+id+"/approve","POST");await loadFacts();msg("Fact approved.")});
 async function loadSemanticStatus(){const result=await request("/organizations/"+organization()+"/semantic-status");$("semanticStatus").textContent=result.configured?
     "Semantic search ready: "+result.indexed_facts+" of "+result.approved_facts+" approved answers indexed.":
-    "Semantic search needs a server-side OPENAI_API_KEY. No embeddings can be generated until configured."}
+    "Semantic search is not connected. Check your Supabase embedding service configuration."}
 window.indexKnowledge=()=>safe(async()=>{const result=await request("/organizations/"+organization()+"/knowledge/reindex","POST");await loadSemanticStatus();return "Indexed "+result.indexed+" approved answers."});
 window.ask=()=>safe(async()=>{const question=v("question").trim();if(!question)throw Error("Please enter a question.");const result=await request("/organizations/"+organization()+"/simulate","POST",{question});$("reply").textContent=result.answer+(result.matched_question?"\n\nMatched approved knowledge: "+result.matched_question:"");});
 async function loadCalendar(){let c=await request("/organizations/"+organization()+"/calendar");$("calendarStatus").textContent=c.connected?"Google Calendar connected":c.configured?"Google Calendar available — connect your account":"Google OAuth credentials not yet configured"}
@@ -358,7 +538,20 @@ const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Numb
 window.checkAvailability=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/availability","POST",slot()),null,2)});
 window.bookTest=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/book-test","POST",{...slot(),caller_name:v("cname"),caller_contact:v("ccontact"),service:v("cservice")}),null,2);await loadBookings()});
 async function loadBookings(){$("bookings").textContent=JSON.stringify(await request("/organizations/"+organization()+"/bookings"),null,2)}
-async function loadBilling(){let b=await request("/organizations/"+organization()+"/billing");$("billingInfo").textContent=b.checkout_enabled?"Test billing available. No live charges.":"No subscription prices have been approved. Checkout is disabled.";$("checkout").disabled=!b.checkout_enabled;$("checkout").textContent=b.checkout_enabled?"Subscribe via Stripe Checkout (test)":"Subscribe (not yet available)";$("portal").style.display=b.has_customer?"inline-block":"none"}
+async function loadBilling(){
+ const b=await request("/organizations/"+organization()+"/billing");
+ const active=["active","trialing"].includes(b.status);
+ $("billingState").textContent=(b.status||"unconfigured").replaceAll("_"," ");
+ $("billingHeading").textContent=active?"Your subscription is "+b.status:"Your CallPilot subscription";
+ $("billingInfo").textContent=active?
+    "Your Stripe test subscription is recorded as "+b.status+". Manage payment methods and invoices securely in Stripe.":
+    b.has_customer?"A billing customer exists, but an active subscription is not confirmed. You can manage the account in Stripe.":
+    b.checkout_enabled?"Sandbox checkout is available. All checkout payments are simulated.":"Checkout is not currently configured for your workspace.";
+ $("checkout").disabled=!b.checkout_enabled||active;
+ $("checkout").style.display=active?"none":"inline-block";
+ $("checkout").textContent=b.checkout_enabled?"Continue to secure Stripe Checkout (test)":"Subscription checkout unavailable";
+ $("portal").style.display=b.has_customer?"inline-block":"none";
+}
 window.requestVoice=()=>safe(async()=>{$("voiceResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/voice-requests","POST",{owner_contact:v("voiceOwnerEmail"),provider_voice_id:v("voiceId"),consent_acknowledged:$("voiceConsent").checked}),null,2)});
 window.testAssistant=()=>safe(async()=>{$("testAgentResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/test-assistant","POST"),null,2)})
 window.checkout=()=>safe(async()=>{const r=await request("/organizations/"+organization()+"/checkout","POST");location.href=r.url});
@@ -481,6 +674,21 @@ window.enableCallAnalysis=()=>safe(async()=>{
  }finally{b.disabled=false}
 });
 
-async function boot(){try{const r=await fetch("/api/account/config");const c=await r.json();if(!c.supabase_url||!c.supabase_publishable_key)throw Error("Authentication is not configured on server");sb=createClient(c.supabase_url,c.supabase_publishable_key);sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_IN"||event==="SIGNED_OUT"){setTimeout(()=>render().catch(e=>msg(e.message,true)),0)}});await render()}catch(e){$("auth").style.display="block";$("authmsg").textContent="Authentication setup incomplete: "+e.message}}
+async function boot(){
+ try{
+   const r=await fetch("/api/account/config");const c=await r.json();
+   if(!c.supabase_url||!c.supabase_publishable_key)throw Error("Authentication is not configured on server");
+   sb=createClient(c.supabase_url,c.supabase_publishable_key);
+   sb.auth.onAuthStateChange((event)=>{
+     if(event==="PASSWORD_RECOVERY"){recoveryMode=true;setTimeout(()=>render().catch(e=>msg(e.message,true)),0)}
+     if(event==="SIGNED_IN"||event==="SIGNED_OUT"){
+       setTimeout(()=>render().catch(e=>msg(e.message,true)),0);
+     }
+   });
+   await render();
+   if(new URLSearchParams(location.search).get("billing")==="success")
+     msg("Checkout completed. Refresh billing status to confirm subscription activation.");
+ }catch(e){$("auth").style.display="block";$("authmsg").textContent="Authentication setup incomplete: "+e.message}
+}
 boot();
 </script></body></html>
