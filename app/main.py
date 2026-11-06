@@ -173,6 +173,9 @@ def check_integrations_on_boot():
     db_url=os.getenv("SUPABASE_URL","").rstrip("/")
     db_secret=os.getenv("SUPABASE_SECRET_KEY","")
     vapi_key=os.getenv("VAPI_API_KEY","")
+    log.info("callpilot_voice_semantic_webhook ready=%s credential_id=%s webhook_token=%s",
+             bool(os.getenv("VAPI_CREDENTIAL_ID") and os.getenv("VAPI_WEBHOOK_TOKEN")),
+             bool(os.getenv("VAPI_CREDENTIAL_ID")),bool(os.getenv("VAPI_WEBHOOK_TOKEN")))
     log.info("callpilot_readiness google_client=%s google_secret=%s google_encryption=%s stripe_test_key=%s stripe_webhook_secret=%s stripe_price_id=%s stripe_billing_enabled=%s public_supabase_key=%s",
              bool(os.getenv("GOOGLE_OAUTH_CLIENT_ID")), bool(os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")),
              bool(os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY")),
