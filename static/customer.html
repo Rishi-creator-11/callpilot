@@ -345,7 +345,9 @@ body.cp-signed-in .sidebar button.cp-quick-open:hover{background:#2a3650;color:#
 body.cp-signed-in.cp-collapsed .cp-quick-open{justify-content:center!important;width:44px!important;margin-left:4px!important;padding:0!important}
 body.cp-signed-in.cp-collapsed .cp-quick-label,body.cp-signed-in.cp-collapsed .cp-quick-open kbd{display:none}
 @media(max-width:850px){body.cp-signed-in .sidebar button.cp-quick-open{min-height:46px}.cp-quick-dialog{padding-top:35px}.cp-quick-modal{max-height:85dvh}}
-</style></head><body>
+</style><style id="cp-interaction-fixes">@media(max-width:850px){body.cp-signed-in.cp-mobile-open{overflow:hidden}body.cp-signed-in.cp-mobile-open #appSidebar{overscroll-behavior:contain}}
+@media(min-width:851px){#appSidebar{overscroll-behavior:contain}}
+#cpQuickResults button:focus-visible{outline-offset:-2px!important}</style></head><body>
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div id="cpQuickDialog" class="cp-quick-dialog" hidden role="presentation">
 <div class="cp-quick-backdrop" onclick="window.closeQuickNav()"></div>
 <div class="cp-quick-modal" role="dialog" aria-modal="true" aria-labelledby="cpQuickHeading">
@@ -594,6 +596,10 @@ window.authMode=mode=>{
  $("password").setAttribute("autocomplete",isSignUp?"new-password":"current-password");
 };
 window.authAction=async mode=>{
+ const button=$("authSubmit");
+ if(button.disabled)return;
+ const label=button.textContent;
+ button.disabled=true;button.textContent=mode==="signup"?"Creating account…":"Signing in…";
  const email=v("email").trim(),password=v("password");
  $("authmsg").textContent="Working...";
  try{
@@ -606,6 +612,7 @@ window.authAction=async mode=>{
    $("authmsg").textContent=mode==="signup"?"Check your inbox to verify your account, then sign in.":"Signed in.";
    if(mode==="signin")await render();
  }catch(e){$("authmsg").textContent=e.message||"Unable to sign in"}
+ finally{button.disabled=false;button.textContent=label}
 };
 window.magicLink=async()=>{
  const email=v("email").trim();
@@ -639,18 +646,26 @@ window.setRecoveredPassword=async()=>{
  await render();
 };
 window.signOut=async()=>{await sb.auth.signOut();current=null;activePage="calls";history.replaceState(null,"",location.pathname);await render()};
+let cpMobileReturnFocus=null;
 window.toggleSidebar=()=>{
  const small=window.matchMedia("(max-width: 850px)").matches;
  if(small){
-  document.body.classList.toggle("cp-mobile-open");
-  const opened=document.body.classList.contains("cp-mobile-open");
-  $("cpSidebarBackdrop").setAttribute("aria-hidden",String(!opened));
+  const opening=!document.body.classList.contains("cp-mobile-open");
+  cpMobileReturnFocus=opening?document.activeElement:cpMobileReturnFocus;
+  document.body.classList.toggle("cp-mobile-open",opening);
+  $("cpSidebarBackdrop").setAttribute("aria-hidden",String(!opening));
+  if(opening)setTimeout(()=>document.querySelector("#appSidebar .cp-collapse-button")?.focus(),20);
+  else if(cpMobileReturnFocus?.isConnected)cpMobileReturnFocus.focus();
  }else{
   document.body.classList.toggle("cp-collapsed");
   try{localStorage.setItem("cp-sidebar-collapsed",document.body.classList.contains("cp-collapsed")?"1":"0")}catch{}
  }
 };
-window.closeSidebar=()=>document.body.classList.remove("cp-mobile-open");
+window.closeSidebar=()=>{
+ const wasOpen=document.body.classList.contains("cp-mobile-open");
+ document.body.classList.remove("cp-mobile-open");
+ if(wasOpen&&cpMobileReturnFocus?.isConnected)cpMobileReturnFocus.focus();
+};
 window.closeAccountMenu=()=>{
  const menu=$("cpAccountMenu");
  if(menu){menu.hidden=true;$("cpAccountTrigger").setAttribute("aria-expanded","false")}
@@ -693,7 +708,7 @@ window.renderQuickNav=()=>{
    '<p class="cp-quick-empty">No matching pages. Try another search.</p>';
  $("cpQuickResults").querySelectorAll("[data-quick]").forEach((b,i)=>{
    b.onclick=()=>{window.closeQuickNav();window.section(b.dataset.quick)};
-   b.onpointerenter=()=>{cpQuickIndex=i;window.renderQuickNav()};
+   b.onpointerenter=()=>{cpQuickIndex=i;document.querySelectorAll("#cpQuickResults [data-quick]").forEach((row,index)=>{row.classList.toggle("cp-quick-selected",index===i);row.setAttribute("aria-selected",String(index===i))})};
  });
 };
 document.addEventListener("keydown",event=>{
@@ -725,6 +740,11 @@ document.addEventListener("keydown",event=>{
  }
 });
 
+window.addEventListener("hashchange",()=>{
+ const page=location.hash.slice(1);
+ if(typeof pageMeta!=="undefined"&&pageMeta[page]&&page!==activePage&&current)
+   window.section(page,{noHash:true});
+});
 const pageMeta={
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
