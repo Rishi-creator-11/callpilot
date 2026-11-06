@@ -263,16 +263,22 @@ def sync_calls(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     return sync_org_calls(oid)
 
-@router.post("/calls/enable-analysis")
-def enable_analysis(oid:str,user=Depends(current_user)):
-    """Create/attach Vapi structured output to already-authorized assistant."""
-    membership(oid,user,("owner","admin"))
+def configure_analysis(oid:str):
+    """Idempotently attach factual structured analysis to a linked Vapi assistant."""
     aid=agent_config(oid).get("provider_agent_id")
     if not aid:raise HTTPException(409,"Connect your Vapi assistant first")
     assistant=vapi("GET","/assistant/"+aid)
     existing=((assistant.get("artifactPlan") or {}).get("structuredOutputIds") or [])
-    if existing:
-        return {"enabled":True,"existing":True,"message":"Structured output analysis already attached"}
+    output_name="CallPilot Lead Intake - "+oid[:8]
+    all_outputs=vapi("GET","/structured-output")
+    matches=[x for x in all_outputs if isinstance(x,dict) and x.get("name")==output_name] if isinstance(all_outputs,list) else []
+    if matches:
+        sid=matches[0]["id"]
+        if sid not in existing:
+            vapi("PATCH","/assistant/"+aid,body={"artifactPlan":{
+                **(assistant.get("artifactPlan") or {}),
+                "structuredOutputIds":existing+[sid]}})
+        return {"enabled":True,"existing":True,"message":"CallPilot AI call analysis is enabled"}
     schema={"type":"object","properties":{
         "lead_stage":{"type":"string","enum":["hot","warm","general","not_qualified","needs_review"],
                       "description":"Hot: concrete intent, quantity or purchasing timeline AND asks next steps. Warm: interest but not ready. General: information only. Not qualified: mismatched request. Needs review: insufficient or conflicting evidence."},
@@ -284,16 +290,21 @@ def enable_analysis(oid:str,user=Depends(current_user)):
         "destination":{"type":"string","description":"Shipment destination if stated."},
         "purchase_timeline":{"type":"string","description":"Purchasing timeline if stated."},
         "follow_up_needed":{"type":"boolean","description":"Caller explicitly requests follow-up or clear sales follow-up is needed."}
-    },"required":["lead_stage","reason","summary","caller_name","product_interest",
-                  "quantity_interest","destination","purchase_timeline","follow_up_needed"],
+    },"required":["lead_stage","reason","summary"],
        "additionalProperties":False}
     created=vapi("POST","/structured-output",body={
-        "name":"CallPilot Lead Intake - "+oid[:8],"type":"ai",
-        "description":"Extract a factual lead classification, short summary and follow-up facts from the completed call. Do not invent name, quantity, location, timeline or buyer verification. Use needs_review when uncertain.",
+        "name":output_name,"type":"ai",
+        "description":"Extract factual lead intent and call summary from the completed call. Only include details explicitly mentioned by the caller. Never treat a caller as identity verified. Use needs_review when evidence is unclear.",
+        "conditions":[{"type":"minCallDuration","seconds":10}],
         "schema":schema})
     sid=created.get("id")
     if not sid:raise HTTPException(502,"Vapi did not return a structured output ID")
     vapi("PATCH","/assistant/"+aid,body={"artifactPlan":{
         **(assistant.get("artifactPlan") or {}),
-        "structuredOutputIds":[sid]}})
+        "structuredOutputIds":existing+[sid]}})
     return {"enabled":True,"existing":False,"message":"Post-call qualification enabled for future calls."}
+
+@router.post("/calls/enable-analysis")
+def enable_analysis(oid:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    return configure_analysis(oid)
