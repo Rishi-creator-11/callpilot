@@ -193,8 +193,11 @@ def voice_assistants(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     result=vapi("GET","/assistant",params={"limit":100})
     if not isinstance(result,list):result=[]
+    business=org_or_404(oid)
+    prefix=(business["name"]+" - CallPilot").casefold()
     return {"assistants":[{"id":x["id"],"name":x.get("name") or "Unnamed assistant"}
-             for x in result if isinstance(x,dict) and isinstance(x.get("id"),str)],
+             for x in result if isinstance(x,dict) and isinstance(x.get("id"),str)
+             and isinstance(x.get("name"),str) and x["name"].casefold().startswith(prefix)],
             "linked":agent_config(oid).get("provider_agent_id")}
 
 class LinkAssistant(BaseModel):
@@ -206,6 +209,9 @@ def link_voice_assistant(oid:str,body:LinkAssistant,user=Depends(current_user)):
     assistant=vapi("GET","/assistant/"+body.assistant_id)
     if not isinstance(assistant,dict) or assistant.get("id")!=body.assistant_id:
         raise HTTPException(404,"Vapi assistant not found")
+    prefix=(org_or_404(oid)["name"]+" - CallPilot").casefold()
+    if not str(assistant.get("name") or "").casefold().startswith(prefix):
+        raise HTTPException(403,"Assistant does not belong to this business")
     other=api("agent_configs",params={"provider_agent_id":"eq."+body.assistant_id,
         "select":"organization_id","limit":10})
     if any(x["organization_id"]!=oid for x in other):
