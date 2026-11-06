@@ -275,7 +275,7 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 <div class="cp-section-box"><h3>Business profile</h3><p>These details identify the business this assistant represents.</p>
 <div class="cp-form-grid"><div><label for="wsName">Business name</label><input id="wsName" maxlength="120" autocomplete="organization" placeholder="Your company"></div>
 <div><label for="wsIndustry">Industry</label><input id="wsIndustry" maxlength="80" placeholder="e.g. Wholesale clothing"></div></div>
-<div id="orgInfo" class="cp-subnav" style="margin-top:13px"></div><button onclick="window.saveWorkspace()">Save business details</button></div>
+<div id="orgInfo" class="cp-subnav" style="margin-top:13px"></div><button id="wsSaveButton" onclick="window.saveWorkspace()">Save business details</button></div>
 <div class="cp-section-box"><h3>Team access</h3><p>Your workspace is private. Access is limited to authorized team members.</p>
 <div id="wsTeam" class="muted">Loading team members...</div></div>
 <div class="cp-section-box"><h3>Additional businesses</h3><p>Manage multiple business workspaces independently.</p>
@@ -572,6 +572,8 @@ window.fillWorkspace=async()=>{
  const o=orgs.find(x=>x.id===organization());
  if(!o)return;
  $("wsName").value=o.name||"";$("wsIndustry").value=o.industry||"";
+ const canEdit=o.role==="owner"||o.role==="admin";
+ $("wsName").disabled=!canEdit;$("wsIndustry").disabled=!canEdit;$("wsSaveButton").disabled=!canEdit;
  try{
    const t=await request("/organizations/"+organization()+"/team");
    $("wsTeam").textContent=t.members.length+" team member"+(t.members.length===1?"":"s")+" · "+t.members.filter(x=>x.is_you).map(x=>"Your role: "+x.role).join("");
