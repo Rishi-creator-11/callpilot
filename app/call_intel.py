@@ -8,7 +8,7 @@ import os, re, uuid
 from datetime import datetime, timezone
 from typing import Literal
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from app.account import current_user, membership
 from app.cloud import api, org_or_404
@@ -168,6 +168,58 @@ def call_detail(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
         "select":"*"})
     if not rows:raise HTTPException(404,"Call not found")
     return rows[0]
+
+@router.get("/calls/{call_id}/recording")
+async def call_recording(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
+    """Authorize playback per workspace and fetch a fresh recording via Vapi.
+
+    Vapi's stored artifact URLs are private and expire; never return them to
+    clients or expose the Vapi API key. The browser downloads audio with its
+    existing Supabase session and plays a local Blob URL.
+    """
+    membership(oid,user)
+    rows=api("call_insights",params={
+        "organization_id":"eq."+oid,"id":"eq."+str(call_id),
+        "select":"provider_call_id,assistant_id,provider_status","limit":1})
+    if not rows:
+        raise HTTPException(404,"Call not found")
+    call=rows[0]
+    key=os.getenv("VAPI_API_KEY","")
+    if not key:
+        raise HTTPException(503,"Call recording service is not connected")
+    try:
+        async with httpx.AsyncClient(timeout=55,follow_redirects=True) as client:
+            async with client.stream("GET",
+                "https://api.vapi.ai/call/"+call["provider_call_id"]+"/mono-recording",
+                headers={"Authorization":"Bearer "+key,"Accept":"audio/*"}) as upstream:
+                if upstream.status_code in (404,410):
+                    raise HTTPException(404,"Recording is not available for this call")
+                if upstream.status_code>=400:
+                    raise HTTPException(502,"Vapi could not retrieve this recording")
+                media_type=upstream.headers.get("content-type","").split(";")[0].strip().lower()
+                if media_type not in ("audio/wav","audio/x-wav","audio/wave",
+                                      "audio/mpeg","audio/mp3","audio/mp4",
+                                      "application/octet-stream","binary/octet-stream"):
+                    raise HTTPException(502,"Vapi returned an unexpected recording format")
+                if int(upstream.headers.get("content-length") or 0)>60_000_000:
+                    raise HTTPException(413,"Recording is too large for browser playback")
+                chunks=[];size=0
+                async for chunk in upstream.aiter_bytes(chunk_size=65536):
+                    size+=len(chunk)
+                    if size>60_000_000:
+                        raise HTTPException(413,"Recording is too large for browser playback")
+                    chunks.append(chunk)
+    except httpx.RequestError:
+        raise HTTPException(503,"Recording service is temporarily unavailable")
+    except httpx.TimeoutException:
+        raise HTTPException(504,"Recording download timed out")
+    if not chunks:
+        raise HTTPException(404,"Recording file is empty")
+    return Response(content=b"".join(chunks),
+        media_type="audio/mpeg" if media_type in ("audio/mpeg","audio/mp3") else
+                   "audio/mp4" if media_type=="audio/mp4" else "audio/wav",
+        headers={"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",
+                 "Content-Disposition":"inline; filename=call-recording"})
 
 class Review(BaseModel):
     lead_stage:Literal["hot","warm","general","not_qualified","needs_review"]
