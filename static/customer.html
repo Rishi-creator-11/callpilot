@@ -338,6 +338,7 @@ body[data-app-state="loading"] #cpBootSplash{display:flex}
 .cp-loading-symbol{color:#635be4;font-size:36px;line-height:1}
 .cp-loading-title{font-size:22px;font-weight:850;letter-spacing:-.8px}
 #cpBootSplash p{font-size:13px;margin:0;color:#718098}
+body[data-app-state="loading"] nav{display:none!important}
 body[data-app-state="guest"] nav{display:flex!important}
 body[data-app-state="guest"] #cpSkipLink{display:none}
 body[data-app-state="ready"] #cpBootSplash{display:none!important}
@@ -422,7 +423,7 @@ body[data-app-state="ready"] #cpBootSplash{display:none!important}
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
 <div id="calls" class="panel">
   <div class="ci-head">
-    <div><h2 style="font-size:24px;margin:0">Call intelligence</h2><p class="muted">Every conversation, the right follow-up. Based on real calls, not estimates.</p></div>
+    <div><h2 style="font-size:24px;margin:0">Your conversations</h2><p class="muted">Review calls, identify genuine interest and follow up with confidence.</p></div>
     <div class="ci-actions">
       <button class="ci-quiet" onclick="window.showVapiSetup()">Connect assistant</button>
       <button class="ci-quiet" onclick="window.exportCalls()">Export CSV</button><button class="ci-primary" id="syncCallsButton" onclick="window.syncCalls()">↻ Sync Vapi calls</button>
@@ -447,7 +448,7 @@ body[data-app-state="ready"] #cpBootSplash{display:none!important}
   <div class="ci-panel">
     <div class="row"><h3 style="margin:0">All conversations</h3><span class="pill" id="ciReviewCount">No calls yet</span></div>
     <div class="ci-filters">
-      <input id="ciSearch" aria-label="Search calls" placeholder="Search caller, product, summary..." oninput="window.filterCalls()">
+      <input type="hidden" id="ciSearch" value="">
       <select id="ciStage" aria-label="Filter lead stage" onchange="window.filterCalls()">
         <option value="all">All lead types</option>
         <option value="hot">Hot leads</option><option value="warm">Warm leads</option>
@@ -645,7 +646,15 @@ window.setRecoveredPassword=async()=>{
  $("authmsg").textContent="Password updated. You're signed in.";
  await render();
 };
-window.signOut=async()=>{await sb.auth.signOut();current=null;activePage="calls";history.replaceState(null,"",location.pathname);await render()};
+window.signOut=async()=>{
+ document.body.dataset.appState="loading";
+ window.closeAccountMenu();
+ try{await sb.auth.signOut()}catch(e){ /* Local sign-out still clears the visible account. */ }
+ current=null;
+ activePage="calls";
+ history.replaceState(null,"",location.pathname);
+ await render();
+};
 let cpMobileReturnFocus=null;
 window.toggleSidebar=()=>{
  const small=window.matchMedia("(max-width: 850px)").matches;
