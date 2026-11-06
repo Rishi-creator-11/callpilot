@@ -89,6 +89,24 @@ def business_phone(oid:str,user=Depends(current_user)):
         "phone_number":rows[0].get("provider_number") if rows else None,
         "provisioning":"linked"}
 
+@router.get("/api/account/organizations/{oid}/phone/options")
+def available_business_numbers(oid:str,user=Depends(current_user)):
+    """Only show Vapi numbers already attached to this business's assistant."""
+    membership(oid,user,("owner","admin"))
+    assistant=agent_config(oid).get("provider_agent_id")
+    if not assistant:return {"numbers":[],"message":"Connect your Vapi assistant first"}
+    results=vapi("GET","/phone-number",params={"limit":100})
+    if isinstance(results,dict):
+        results=results.get("data") or results.get("results") or []
+    if not isinstance(results,list):results=[]
+    owned=api("phone_assignments",params={"select":"organization_id,provider_phone_id","limit":200})
+    claimed={row["provider_phone_id"]:row["organization_id"] for row in owned}
+    choices=[{"id":item["id"],"number":item.get("number") or "Number pending activation"}
+        for item in results if isinstance(item,dict) and item.get("assistantId")==assistant
+        and isinstance(item.get("id"),str)
+        and claimed.get(item["id"],oid)==oid]
+    return {"numbers":choices,"message":"Only numbers currently assigned to your business's assistant are shown."}
+
 class PhoneLink(BaseModel):
     provider_phone_id:str=Field(min_length=5,max_length=150)
 
