@@ -113,6 +113,38 @@ def usage(oid:str,user=Depends(current_user)):
     membership(oid,user)
     return compute_usage(oid)
 
+def discover_linked_business_phone(oid:str):
+    """Link a unique already-owned Vapi number observed in prior calls.
+
+    Does not buy or change provider phone routing. Never claims a number that
+    Vapi does not currently associate with this business's linked assistant.
+    """
+    config=agent_config(oid)
+    aid=config.get("provider_agent_id")
+    if not aid or config.get("provider_phone_id"):
+        return {"linked":False,"reason":"already_configured_or_no_agent"}
+    calls=api("call_insights",params={"organization_id":"eq."+oid,
+        "phone_number_id":"not.is.null",
+        "select":"phone_number_id","order":"started_at.desc","limit":10})
+    ids={row.get("phone_number_id") for row in calls if row.get("phone_number_id")}
+    if len(ids)!=1:
+        return {"linked":False,"reason":"phone_not_unique"}
+    pid=ids.pop()
+    phone=vapi("GET","/phone-number/"+pid)
+    if phone.get("id")!=pid or phone.get("assistantId")!=aid:
+        return {"linked":False,"reason":"provider_assignment_does_not_match"}
+    claimed=api("phone_assignments",params={"provider_phone_id":"eq."+pid,
+        "select":"organization_id","limit":2})
+    if any(row["organization_id"]!=oid for row in claimed):
+        return {"linked":False,"reason":"number_claimed_elsewhere"}
+    api("phone_assignments","POST",params={"on_conflict":"provider_phone_id"},
+        data={"organization_id":oid,"provider_phone_id":pid,
+              "provider_number":phone.get("number"),"status":"linked"},
+        prefer="resolution=merge-duplicates,return=minimal")
+    api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+        data={"provider_phone_id":pid},prefer="return=minimal")
+    return {"linked":True,"reason":"provider_verified"}
+
 @router.get("/api/account/organizations/{oid}/phone")
 def business_phone(oid:str,user=Depends(current_user)):
     membership(oid,user)
