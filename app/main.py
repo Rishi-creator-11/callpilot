@@ -85,7 +85,7 @@ def health(): return {"status":"ok","mode":"internal-demo"}
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return (ROOT/"static"/"cloud.html").read_text()
+    return (ROOT/"static"/"customer.html").read_text()
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])
 def businesses():
@@ -190,3 +190,16 @@ def check_integrations_on_boot():
             log.info("callpilot_vapi_probe http_status=%s authenticated=%s",r.status_code,r.status_code==200)
         except Exception as e:
             log.warning("callpilot_vapi_probe failed error_type=%s",type(e).__name__)
+
+from app.account import router as account_router
+from app.billing import router as billing_router
+app.include_router(account_router)
+app.include_router(billing_router)
+
+@app.get('/app',response_class=HTMLResponse)
+def customer_app():
+    return (ROOT/'static'/'customer.html').read_text()
+
+@app.get('/operator',response_class=HTMLResponse)
+def operator_app():
+    return (ROOT/'static'/'cloud.html').read_text()
