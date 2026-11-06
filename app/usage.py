@@ -17,6 +17,16 @@ router=APIRouter(tags=["voice-usage"])
 
 def billing_window(row,now=None):
     now=now or datetime.now(timezone.utc)
+    explicit_start=(row or {}).get("current_period_start")
+    explicit_end=(row or {}).get("current_period_end")
+    if explicit_start and explicit_end:
+        try:
+            a=datetime.fromisoformat(explicit_start.replace("Z","+00:00"))
+            b=datetime.fromisoformat(explicit_end.replace("Z","+00:00"))
+            if a.tzinfo and b.tzinfo and a<=now<b:
+                return a,b
+        except (ValueError,TypeError):
+            pass
     stop_text=(row or {}).get("current_period_end")
     if stop_text:
         try:
@@ -54,7 +64,9 @@ def compute_usage(oid):
         elif percentage>=95:warning="critical"
         elif percentage>=80:warning="warning"
     eligible=bool(a.get("status") in ("active","trialing") and
-                  a.get("enforcement_enabled") and max_seconds)
+                  a.get("enforcement_enabled") and max_seconds
+                  and a.get("current_period_start") and a.get("current_period_end")
+                  and start<=datetime.now(timezone.utc)<end)
     return {
         "plan":plan,"subscription_status":a.get("status") or "not_configured",
         "period_start":start.isoformat(),"period_end":end.isoformat(),
