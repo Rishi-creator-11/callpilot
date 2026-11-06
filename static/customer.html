@@ -208,6 +208,7 @@ window.openCall=async id=>{
       '<div><label>Follow-up status</label><select id="ciFollowStatus">'+
       [["none","No follow-up"],["todo","To do"],["in_progress","In progress"],["done","Completed"]].map(([k,t])=>'<option value="'+k+'"'+(k===c.follow_up_status?' selected':'')+'>'+t+'</option>').join("")+'</select></div></div>'+
       '<label><input id="ciNeedsFollow" type="checkbox" '+(c.follow_up_needed?'checked':'')+'> Follow-up needed</label>'+
+      '<label><input id="ciBuyerVerified" type="checkbox" '+(c.buyer_verified?'checked':'')+'> Buyer identity / purchasing ability independently verified by our team</label>'+
       '<label>Why this lead category?</label><textarea id="ciReason" maxlength="600" placeholder="Quote the specific evidence in the conversation...">'+esc(c.lead_reason||"")+'</textarea>'+
       '<label>Next action / notes</label><textarea id="ciNote" maxlength="1000" placeholder="E.g. Call back to confirm shipping destination">'+esc(c.follow_up_note||"")+'</textarea>'+
       '<div class="ci-detail-actions"><button id="ciSaveReview">Save review</button><span id="ciSaveStatus" class="muted"></span></div>';
@@ -219,7 +220,7 @@ window.saveCallReview=async id=>{
  const button=$("ciSaveReview");button.disabled=true;$("ciSaveStatus").textContent="Saving...";
  try{
    await request("/organizations/"+organization()+"/calls/"+encodeURIComponent(id),"PATCH",{
-     lead_stage:v("ciReviewStage"),lead_reason:v("ciReason"),follow_up_needed:$("ciNeedsFollow").checked,
+     lead_stage:v("ciReviewStage"),lead_reason:v("ciReason"),follow_up_needed:$("ciNeedsFollow").checked,buyer_verified:$("ciBuyerVerified").checked,
      follow_up_status:v("ciFollowStatus"),follow_up_note:v("ciNote")});
    $("ciSaveStatus").textContent="Saved ✓";
    await window.loadCalls();
