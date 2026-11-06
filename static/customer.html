@@ -407,7 +407,7 @@ border-radius:11px;min-height:46px;min-width:46px}
 .cp-usage-fill.cp-usage-warning{background:#d18b38}
 .cp-price-calls{font-size:12px!important;color:#5c4dd2!important;font-weight:750;margin-top:-4px!important}
 @media(max-width:550px){.cp-usage-stats{grid-template-columns:1fr 1fr}.cp-usage-stats>div{padding:13px}}
-</style></head><body data-app-state="loading">
+</style><style id="cp-fallback-settings">.cp-fallback-check{display:flex;align-items:center;gap:10px;margin:14px 0;color:#4a5266;font-weight:600;line-height:1.5}.cp-fallback-check input{width:18px;height:18px;flex:none}</style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
@@ -598,11 +598,19 @@ border-radius:11px;min-height:46px;min-width:46px}
 <div class="cp-section-box"><h3>Usage alerts and limits</h3>
 <p>Alerts appear at 80%, 95%, and 100% of your included minutes. We never bill additional minutes without your approval.</p>
 <div class="cp-help" id="usageGuardStatus" role="status">Checking whether automatic inbound-call limits are active…</div>
-<p class="muted" style="font-size:12px">Once inbound routing is tested and enabled, the system can decline new AI calls after the monthly allowance is exhausted. It does not interrupt an already connected call. No daily cap is imposed.</p></div>
+<p class="muted" style="font-size:12px">Each AI call has a hard four-minute maximum. When the monthly minutes are used, new AI calls are declined until renewal or a plan upgrade; an existing call may finish up to its four-minute maximum. There is no daily call limit or automatic overage charge.</p></div>
 <div class="cp-section-box"><h3>Your business phone number</h3>
 <p>Each business has its own AI assistant and number. You can use an imported provider number, or forward your existing business number.</p>
 <div class="cp-help" id="usagePhoneStatus" role="status">Checking your business number…</div>
 <label for="usagePhoneOptions">Available numbers for this assistant</label><select id="usagePhoneOptions"><option value="">Choose a linked Vapi number…</option></select><div class="cp-inline-actions"><button class="secondary" onclick="window.findBusinessPhones()">Refresh available numbers</button><button onclick="window.linkBusinessPhone()">Connect selected number</button></div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer;color:#64718c">Advanced: connect with provider phone ID</summary><label for="usagePhoneId">Vapi phone-number ID</label><input id="usagePhoneId" maxlength="150" placeholder="Enter an existing ID"></details>
+<div class="cp-divider"></div>
+<h3>When your AI minutes run out</h3>
+<p>By default, CallPilot stops starting new AI conversations. You can optionally forward callers to a human phone number. The phone carrier may charge for that transfer.</p>
+<label for="usageFallbackNumber">Human backup number (international format)</label>
+<input id="usageFallbackNumber" type="tel" placeholder="+12125551234" autocomplete="tel">
+<label class="cp-fallback-check"><input id="usageFallbackEnabled" type="checkbox"> Forward new calls to this number when the AI is unavailable (carrier charges may apply)</label>
+<div class="cp-inline-actions"><button class="secondary" onclick="window.saveFallback()">Save backup call preference</button>
+<span id="usageFallbackStatus" role="status" class="muted">Forwarding is off unless you enable it.</span></div>
 <p class="muted" style="font-size:12px">This only links a number already assigned to your business's assistant in Vapi. It does not purchase a number, change carrier routing or enable new charges.</p>
 <p><a href="https://dashboard.vapi.ai" target="_blank" rel="noopener noreferrer">Open Vapi dashboard ↗</a></p></div></div>
 <div id="billing" class="panel card">
@@ -996,7 +1004,7 @@ window.loadUsage=async()=>{
   $("usageProgress").classList.toggle("cp-usage-warning",u.alert!=="none");
   const alerts={warning:"You've used at least 80% of your monthly minutes.",
     critical:"You've used at least 95% of your monthly minutes.",
-    exhausted:"You've used all included minutes. New calls can be restricted once enforcement is activated."};
+    exhausted:"Monthly minutes exhausted. The AI stops accepting new calls once inbound enforcement is active; renew or upgrade to resume."};
   $("usageMessage").textContent=alerts[u.alert]||
    (u.minutes_included?"Your allowance is measured by minutes, not the number of calls.":"No paid calling plan is assigned to this workspace yet.");
   $("usagePeriod").textContent="Usage period: "+new Date(u.period_start).toLocaleDateString()+
@@ -1010,12 +1018,28 @@ window.loadUsage=async()=>{
    "Connected Vapi number"+(p.phone_number?": "+p.phone_number:" (number ID linked)")+
    ". Inbound quota enforcement is separate from number assignment.":
    "No provider number is linked here yet. Existing test calling may still work in Vapi.";
+  $("usageFallbackEnabled").checked=Boolean(p.fallback_enabled);
+  $("usageFallbackNumber").value=p.fallback_number||"";
+  $("usageFallbackStatus").textContent=p.fallback_enabled?
+    "Backup forwarding selected. Carrier transfer fees may apply.":"No human forwarding is configured.";
   await window.findBusinessPhones();
  }catch(e){
   $("usageMessage").textContent="Unable to load usage: "+e.message;
   $("usageGuardStatus").textContent="Automatic calling limits could not be verified.";
  }
 };
+window.saveFallback=()=>safe(async()=>{
+ const enabled=$("usageFallbackEnabled").checked;
+ const number=v("usageFallbackNumber").trim();
+ if(enabled&&!/^\\+[1-9]\\d{7,14}$/.test(number))
+   throw Error("Enter the human number with country code, e.g. +12125551234");
+ await request("/organizations/"+organization()+"/phone/fallback","PUT",
+   {enabled,number:number||null});
+ await window.loadUsage();
+ return enabled?
+   "Human forwarding preference saved. Provider routing must be activated and tested first; carrier fees may apply.":
+   "Human forwarding disabled. New AI calls will be declined at the monthly limit.";
+});
 window.findBusinessPhones=async()=>{
  const selector=$("usagePhoneOptions");
  selector.innerHTML='<option value="">Looking up available numbers…</option>';
