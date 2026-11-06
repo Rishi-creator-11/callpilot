@@ -173,6 +173,12 @@ def check_integrations_on_boot():
     db_url=os.getenv("SUPABASE_URL","").rstrip("/")
     db_secret=os.getenv("SUPABASE_SECRET_KEY","")
     vapi_key=os.getenv("VAPI_API_KEY","")
+    log.info("callpilot_readiness google_client=%s google_secret=%s google_encryption=%s stripe_test_key=%s stripe_webhook_secret=%s stripe_price_id=%s stripe_billing_enabled=%s public_supabase_key=%s",
+             bool(os.getenv("GOOGLE_OAUTH_CLIENT_ID")), bool(os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")),
+             bool(os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY")),
+             os.getenv("STRIPE_SECRET_KEY","").startswith("sk_test_"),bool(os.getenv("STRIPE_WEBHOOK_SECRET")),
+             bool(os.getenv("STRIPE_PRICE_ID")),os.getenv("STRIPE_BILLING_ENABLED")=="true",
+             bool(os.getenv("SUPABASE_PUBLISHABLE_KEY")))
     log.info("callpilot_integrations configured supabase_url=%s supabase_secret=%s vapi_key=%s admin_token=%s",
              bool(db_url),bool(db_secret),bool(vapi_key),bool(os.getenv("ADMIN_TOKEN")))
     if db_url and db_secret:
