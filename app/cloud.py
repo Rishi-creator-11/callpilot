@@ -85,3 +85,45 @@ def booking(oid:str,body:Request):
         raise HTTPException(422,"Time must be future and include timezone")
     row=api("appointment_requests","POST",data={"organization_id":oid,"caller_name":body.name,"caller_contact":body.phone,"service":body.service,"requested_time":body.requested_time.isoformat(),"status":"requested"},prefer="return=representation")
     return {"id":row[0]["id"],"status":"requested","confirmed":False}
+
+class AgentConfig(BaseModel):
+    agent_name:str=Field(default="Alex",max_length=80)
+    greeting:str=Field(min_length=10,max_length=500)
+    voice_provider:str=Field(default="standard",pattern="^(standard|elevenlabs)$")
+    voice_id:str|None=None
+    consent_verified:bool=False
+
+@router.get("/businesses/{oid}/agent")
+def get_agent(oid:str):
+    org_or_404(oid)
+    x=api("agent_configs",params={"organization_id":"eq."+oid,"select":"agent_name,greeting,voice_provider,voice_id,voice_consent_verified_at,provider_agent_id"})
+    return x[0] if x else {}
+
+@router.put("/businesses/{oid}/agent")
+def update_agent(oid:str,body:AgentConfig):
+    org_or_404(oid)
+    if body.voice_provider=="elevenlabs" and (not body.consent_verified or not body.voice_id):
+        raise HTTPException(422,"Verified owner consent and a voice ID are required")
+    # A checkbox alone is not sufficient verification: keep the agent offline until verified with provider.
+    data={"agent_name":body.agent_name,"greeting":body.greeting,"voice_provider":body.voice_provider,
+          "voice_id":body.voice_id,
+          "voice_consent_verified_at":None}
+    api("agent_configs","PATCH",params={"organization_id":"eq."+oid},data=data,prefer="return=minimal")
+    return {"saved":True,"voice_live":False,"verification_pending":body.voice_provider=="elevenlabs"}
+
+@router.post("/businesses/{oid}/knowledge/{fact_id}/approve")
+def approve_fact(oid:str,fact_id:str):
+    org_or_404(oid)
+    rows=api("knowledge_facts",params={"id":"eq."+fact_id,"organization_id":"eq."+oid,"select":"id,answer"})
+    if not rows:raise HTTPException(404,"Fact not found")
+    if MONEY.search(rows[0]["answer"]):
+        raise HTTPException(400,"Cannot approve a monetary answer")
+    api("knowledge_facts","PATCH",params={"id":"eq."+fact_id,"organization_id":"eq."+oid},
+        data={"approved_at":datetime.now(timezone.utc).isoformat()},prefer="return=minimal")
+    return {"approved":True}
+
+@router.get("/businesses/{oid}/booking-requests")
+def booking_requests(oid:str):
+    org_or_404(oid)
+    return api("appointment_requests",params={"organization_id":"eq."+oid,
+        "select":"id,caller_name,service,requested_time,status,created_at","order":"created_at.desc","limit":50})
