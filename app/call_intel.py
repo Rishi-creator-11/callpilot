@@ -318,3 +318,33 @@ def configure_analysis(oid:str):
 def enable_analysis(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     return configure_analysis(oid)
+
+def request_call_analysis(oid:str,provider_call_id:str):
+    """Queue Vapi structured output for an already completed call exactly once."""
+    from datetime import timedelta
+    rows=api("call_insights",params={
+        "organization_id":"eq."+oid,"provider_call_id":"eq."+provider_call_id,
+        "select":"id,analysis_requested_at,lead_source","limit":1})
+    if not rows:raise HTTPException(404,"Call has not been imported")
+    row=rows[0]
+    if row.get("analysis_requested_at"):
+        return {"queued":False,"already_requested":True}
+    cfg=configure_analysis(oid)
+    sid=cfg.get("structured_output_id")
+    if not sid:raise HTTPException(503,"Call analysis is not configured")
+    result=vapi("POST","/structured-output/run",body={
+        "callIds":[provider_call_id],"structuredOutputId":sid,"previewEnabled":False})
+    api("call_insights","PATCH",params={"organization_id":"eq."+oid,
+        "provider_call_id":"eq."+provider_call_id},
+        data={"analysis_requested_at":datetime.now(timezone.utc).isoformat(),
+              "analysis_workflow_id":result.get("workflowId") if isinstance(result,dict) else None},
+        prefer="return=minimal")
+    return {"queued":True,"message":"Vapi analysis requested. Sync calls after processing."}
+
+@router.post("/calls/{call_id}/analyze")
+def analyze_past_call(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    rows=api("call_insights",params={"organization_id":"eq."+oid,"id":"eq."+str(call_id),
+        "select":"provider_call_id","limit":1})
+    if not rows:raise HTTPException(404,"Call not found")
+    return request_call_analysis(oid,rows[0]["provider_call_id"])
