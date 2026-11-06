@@ -172,7 +172,7 @@ def provision_test_agent(oid:str):
                         "required":["question"],"additionalProperties":False}},
           "server":{"url":base+"/webhooks/vapi-tools/"+oid,
                     "credentialId":credential,"timeoutSeconds":20}}
-    payload={"name":business["name"][:35]+" - CallPilot SEMANTIC TEST",
+    payload={"name":(business["name"][:24]+" - CallPilot")[:40],
         "firstMessage":a["greeting"],
         "model":{"provider":"openai","model":"gpt-4o-mini","temperature":0,
                  "messages":[{"role":"system","content":prompt}],"tools":[tool]},
@@ -182,7 +182,8 @@ def provision_test_agent(oid:str):
             resp=c.post("https://api.vapi.ai/assistant",
                 headers={"Authorization":"Bearer "+key,"Content-Type":"application/json"},json=payload)
         if resp.status_code not in (200,201):
-            raise HTTPException(502,"Vapi assistant provisioning failed: HTTP "+str(resp.status_code)+" "+" ".join(resp.text.split())[:300])
+            __import__("logging").getLogger("callpilot").warning("vapi_provision_failed status=%s body=%s",resp.status_code," ".join(resp.text.split())[:500])
+            raise HTTPException(502,"Vapi assistant provisioning failed: HTTP "+str(resp.status_code))
         assistant_id=resp.json().get("id")
     except httpx.RequestError:
         raise HTTPException(503,"Vapi service unavailable")
