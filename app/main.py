@@ -85,7 +85,7 @@ def health(): return {"status":"ok","mode":"internal-demo"}
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return (ROOT/"static"/"index.html").read_text()
+    return (ROOT/"static"/"cloud.html").read_text()
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])
 def businesses():
