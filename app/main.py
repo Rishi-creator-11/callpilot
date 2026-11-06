@@ -248,5 +248,8 @@ def customer_app():
 def operator_app():
     return (ROOT/'static'/'cloud.html').read_text()
 
+from app.call_intel import router as call_intel_router
+app.include_router(call_intel_router)
+
 from app.calendar import router as calendar_router
 app.include_router(calendar_router)
