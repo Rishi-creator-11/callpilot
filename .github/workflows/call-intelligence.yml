@@ -13,6 +13,18 @@ jobs:
           python-version: '3.11'
       - name: Install pinned dependencies
         run: pip install -r requirements.txt
+      - name: Compile Python source
+        run: python -m compileall -q app tests
+      - name: Check inline frontend JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('static/customer.html').read_text()
+          assert '<script type="module">' in html
+          source=html.split('<script type="module">',1)[1].split('</script>',1)[0]
+          Path('/tmp/callpilot-frontend.mjs').write_text(source)
+          PY
+          node --check /tmp/callpilot-frontend.mjs
       - name: Run tests
         env:
           PYTHONPATH: .
