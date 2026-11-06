@@ -189,6 +189,19 @@ def check_integrations_on_boot():
             log.info("callpilot_supabase_probe http_status=%s connected=%s",r.status_code,r.status_code==200)
         except Exception as e:
             log.warning("callpilot_supabase_probe failed error_type=%s",type(e).__name__)
+    stripe_key=os.getenv("STRIPE_SECRET_KEY","")
+    price_id=os.getenv("STRIPE_PRICE_ID","")
+    if stripe_key.startswith("sk_test_") and price_id.startswith("price_"):
+        try:
+            with httpx.Client(timeout=7) as c:
+                resp=c.get("https://api.stripe.com/v1/prices/"+price_id,auth=(stripe_key,""))
+            valid=resp.status_code==200
+            price=resp.json() if valid else {}
+            log.info("callpilot_stripe_price_probe http_status=%s valid=%s active=%s recurring=%s livemode=%s",
+                     resp.status_code,valid,bool(price.get("active")),
+                     bool(price.get("recurring")),price.get("livemode") if valid else "unknown")
+        except Exception as e:
+            log.warning("callpilot_stripe_price_probe failed error_type=%s",type(e).__name__)
     if vapi_key:
         try:
             with httpx.Client(timeout=5) as c:
