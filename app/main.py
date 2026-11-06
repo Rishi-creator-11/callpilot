@@ -229,6 +229,13 @@ def check_integrations_on_boot():
                 from app.call_intel import configure_analysis, agent_config
                 if agent_config(org["id"]).get("provider_agent_id"):
                     try:
+                        from app.usage import discover_linked_business_phone
+                        phone_link=discover_linked_business_phone(org["id"])
+                        log.info("callpilot_existing_phone_link verified=%s reason=%s",
+                                 phone_link.get("linked"),phone_link.get("reason"))
+                    except Exception as phone_error:
+                        log.warning("callpilot_existing_phone_link failed=%s",type(phone_error).__name__)
+                    try:
                         configured=configure_analysis(org["id"])
                         log.info("callpilot_call_analysis_enabled=%s reused=%s",
                                  configured["enabled"],configured.get("existing",False))
