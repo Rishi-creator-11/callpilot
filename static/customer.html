@@ -999,7 +999,7 @@ window.openCall=async id=>{
   try{
     const c=await request("/organizations/"+organization()+"/calls/"+encodeURIComponent(id));
     if(ciSelected!==id)return;
-    const allowedUrl=(x)=>typeof x==="string"&&x.startsWith("https://")?x:null;
+
     const fields=[["Caller",c.caller_name||c.caller_phone||"Not provided"],["Product interest",c.product_interest||"Not captured"],
      ["Quantity",c.quantity_interest||"Not captured"],["Destination",c.destination||"Not captured"],
      ["Purchase timeline",c.purchase_timeline||"Not captured"],["Call duration",ciDuration(c.duration_seconds)]];
@@ -1007,7 +1007,7 @@ window.openCall=async id=>{
       '<div class="ci-detail-grid">'+fields.map(([a,b])=>'<p><strong>'+esc(a)+'</strong>'+esc(b)+'</p>').join("")+'</div>'+
       '<h3 style="margin-top:18px">Call summary</h3><blockquote>'+esc(c.summary||"No AI summary available for this call. Review the transcript and categorize it manually.")+'</blockquote>'+
       '<p class="muted">'+esc(c.lead_reason||"No qualification evidence captured.")+' · '+esc(c.lead_source==="human_reviewed"?"Reviewed by team":c.lead_source==="ai_suggested"?"AI suggested, not verified":"Needs human review")+'</p>'+
-      (allowedUrl(c.recording_url)?'<div class="cp-recording-panel"><div><h3>Call recording</h3><p class="muted">Listen to the original conversation privately.</p></div><button id="ciLoadRecording" class="secondary" type="button">▶ Play recording</button><audio id="ciAudio" controls preload="none" style="display:none;width:100%" aria-label="Call recording"></audio><p id="ciAudioStatus" class="cp-recording-status" role="status"></p></div>':'<div class="cp-recording-panel"><h3>Call recording</h3><p class="muted">No recording is available for this call.</p></div>')+
+      (c.has_recording?'<div class="cp-recording-panel"><div><h3>Call recording</h3><p class="muted">Listen to the original conversation privately.</p></div><button id="ciLoadRecording" class="secondary" type="button">▶ Play recording</button><audio id="ciAudio" controls preload="none" style="display:none;width:100%" aria-label="Call recording"></audio><p id="ciAudioStatus" class="cp-recording-status" role="status"></p></div>':'<div class="cp-recording-panel"><h3>Call recording</h3><p class="muted">No recording is available for this call.</p></div>')+
       '<h3 style="margin-top:20px">Transcript</h3><div class="ci-transcript">'+esc(c.transcript||"No transcript was supplied for this call.")+'</div>'+
       '<h3 style="margin-top:20px">Qualify and follow up</h3>'+
       '<div class="ci-detail-grid"><div><label>Lead category</label><select id="ciReviewStage">'+
