@@ -403,3 +403,57 @@ def analyze_past_call(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
         "select":"provider_call_id","limit":1})
     if not rows:raise HTTPException(404,"Call not found")
     return request_call_analysis(oid,rows[0]["provider_call_id"])
+
+def disable_knowledge_filler(oid:str):
+    """Silence Vapi's default request-start filler on approved FAQ lookups.
+
+    Changes only the linked assistant's inline knowledge tool; leaves its voice,
+    prompts, providers, credentials, other tools and phone number unchanged.
+    """
+    aid=agent_config(oid).get("provider_agent_id")
+    if not aid:return {"updated":False,"reason":"no_linked_assistant"}
+    assistant=vapi("GET","/assistant/"+aid)
+    model=assistant.get("model") or {}
+    tools=model.get("tools") if isinstance(model,dict) else None
+    if not isinstance(tools,list):
+        return {"updated":False,"reason":"no_inline_model_tools"}
+    modified=[]
+    changed=False
+    for item in tools:
+        if not isinstance(item,dict):
+            modified.append(item)
+            continue
+        name=(item.get("function") or {}).get("name")
+        if name!="lookup_approved_knowledge":
+            modified.append(item)
+            continue
+        tool=dict(item)
+        existing=[m for m in (tool.get("messages") or []) if isinstance(m,dict)
+                  and m.get("type") not in ("request-start","request-response-delayed")]
+        messages=[{"type":"request-start","content":""},
+                  {"type":"request-response-delayed",
+                   "content":"I'm still checking that information.",
+                   "timingMilliseconds":4000}]
+        desired=existing+messages
+        if tool.get("messages")!=desired:
+            tool["messages"]=desired
+            changed=True
+        modified.append(tool)
+    if not any(isinstance(t,dict) and (t.get("function") or {}).get("name")=="lookup_approved_knowledge" for t in tools):
+        return {"updated":False,"reason":"knowledge_tool_not_found"}
+    if not changed:
+        return {"updated":False,"reason":"already_configured"}
+    patch_model=dict(model)
+    patch_model["tools"]=modified
+    # Vapi assistant updates accept the complete existing model configuration.
+    vapi("PATCH","/assistant/"+aid,body={"model":patch_model})
+    updated=vapi("GET","/assistant/"+aid)
+    saved=(updated.get("model") or {}).get("tools") or []
+    verified=any(isinstance(t,dict)
+      and (t.get("function") or {}).get("name")=="lookup_approved_knowledge"
+      and any(m.get("type")=="request-start" and m.get("content")==""
+              for m in (t.get("messages") or []) if isinstance(m,dict))
+      for t in saved)
+    if not verified:raise HTTPException(502,"Vapi did not confirm silent knowledge lookups")
+    return {"updated":True,"reason":"silent_lookup_verified"}
+
