@@ -154,6 +154,56 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
         return {"error":"The automated receptionist is unavailable right now. Please contact the business directly."}
     return {"assistantId":agent_id}
 
+class ActivateRequest(BaseModel):
+    confirm:bool=False
+
+@router.post("/api/account/organizations/{oid}/phone/activate-limits")
+def activate_limits(oid:str,body:ActivateRequest,user=Depends(current_user)):
+    """High-impact routing operation gated on real billing and owner confirmation.
+
+    This endpoint deliberately does NOT activate on sandbox subscriptions.
+    """
+    membership(oid,user,("owner",))
+    if not body.confirm:
+        raise HTTPException(400,"Confirm activation of inbound call limits first")
+    if os.getenv("STRIPE_MODE")!="live":
+        raise HTTPException(409,"Production enforcement is not available during sandbox billing")
+    billing=account(oid) or {}
+    if (billing.get("status") not in ("active","trialing") or
+        billing.get("selected_plan") not in PLANS or
+        not billing.get("setup_paid_at")):
+        raise HTTPException(409,"A fully paid subscription and setup fee are required")
+    credential=os.getenv("VAPI_CREDENTIAL_ID","")
+    if not credential:
+        raise HTTPException(503,"Secure Vapi routing credential is not configured")
+    config=agent_config(oid)
+    phone_id=config.get("provider_phone_id")
+    agent_id=config.get("provider_agent_id")
+    if not phone_id or not agent_id:
+        raise HTTPException(409,"Connect a Vapi phone number and assistant first")
+    rows=api("phone_assignments",params={
+        "organization_id":"eq."+oid,"provider_phone_id":"eq."+phone_id,
+        "select":"provider_phone_id","limit":1})
+    if not rows:raise HTTPException(409,"Phone number ownership not verified")
+    provider=vapi("GET","/phone-number/"+phone_id)
+    if provider.get("assistantId")!=agent_id:
+        raise HTTPException(409,"Provider number routing differs from this workspace")
+    base=os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")
+    if not base.startswith("https://"):
+        raise HTTPException(503,"Secure HTTPS application URL required")
+    endpoint=base+"/webhooks/vapi-admission/"+oid
+    vapi("PATCH","/phone-number/"+phone_id,body={
+        "assistantId":None,
+        "server":{"url":endpoint,"credentialId":credential,"timeoutSeconds":6}})
+    try:
+        api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},
+            data={"enforcement_enabled":True},prefer="return=minimal")
+    except Exception:
+        try:vapi("PATCH","/phone-number/"+phone_id,body={"assistantId":agent_id})
+        except Exception:pass
+        raise HTTPException(503,"Could not save call limits; number routing rollback attempted")
+    return {"enforced":True,"note":"Future calls must pass monthly usage admission; ongoing calls are not interrupted"}
+
 @router.get("/api/account/organizations/{oid}/phone/setup-guide")
 def phone_setup_guide(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
