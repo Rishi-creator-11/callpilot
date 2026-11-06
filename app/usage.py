@@ -281,8 +281,28 @@ def activate_limits(oid:str,body:ActivateRequest,user=Depends(current_user)):
     if not base.startswith("https://"):
         raise HTTPException(503,"Secure HTTPS application URL required")
     endpoint=base+"/webhooks/vapi-admission/"+oid
+    # On webhook timeout/error, route to a human only if the owner explicitly
+    # enabled it. Otherwise play a brief provider announcement rather than
+    # consuming more billable AI minutes.
+    settings=api("phone_assignments",params={
+        "organization_id":"eq."+oid,"provider_phone_id":"eq."+phone_id,
+        "select":"fallback_enabled,fallback_number","limit":1})
+    fallback=settings[0] if settings else {}
+    if fallback.get("fallback_enabled") and fallback.get("fallback_number"):
+        failure_action={"type":"transfer","destination":{
+            "type":"number","number":fallback["fallback_number"]}}
+    else:
+        failure_action={"type":"say","exact":
+            "The AI receptionist is unavailable right now. Please try again later."}
+    hooks=[h for h in (provider.get("hooks") or [])
+        if not (isinstance(h,dict) and h.get("name")=="callpilot-assistant-failure")]
+    hooks.append({"name":"callpilot-assistant-failure","on":"call.ending",
+        "filters":[{"type":"oneOf","key":"call.endedReason",
+          "oneOf":["assistant-request-failed","assistant-request-returned-error",
+                   "assistant-request-returned-no-assistant"]}],
+        "do":failure_action})
     vapi("PATCH","/phone-number/"+phone_id,body={
-        "assistantId":None,
+        "assistantId":None,"hooks":hooks,
         "server":{"url":endpoint,"credentialId":credential,"timeoutSeconds":6}})
     try:
         api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},
