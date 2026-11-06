@@ -15,11 +15,30 @@ async def vapi_event(organization_id:str, request:Request, authorization:str|Non
     except (ValueError,AttributeError):
         raise HTTPException(400,"Invalid webhook body")
     if not isinstance(msg,dict):raise HTTPException(400,"Invalid message")
-    if msg.get("type")!="end-of-call-report": return {"ok":True,"ignored":True}
+    event_type=msg.get("type")
+    if event_type not in ("end-of-call-report","status-update"):
+        return {"ok":True,"ignored":True}
     call=msg.get("call") or {}
     if not isinstance(call,dict) or not isinstance(call.get("id"),str):
         raise HTTPException(400,"Missing provider call ID")
     org_or_404(organization_id)
+    configured=api("agent_configs",params={"organization_id":"eq."+organization_id,
+        "select":"provider_agent_id,provider_phone_id","limit":1})
+    config=configured[0] if configured else {}
+    if config.get("provider_agent_id") and call.get("assistantId") and call["assistantId"]!=config["provider_agent_id"]:
+        raise HTTPException(403,"Assistant does not belong to this workspace")
+    if event_type=="status-update":
+        if msg.get("status")!="in-progress":
+            return {"ok":True,"ignored":True}
+        from datetime import datetime,timezone
+        started=call.get("startedAt") or datetime.now(timezone.utc).isoformat()
+        api("call_insights","POST",params={"on_conflict":"organization_id,provider_call_id"},
+            data={"organization_id":organization_id,"provider_call_id":call["id"],
+                  "provider":"vapi","assistant_id":call.get("assistantId"),
+                  "phone_number_id":call.get("phoneNumberId"),
+                  "started_at":started,"provider_status":"in-progress","direction":"inbound"},
+            prefer="resolution=merge-duplicates,return=minimal")
+        return {"ok":True,"usage_tracking":"started"}
     # Idempotent insert. No call transcript, recording URL, caller phone, or provider secrets.
     api("call_events","POST",
         params={"on_conflict":"organization_id,provider_call_id,event_type"},
