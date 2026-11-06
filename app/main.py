@@ -226,6 +226,14 @@ def check_integrations_on_boot():
                 if not existing:
                     result=sync_org_calls(org["id"],limit=20)
                     log.info("callpilot_call_intelligence_initial_sync imported=%s",result["synced"])
+                from app.call_intel import configure_analysis, agent_config
+                if agent_config(org["id"]).get("provider_agent_id"):
+                    try:
+                        configured=configure_analysis(org["id"])
+                        log.info("callpilot_call_analysis_enabled=%s reused=%s",
+                                 configured["enabled"],configured.get("existing",False))
+                    except Exception as e:
+                        log.warning("callpilot_call_analysis_blocked error_type=%s",type(e).__name__)
         except Exception as e:
             log.warning("callpilot_call_intelligence_initial_sync blocked=%s",type(e).__name__)
     stripe_key=os.getenv("STRIPE_SECRET_KEY","")
