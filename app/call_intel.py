@@ -214,9 +214,7 @@ def link_voice_assistant(oid:str,body:LinkAssistant,user=Depends(current_user)):
         data={"provider_agent_id":body.assistant_id},prefer="return=minimal")
     return {"linked":True,"assistant_id":body.assistant_id,"name":assistant.get("name")}
 
-@router.post("/calls/sync")
-def sync_calls(oid:str,user=Depends(current_user)):
-    membership(oid,user,("owner","admin"))
+def sync_org_calls(oid:str,limit:int=50):
     config=agent_config(oid)
     assistant=config.get("provider_agent_id")
     if not assistant:
@@ -237,7 +235,7 @@ def sync_calls(oid:str,user=Depends(current_user)):
                 assistant=proposed
         if not assistant:
             raise HTTPException(409,"Choose the correct Vapi assistant under Connect assistant, then sync calls")
-    result=vapi("GET","/call",params={"assistantId":assistant,"limit":100})
+    result=vapi("GET","/call",params={"assistantId":assistant,"limit":limit})
     if not isinstance(result,list):
         raise HTTPException(502,"Unexpected Vapi call list format")
     count=0
@@ -252,6 +250,11 @@ def sync_calls(oid:str,user=Depends(current_user)):
         persist(oid,detail)
         count+=1
     return {"synced":count,"checked":len(result),"assistant_id":assistant}
+
+@router.post("/calls/sync")
+def sync_calls(oid:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    return sync_org_calls(oid)
 
 @router.post("/calls/enable-analysis")
 def enable_analysis(oid:str,user=Depends(current_user)):
