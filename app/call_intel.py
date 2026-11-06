@@ -270,7 +270,17 @@ def configure_analysis(oid:str):
     assistant=vapi("GET","/assistant/"+aid)
     existing=((assistant.get("artifactPlan") or {}).get("structuredOutputIds") or [])
     output_name="CallPilot Lead Intake - "+oid[:8]
+    # First inspect the actual outputs attached to this assistant. Provider list
+    # APIs can be paginated; don't create a duplicate on every deployment.
+    for sid in existing:
+        if not isinstance(sid,str):continue
+        output=vapi("GET","/structured-output/"+sid)
+        if isinstance(output,dict) and output.get("name")==output_name:
+            return {"enabled":True,"existing":True,"structured_output_id":sid,
+                    "message":"CallPilot AI call analysis is enabled"}
     all_outputs=vapi("GET","/structured-output")
+    if isinstance(all_outputs,dict):
+        all_outputs=all_outputs.get("data") or all_outputs.get("results") or all_outputs.get("items") or []
     matches=[x for x in all_outputs if isinstance(x,dict) and x.get("name")==output_name] if isinstance(all_outputs,list) else []
     if matches:
         sid=matches[0]["id"]
@@ -278,7 +288,7 @@ def configure_analysis(oid:str):
             vapi("PATCH","/assistant/"+aid,body={"artifactPlan":{
                 **(assistant.get("artifactPlan") or {}),
                 "structuredOutputIds":existing+[sid]}})
-        return {"enabled":True,"existing":True,"message":"CallPilot AI call analysis is enabled"}
+        return {"enabled":True,"existing":True,"structured_output_id":sid,"message":"CallPilot AI call analysis is enabled"}
     schema={"type":"object","properties":{
         "lead_stage":{"type":"string","enum":["hot","warm","general","not_qualified","needs_review"],
                       "description":"Hot: concrete intent, quantity or purchasing timeline AND asks next steps. Warm: interest but not ready. General: information only. Not qualified: mismatched request. Needs review: insufficient or conflicting evidence."},
@@ -302,7 +312,7 @@ def configure_analysis(oid:str):
     vapi("PATCH","/assistant/"+aid,body={"artifactPlan":{
         **(assistant.get("artifactPlan") or {}),
         "structuredOutputIds":existing+[sid]}})
-    return {"enabled":True,"existing":False,"message":"Post-call qualification enabled for future calls."}
+    return {"enabled":True,"existing":False,"structured_output_id":sid,"message":"Post-call qualification enabled for future calls."}
 
 @router.post("/calls/enable-analysis")
 def enable_analysis(oid:str,user=Depends(current_user)):
