@@ -531,7 +531,8 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("wsName").value=o?.name||"";
    $("wsIndustry").value=o?.industry||"";
    await Promise.all([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);
-   window.section(preserve&&pageMeta[location.hash.slice(1)]?location.hash.slice(1):"calls",{noHash:preserve});
+   const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"calls";
+   window.section(destination);
  });
 };
 window.fillProfile=()=>{
@@ -650,8 +651,12 @@ window.exportCalls=()=>{
     let value=String(x??"");if(/^[\s]*[=+@\-]/.test(value))value="'"+value;
     return '"'+value.replace(/"/g,'""')+'"';
   };
+  const filter=v("ciStage"),term=v("ciSearch").trim().toLowerCase();
+  const selected=ciCalls.filter(c=>(filter==="all"||c.lead_stage===filter)&&
+    (!term||[c.caller_phone,c.caller_name,c.summary,c.product_interest].some(x=>String(x||"").toLowerCase().includes(term))));
+  if(!selected.length){msg("No calls match the current filters.",true);return}
   const lines=[fields.map(x=>quote(x[0])).join(","),
-    ...ciCalls.map(c=>fields.map(x=>quote(c[x[1]])).join(","))];
+    ...selected.map(c=>fields.map(x=>quote(c[x[1]])).join(","))];
   const csv=lines.join("\r\n");
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(blob),a=document.createElement("a");
