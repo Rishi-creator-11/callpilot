@@ -130,3 +130,9 @@ def simulate(oid:str,body:Question,user=Depends(current_user)):
 def bookings(oid:str,user=Depends(current_user)):
     membership(oid,user)
     return api("appointment_requests",params={"organization_id":"eq."+oid,"select":"id,caller_name,service,requested_time,status,created_at","order":"created_at.desc","limit":50})
+
+@router.post("/organizations/{oid}/test-assistant")
+def create_test_assistant(oid:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    from app.cloud import provision_test_agent
+    return provision_test_agent(oid)
