@@ -156,3 +156,7 @@ def voice_preview(bid: str):
         return {"name":b["agent_name"],"firstMessage":b["greeting"],"voice":{"provider":b["voice_provider"],"voiceId":b["voice_id"]},
                 "system_prompt":"You are an AI receptionist. Never quote prices or estimates. Never invent information. Escalate unknown questions. Only use approved FAQ facts.",
                 "approved_faqs":[dict(x) for x in faq],"not_active":True}
+
+# Cloud persistence is enabled only after server-side Supabase credentials are configured.
+from app.cloud import router as cloud_router
+app.include_router(cloud_router)
