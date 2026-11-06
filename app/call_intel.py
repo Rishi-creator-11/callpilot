@@ -457,3 +457,35 @@ def disable_knowledge_filler(oid:str):
     if not verified:raise HTTPException(502,"Vapi did not confirm silent knowledge lookups")
     return {"updated":True,"reason":"silent_lookup_verified"}
 
+
+def apply_call_duration_policy(oid:str):
+    """Cap this business's actual Vapi assistant at 240 seconds.
+
+    At 215 seconds the agent receives a gentle wrap-up cue.
+    The 240-second timeout is provider-enforced, even while speaking.
+    Retains existing hooks and never alters another assistant.
+    """
+    aid=agent_config(oid).get("provider_agent_id")
+    if not aid:
+        return {"configured":False,"reason":"no_linked_assistant"}
+    assistant=vapi("GET","/assistant/"+aid)
+    if not isinstance(assistant,dict) or assistant.get("id")!=aid:
+        raise HTTPException(502,"Vapi assistant could not be verified")
+    prior=assistant.get("hooks") or []
+    if not isinstance(prior,list):
+        prior=[]
+    existing=[hook for hook in prior if not (
+        isinstance(hook,dict) and hook.get("name")=="callpilot-four-minute-wrapup")]
+    hook={"name":"callpilot-four-minute-wrapup",
+          "on":"call.timeElapsed",
+          "options":{"seconds":215},
+          "do":[{"type":"say","exact":"We're almost at the end of this call. Is there one last thing I can help with?"}]}
+    target=existing+[hook]
+    if assistant.get("maxDurationSeconds")==240 and prior==target:
+        return {"configured":True,"changed":False,"max_duration_seconds":240}
+    vapi("PATCH","/assistant/"+aid,
+         body={"maxDurationSeconds":240,"hooks":target})
+    verified=vapi("GET","/assistant/"+aid)
+    if verified.get("maxDurationSeconds")!=240:
+        raise HTTPException(502,"Vapi did not confirm the 4-minute call limit")
+    return {"configured":True,"changed":True,"max_duration_seconds":240}
