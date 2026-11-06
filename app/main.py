@@ -199,7 +199,7 @@ def check_integrations_on_boot():
             for organization in orgs:
                 result=reindex_approved(organization["id"])
                 log.info("callpilot_semantic_backfill indexed=%s",result["indexed"])
-                if result["indexed"] and len(orgs)==1:
+                if len(orgs)==1:
                     fact,metadata=retrieve(organization["id"],"Can I buy half container?")
                     log.info("callpilot_semantic_smoke matched=%s reason=%s score=%s",
                              bool(fact),metadata.get("reason"),metadata.get("similarity","n/a"))
