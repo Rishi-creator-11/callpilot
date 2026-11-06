@@ -150,7 +150,11 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
         # Only configure this endpoint on a phone after paying account,
         # verified plan and enforcement have been enabled.
         return {"error":"This business line has not been activated yet."}
-    if usage["minutes_remaining"]<=0 or usage["subscription_status"] not in ("active","trialing"):
+    # Count minutes from ongoing calls as well as completed calls at admission.
+    # A live call is never interrupted; another new call may be rejected.
+    if (usage["minutes_remaining"]<=0 or
+        usage["seconds_used"]+usage["seconds_active"]>=usage["minutes_included"]*60 or
+        usage["subscription_status"] not in ("active","trialing")):
         return {"error":"The automated receptionist is unavailable right now. Please contact the business directly."}
     return {"assistantId":agent_id}
 
