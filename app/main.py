@@ -244,6 +244,23 @@ def check_integrations_on_boot():
                                 log.info("callpilot_historical_analysis_queued=%s",outcome.get("queued"))
                             except Exception as inner:
                                 log.warning("callpilot_historical_analysis_blocked error_type=%s",type(inner).__name__)
+                        # Reconcile completed analysis on calls that were queued earlier.
+                        # Never log transcript, customer identity, or recording.
+                        from app.call_intel import vapi as vapi_api, persist as save_call
+                        queued=cloud_api("call_insights",params={
+                            "organization_id":"eq."+org["id"],
+                            "analysis_requested_at":"not.is.null","lead_source":"eq.unreviewed",
+                            "select":"provider_call_id","limit":3})
+                        for row in queued:
+                            try:
+                                detail=vapi_api("GET","/call/"+row["provider_call_id"])
+                                artifacts=(detail.get("artifact") or {}).get("structuredOutputs") or {}
+                                present=bool(artifacts)
+                                log.info("callpilot_queued_analysis_provider_output_available=%s",present)
+                                if present:
+                                    save_call(org["id"],detail)
+                            except Exception as err:
+                                log.warning("callpilot_analysis_reconcile_error_type=%s",type(err).__name__)
                     except Exception as e:
                         log.warning("callpilot_call_analysis_blocked error_type=%s",type(e).__name__)
         except Exception as e:
