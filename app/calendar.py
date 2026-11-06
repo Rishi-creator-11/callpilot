@@ -11,7 +11,7 @@ from app.cloud import api
 
 router=APIRouter(tags=["calendar"])
 REDIRECT="https://callpilot-internal.onrender.com/api/oauth/google/callback"
-SCOPES="https://www.googleapis.com/auth/calendar.events"
+SCOPES="https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.freebusy"
 def configured():
     return bool(os.getenv("GOOGLE_OAUTH_CLIENT_ID") and os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
         and os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY"))
