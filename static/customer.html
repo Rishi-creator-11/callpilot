@@ -602,8 +602,7 @@ border-radius:11px;min-height:46px;min-width:46px}
 <div class="cp-section-box"><h3>Your business phone number</h3>
 <p>Each business has its own AI assistant and number. You can use an imported provider number, or forward your existing business number.</p>
 <div class="cp-help" id="usagePhoneStatus" role="status">Checking your business number…</div>
-<label for="usagePhoneId">Existing Vapi phone-number ID</label><input id="usagePhoneId" maxlength="150" placeholder="Paste an existing Vapi phone number ID">
-<button class="secondary" onclick="window.linkBusinessPhone()">Connect existing number</button>
+<label for="usagePhoneOptions">Available numbers for this assistant</label><select id="usagePhoneOptions"><option value="">Choose a linked Vapi number…</option></select><div class="cp-inline-actions"><button class="secondary" onclick="window.findBusinessPhones()">Refresh available numbers</button><button onclick="window.linkBusinessPhone()">Connect selected number</button></div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer;color:#64718c">Advanced: connect with provider phone ID</summary><label for="usagePhoneId">Vapi phone-number ID</label><input id="usagePhoneId" maxlength="150" placeholder="Enter an existing ID"></details>
 <p class="muted" style="font-size:12px">This only links a number already assigned to your business's assistant in Vapi. It does not purchase a number, change carrier routing or enable new charges.</p>
 <p><a href="https://dashboard.vapi.ai" target="_blank" rel="noopener noreferrer">Open Vapi dashboard ↗</a></p></div></div>
 <div id="billing" class="panel card">
@@ -1011,13 +1010,26 @@ window.loadUsage=async()=>{
    "Connected Vapi number"+(p.phone_number?": "+p.phone_number:" (number ID linked)")+
    ". Inbound quota enforcement is separate from number assignment.":
    "No provider number is linked here yet. Existing test calling may still work in Vapi.";
+  await window.findBusinessPhones();
  }catch(e){
   $("usageMessage").textContent="Unable to load usage: "+e.message;
   $("usageGuardStatus").textContent="Automatic calling limits could not be verified.";
  }
 };
+window.findBusinessPhones=async()=>{
+ const selector=$("usagePhoneOptions");
+ selector.innerHTML='<option value="">Looking up available numbers…</option>';
+ try{
+  const d=await request("/organizations/"+organization()+"/phone/options");
+  selector.innerHTML='<option value="">Choose a number…</option>'+
+   d.numbers.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.number)+'</option>').join("");
+  if(!d.numbers.length)selector.innerHTML='<option value="">No matching numbers found in Vapi</option>';
+ }catch(e){
+  selector.innerHTML='<option value="">Unable to load available numbers</option>';
+ }
+};
 window.linkBusinessPhone=()=>safe(async()=>{
- const phoneId=v("usagePhoneId").trim();
+ const phoneId=v("usagePhoneOptions")||v("usagePhoneId").trim();
  if(phoneId.length<5)throw Error("Paste a valid Vapi phone-number ID.");
  const r=await request("/organizations/"+organization()+"/phone/link","POST",
   {provider_phone_id:phoneId});
