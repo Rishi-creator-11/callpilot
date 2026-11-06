@@ -26,6 +26,18 @@ async def vapi_event(organization_id:str, request:Request, authorization:str|Non
         data={"organization_id":organization_id,"provider_call_id":call["id"],"event_type":"end-of-call-report",
               "outcome":"received"},
         prefer="resolution=ignore-duplicates,return=minimal")
+    # Keep the business call dashboard in sync as events arrive.
+    # Preserve server-side tenant verification and idempotent provider call ID.
+    from app.call_intel import persist
+    persist(organization_id,{**call,
+        "artifact":msg.get("artifact") or call.get("artifact") or {},
+        "analysis":msg.get("analysis") or call.get("analysis") or {},
+        "endedAt":msg.get("endedAt") or call.get("endedAt"),
+        "startedAt":msg.get("startedAt") or call.get("startedAt"),
+        "endedReason":msg.get("endedReason") or call.get("endedReason"),
+        "recordingUrl":msg.get("recordingUrl") or call.get("recordingUrl"),
+        "transcript":msg.get("transcript") or call.get("transcript"),
+    })
     return {"ok":True}
 
 @router.post("/webhooks/vapi-tools/{organization_id}")
