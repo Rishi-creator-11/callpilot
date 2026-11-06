@@ -189,6 +189,22 @@ def check_integrations_on_boot():
             log.info("callpilot_supabase_probe http_status=%s connected=%s",r.status_code,r.status_code==200)
         except Exception as e:
             log.warning("callpilot_supabase_probe failed error_type=%s",type(e).__name__)
+    # One-time semantic rollout: index a small number of pre-existing approved FAQs.
+    # Existing indexed facts are skipped on later deployments.
+    if db_url and db_secret:
+        try:
+            from app.cloud import api as cloud_api
+            from app.semantic import reindex_approved, retrieve
+            orgs=cloud_api("organizations",params={"select":"id","limit":5})
+            for organization in orgs:
+                result=reindex_approved(organization["id"])
+                log.info("callpilot_semantic_backfill indexed=%s",result["indexed"])
+                if result["indexed"] and len(orgs)==1:
+                    fact,metadata=retrieve(organization["id"],"Can I buy half container?")
+                    log.info("callpilot_semantic_smoke matched=%s reason=%s score=%s",
+                             bool(fact),metadata.get("reason"),metadata.get("similarity","n/a"))
+        except Exception as e:
+            log.warning("callpilot_semantic_rollout error_type=%s",type(e).__name__)
     stripe_key=os.getenv("STRIPE_SECRET_KEY","")
     price_id=os.getenv("STRIPE_PRICE_ID","")
     if stripe_key.startswith("sk_test_") and price_id.startswith("price_"):
