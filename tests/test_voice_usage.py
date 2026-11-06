@@ -34,7 +34,7 @@ def test_monthly_plan_usage_is_actual_minutes_and_warning(monkeypatch):
 def test_usage_exhausted_alert(monkeypatch):
     monkeypatch.setattr(usage,"account",lambda oid:{
         "selected_plan":"growth","status":"active","enforcement_enabled":True})
-    monkeypatch.setattr(usage,"api",lambda table,**kwargs:[
+    monkeypatch.setattr(usage,"api",lambda table,method="GET",**kwargs:[
         {"call_count":10,"used_seconds":18000,"live_seconds":0}])
     outcome=usage.compute_usage(OID)
     assert outcome["minutes_remaining"]==0
