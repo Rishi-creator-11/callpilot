@@ -13,21 +13,56 @@ PLANS={"starter":{"name":"Starter","monthly_cents":4900,"included_minutes":100},
        "business":{"name":"Business","monthly_cents":17900,"included_minutes":600}}
 SETUP_FEE_CENTS=10000
 
+def billing_mode():
+    mode=os.getenv("STRIPE_MODE","test").lower()
+    return mode if mode in ("test","live") else "invalid"
+
 def billing_ready():
-    return (os.getenv("STRIPE_BILLING_ENABLED","").lower()=="true"
-            and os.getenv("STRIPE_MODE")=="test"
-            and os.getenv("STRIPE_SECRET_KEY","").startswith("sk_test_"))
+    if os.getenv("STRIPE_BILLING_ENABLED","").lower()!="true":
+        return False
+    mode=billing_mode()
+    if mode not in ("test","live"):
+        return False
+    key=os.getenv("STRIPE_SECRET_KEY","")
+    if not key.startswith(("sk_"+mode+"_","rk_"+mode+"_")):
+        return False
+    if not os.getenv("STRIPE_WEBHOOK_SECRET","").startswith("whsec_"):
+        return False
+    if mode=="live":
+        return (os.getenv("STRIPE_LIVE_APPROVED","").lower()=="true"
+            and all(os.getenv("STRIPE_PRICE_"+plan.upper(),"").startswith("price_") for plan in PLANS)
+            and os.getenv("STRIPE_PRICE_SETUP","").startswith("price_"))
+    return True
 
 def stripe_call(path,method="POST",data=None):
+    mode=billing_mode()
     key=os.getenv("STRIPE_SECRET_KEY","")
-    if not key.startswith("sk_test_"):raise HTTPException(503,"Stripe test mode is not configured")
+    if not billing_ready() or not key.startswith(("sk_"+mode+"_","rk_"+mode+"_")):
+        raise HTTPException(503,"Stripe checkout is not configured")
     try:
         with httpx.Client(timeout=15) as client:
             r=client.request(method,"https://api.stripe.com/v1/"+path,
                 auth=(key,""),data=data)
-    except httpx.RequestError:raise HTTPException(503,"Stripe unavailable")
-    if r.status_code>=400:raise HTTPException(502,"Stripe request failed")
+    except httpx.RequestError:
+        raise HTTPException(503,"Stripe service unavailable")
+    if r.status_code>=400:
+        raise HTTPException(502,"Stripe request could not be completed")
     return r.json()
+
+def verify_live_prices():
+    if billing_mode()!="live":
+        return
+    expected={key:plan["monthly_cents"] for key,plan in PLANS.items()}
+    expected["setup"]=SETUP_FEE_CENTS
+    for name,cents in expected.items():
+        pid=os.environ["STRIPE_PRICE_"+name.upper()]
+        price=stripe_call("prices/"+pid,method="GET")
+        monthly=name!="setup"
+        if (price.get("currency")!="usd" or price.get("unit_amount")!=cents or
+            price.get("active") is not True or
+            (price.get("type")=="recurring")!=monthly or
+            (monthly and (price.get("recurring") or {}).get("interval")!="month")):
+            raise HTTPException(409,"Stripe product prices do not match CallPilot plans")
 
 def account(oid):
     rows=api("billing_accounts",params={"organization_id":"eq."+oid,"select":"*"})
@@ -41,7 +76,8 @@ def billing_status(oid:str,user=Depends(current_user)):
         "has_customer":bool(a and a.get("stripe_customer_id")),"plans":PLANS,
         "setup_fee_cents":SETUP_FEE_CENTS,"setup_paid":bool(a and a.get("setup_paid_at")),
         "selected_plan":(a or {}).get("selected_plan"),
-        "mode":"sandbox" if billing_ready() else "not_enabled"}
+        "mode":("sandbox" if billing_mode()=="test" else "live") if billing_ready() else "not_enabled",
+        "live_ready":billing_ready() and billing_mode()=="live"}
 
 from pydantic import BaseModel
 from typing import Literal
@@ -53,8 +89,12 @@ class CheckoutSelection(BaseModel):
 def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
     membership(oid,user,("owner",))
     if not billing_ready():
-        raise HTTPException(503,"Sandbox checkout is disabled until billing integration is verified")
+        raise HTTPException(503,"Checkout is disabled until billing integration is verified")
+    if billing_mode()=="live":
+        verify_live_prices()
     a=account(oid)
+    if a and a.get("stripe_customer_id") and a.get("stripe_mode","test")!=billing_mode():
+        raise HTTPException(409,"This workspace has a sandbox customer. Contact support before switching to live billing.")
     if a and a.get("status") in ("active","trialing"):
         raise HTTPException(409,"An active subscription already exists. Use the billing portal.")
     customer=(a or {}).get("stripe_customer_id")
@@ -62,16 +102,13 @@ def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
         c=stripe_call("customers",data={"email":user["email"],"metadata[organization_id]":oid})
         customer=c["id"]
         api("billing_accounts","POST",params={"on_conflict":"organization_id"},
-            data={"organization_id":oid,"stripe_customer_id":customer},
+            data={"organization_id":oid,"stripe_customer_id":customer,
+                  "stripe_mode":billing_mode()},
             prefer="resolution=merge-duplicates,return=minimal")
     plan=PLANS[selection.plan]
     base=os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")
     data={
         "mode":"subscription","customer":customer,
-        "line_items[0][price_data][currency]":"usd",
-        "line_items[0][price_data][unit_amount]":str(plan["monthly_cents"]),
-        "line_items[0][price_data][recurring][interval]":"month",
-        "line_items[0][price_data][product_data][name]":"CallPilot "+plan["name"]+" subscription",
         "line_items[0][quantity]":"1",
         "client_reference_id":oid,
         "metadata[organization_id]":oid,
@@ -80,21 +117,35 @@ def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
         "subscription_data[metadata][plan]":selection.plan,
         "success_url":base+"/app?billing=success#billing",
         "cancel_url":base+"/app?billing=cancelled#billing"}
+    if billing_mode()=="live":
+        data["line_items[0][price]"]=os.environ["STRIPE_PRICE_"+selection.plan.upper()]
+    else:
+        data.update({"line_items[0][price_data][currency]":"usd",
+          "line_items[0][price_data][unit_amount]":str(plan["monthly_cents"]),
+          "line_items[0][price_data][recurring][interval]":"month",
+          "line_items[0][price_data][product_data][name]":"CallPilot "+plan["name"]+" subscription"})
     if not (a or {}).get("setup_paid_at"):
-        data.update({
+        if billing_mode()=="live":
+            data.update({"line_items[1][price]":os.environ["STRIPE_PRICE_SETUP"],
+                         "line_items[1][quantity]":"1",
+                         "metadata[setup_applied]":"true"})
+        else:
+            data.update({
             "line_items[1][price_data][currency]":"usd",
             "line_items[1][price_data][unit_amount]":str(SETUP_FEE_CENTS),
             "line_items[1][price_data][product_data][name]":"One-time professional AI receptionist setup",
             "line_items[1][quantity]":"1",
             "metadata[setup_applied]":"true"})
     session=stripe_call("checkout/sessions",data=data)
-    return {"url":session["url"],"mode":"sandbox","plan":selection.plan}
+    return {"url":session["url"],"mode":"sandbox" if billing_mode()=="test" else "live","plan":selection.plan}
 
 @router.post("/api/account/organizations/{oid}/billing-portal")
 def billing_portal(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner",))
     a=account(oid)
     if not a or not a.get("stripe_customer_id"):raise HTTPException(404,"No billing account")
+    if not billing_ready() or a.get("stripe_mode","test")!=billing_mode():
+        raise HTTPException(503,"The configured billing environment does not match this account")
     session=stripe_call("billing_portal/sessions",data={
         "customer":a["stripe_customer_id"],
         "return_url":"https://callpilot-internal.onrender.com/app"})
@@ -125,6 +176,8 @@ async def stripe_webhook(request:Request):
     exists=api("stripe_webhook_events",params={"id":"eq."+eid,"select":"id"})
     if exists:return {"received":True,"duplicate":True}
     e_type=event.get("type","")
+    if event.get("livemode") != (billing_mode()=="live"):
+        raise HTTPException(400,"Wrong Stripe payment environment")
     obj=event.get("data",{}).get("object",{})
     if e_type=="checkout.session.completed" and obj.get("mode")=="subscription":
         oid=(obj.get("metadata") or {}).get("organization_id")
@@ -142,6 +195,19 @@ async def stripe_webhook(request:Request):
                 api("billing_accounts","PATCH",
                     params={"organization_id":"eq."+str(oid),"stripe_customer_id":"eq."+str(customer)},
                     data=patch,prefer="return=minimal")
+    if e_type=="invoice.payment_failed":
+        customer=obj.get("customer")
+        subscription=obj.get("subscription")
+        if customer:
+            matching=api("billing_accounts",params={"stripe_customer_id":"eq."+str(customer),
+                "select":"organization_id,stripe_subscription_id"})
+            for row in matching:
+                if subscription and row.get("stripe_subscription_id")!=subscription:
+                    continue
+                api("billing_accounts","PATCH",
+                    params={"organization_id":"eq."+row["organization_id"]},
+                    data={"status":"past_due","updated_at":datetime.now(timezone.utc).isoformat()},
+                    prefer="return=minimal")
     if e_type in ("customer.subscription.created","customer.subscription.updated","customer.subscription.deleted"):
         customer=obj.get("customer")
         subscriptions=api("billing_accounts",params={"stripe_customer_id":"eq."+str(customer),"select":"organization_id"})
