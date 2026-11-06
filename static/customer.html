@@ -174,6 +174,93 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 @media(max-width:1000px){#dashboard{padding:24px 20px 46px}#dashboard .cols{grid-template-columns:210px minmax(0,1fr);gap:17px}.ci-kpis{gap:9px}.ci-kpi{padding:14px}.panel.card{padding:22px}#auth .cp-auth-wrap{gap:36px}}
 @media(max-width:780px){nav{height:64px;padding:0 17px}nav .pill{display:none}#dashboard{padding:20px 16px}#dashboard .cols{display:block}.sidebar{position:static;display:flex;align-items:center;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:10px;border-radius:13px;margin-bottom:18px;white-space:nowrap}.sidebar select{min-width:170px;width:170px;margin:0 8px 0 0}.sidebar button{flex:none;width:auto;padding:10px 12px;margin:0}.sidebar .cp-nav-group,.sidebar h3,.sidebar .cp-sidebar-foot,.sidebar .cp-nav-divider{display:none}.panel.card{padding:21px}.cp-auth-wrap{display:block;margin:24px auto!important}.cp-auth-wrap .hero{padding:10px 0 28px!important}.cp-form-grid,.cp-detail-pairs{grid-template-columns:1fr}.ci-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#authBox{padding:26px}.cp-top-user-name{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+</style><style id="cp-app-shell-v3">
+/* 2026-11: Full-bleed professional app shell, independent scrollable sidebar and persistent account dock */
+body.cp-signed-in{--cp-sidebar-w:264px;background:#f8f9fc}
+body.cp-signed-in .shell{min-height:100dvh;overflow:clip}
+body.cp-signed-in nav{display:none!important}
+body.cp-signed-in #dashboard{display:block;min-height:100dvh;padding:0!important;margin:0!important;max-width:none!important}
+body.cp-signed-in #dashboard>.row{position:relative;margin:0 0 0 var(--cp-sidebar-w)!important;padding:34px clamp(24px,4vw,72px) 22px;max-width:none;min-height:136px;transition:margin-left .22s ease}
+body.cp-signed-in #dashboard .cols{display:block!important;margin:0!important;padding:0!important;gap:0!important}
+body.cp-signed-in #dashboard .cols>aside.sidebar{display:flex!important;flex-direction:column;position:fixed!important;left:0;top:0;bottom:0;width:var(--cp-sidebar-w)!important;min-width:0;max-width:none;height:100dvh;max-height:100dvh;margin:0!important;padding:18px 12px 12px!important;z-index:50;background:#111827;border:0;border-right:1px solid #293248;border-radius:0!important;box-shadow:none!important;overflow:visible!important;white-space:normal;transition:width .22s ease,transform .22s ease}
+body.cp-signed-in .cp-main-content{margin-left:var(--cp-sidebar-w);padding:0 clamp(24px,4vw,72px) 50px;max-width:none;min-width:0;transition:margin-left .22s ease}
+body.cp-signed-in .cp-main-content>.panel{max-width:1500px;margin-left:auto;margin-right:auto}
+body.cp-signed-in #dashboard>.row>div{width:min(100%,1500px);margin:0 auto}
+body.cp-signed-in #dashboard>.row h1{font-size:30px;letter-spacing:-1px}
+body.cp-signed-in #dashboard>.row .pill{margin-top:5px;white-space:nowrap}
+body.cp-signed-in .sidebar .cp-side-brand{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 7px 0 13px;margin-bottom:25px;flex:none}
+.cp-brand-lockup{display:flex;align-items:center;gap:9px;white-space:nowrap}.cp-brand-glyph{font-size:20px;color:#a89dff}.cp-brand-name{font-size:20px;font-weight:820;letter-spacing:-.8px;color:#fff}.cp-brand-name span{color:#aba3ff}
+body.cp-signed-in .sidebar button.cp-collapse-button{width:34px;min-width:34px;height:34px;margin:0;padding:0;display:grid;place-items:center;font-size:16px;border-radius:8px;background:transparent;color:#95a2bb}
+body.cp-signed-in .sidebar button.cp-collapse-button:hover{background:#26334e;color:#fff}
+body.cp-signed-in .sidebar .cp-side-workspace{padding:0 9px 15px;flex:none;border-bottom:1px solid #29334a}
+.cp-side-workspace label{display:block;color:#8998b2;font-size:10px;letter-spacing:1.3px;font-weight:800;margin:0 0 9px}
+body.cp-signed-in .sidebar #org{margin:0!important;min-width:0;width:100%!important;min-height:40px;font-size:12px;font-weight:700;padding:9px 10px;background:#202b40;border:1px solid #3a4860;color:#e7edfb;border-radius:9px}
+body.cp-signed-in .sidebar .cp-side-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:15px 2px 14px;scrollbar-width:thin;scrollbar-color:#42506a transparent}
+body.cp-signed-in .sidebar .cp-side-scroll>.cp-nav-group{padding:17px 13px 8px;font-size:10px;letter-spacing:1.2px}
+body.cp-signed-in .sidebar .cp-side-scroll>.cp-nav-group:first-child{padding-top:8px}
+body.cp-signed-in .sidebar .cp-side-scroll>button[data-section]{display:flex;align-items:center;gap:12px;width:100%!important;min-height:41px;padding:10px 12px!important;margin:2px 0!important;border-radius:8px!important;color:#b9c5d8;font-size:13px;font-weight:650;text-align:left;background:transparent;line-height:1.35}
+body.cp-signed-in .sidebar .cp-side-scroll>button[data-section]:hover{background:#25334d;color:white;transform:none}
+body.cp-signed-in .sidebar .cp-side-scroll>button.cp-active{background:#343260;color:#fff;box-shadow:none}
+body.cp-signed-in .sidebar .cp-side-scroll>button .cp-nav-icon{width:20px;min-width:20px;text-align:center;color:#b8bee0;font-size:17px}
+body.cp-signed-in .sidebar .cp-side-scroll>.cp-nav-divider{margin:16px 12px 7px;background:#29334a}
+body.cp-signed-in .sidebar .cp-sidebar-bottom{flex:none;position:relative;border-top:1px solid #303c52;padding:12px 0 0}
+body.cp-signed-in .sidebar .cp-account-trigger{display:flex!important;align-items:center;gap:10px;min-height:56px;width:100%;text-align:left;padding:8px 10px;margin:0;border-radius:10px;background:transparent;color:#fff;overflow:hidden}
+body.cp-signed-in .sidebar .cp-account-trigger:hover{background:#25334a;transform:none}
+.cp-account-avatar{width:37px;height:37px;min-width:37px;border-radius:11px;background:#635bdd;color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center}
+.cp-account-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.cp-account-info strong{font-size:12px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f7f8ff}
+.cp-account-info small{font-size:10.5px;color:#94a3bd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cp-account-chevron{font-size:19px;color:#9aa7bc;margin-right:2px}
+body.cp-signed-in .sidebar .cp-account-menu{display:flex;flex-direction:column;position:absolute;bottom:calc(100% + 9px);left:0;right:0;background:#1d293e;border:1px solid #45516a;border-radius:12px;padding:6px;box-shadow:0 22px 48px #0006;z-index:65}
+body.cp-signed-in .sidebar .cp-account-menu[hidden]{display:none!important}
+body.cp-signed-in .sidebar .cp-account-menu>button{display:flex;gap:12px;align-items:center;color:#dce5f7;width:100%;background:none;margin:0;padding:11px;font-size:12px;border-radius:7px}
+body.cp-signed-in .sidebar .cp-account-menu>button:hover{background:#303c56;transform:none}
+body.cp-signed-in .sidebar .cp-account-menu .cp-menu-signout{color:#f6b8b8}
+.cp-menu-divider{height:1px;background:#3b475b;margin:5px 7px}
+.cp-mobile-appbar,.cp-sidebar-backdrop{display:none}
+body.cp-signed-in.cp-collapsed{--cp-sidebar-w:76px}
+body.cp-signed-in.cp-collapsed .cp-side-brand{justify-content:center!important;padding:0!important}
+body.cp-signed-in.cp-collapsed .cp-brand-name,
+body.cp-signed-in.cp-collapsed .cp-side-workspace,
+body.cp-signed-in.cp-collapsed .cp-side-scroll>.cp-nav-group,
+body.cp-signed-in.cp-collapsed .cp-side-scroll>.cp-nav-divider,
+body.cp-signed-in.cp-collapsed .cp-account-info,
+body.cp-signed-in.cp-collapsed .cp-account-chevron{display:none!important}
+body.cp-signed-in.cp-collapsed .cp-side-brand .cp-collapse-button{display:none!important}
+body.cp-signed-in.cp-collapsed .cp-side-scroll{padding-top:12px}
+body.cp-signed-in.cp-collapsed .cp-side-scroll>button[data-section]{font-size:0!important;justify-content:center;gap:0;padding:10px!important}
+body.cp-signed-in.cp-collapsed .cp-side-scroll>button .cp-nav-icon{font-size:20px}
+body.cp-signed-in.cp-collapsed .cp-account-trigger{justify-content:center}
+body.cp-signed-in.cp-collapsed .cp-account-menu{left:62px;right:auto;bottom:0;width:235px}
+body.cp-signed-in.cp-collapsed .cp-brand-glyph{cursor:pointer}
+body.cp-signed-in.cp-collapsed #dashboard .cols>aside.sidebar{padding-left:10px!important;padding-right:10px!important}
+body.cp-signed-in .cp-sidebar-collapse-open{display:none}
+body.cp-signed-in.cp-collapsed .cp-sidebar-collapse-open{display:block}
+body.cp-signed-in .cp-sidebar-collapse-open{position:fixed;left:23px;top:70px;z-index:75;border:0;background:#1d2943;color:#c6d1e5;border-radius:9px;width:32px;height:32px;line-height:32px;text-align:center;cursor:pointer}
+body.cp-signed-in .cp-sidebar-collapse-open:hover{background:#354468}
+@media(max-width:850px){
+ body.cp-signed-in{--cp-sidebar-w:0px}
+ body.cp-signed-in #dashboard>.row{margin-left:0!important;padding:86px 22px 19px}
+ body.cp-signed-in .cp-main-content{margin-left:0!important;padding:0 16px 30px}
+ body.cp-signed-in .cp-mobile-appbar{display:flex;position:fixed;z-index:42;left:0;right:0;top:0;height:62px;padding:0 16px;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #e6e9f1}
+ .cp-mobile-brand{font-size:19px;font-weight:800;color:#161c32;letter-spacing:-.7px}.cp-mobile-brand span{color:#7166ef}
+ .cp-mobile-menu,.cp-mobile-account{background:#f0f2f8;border:0;border-radius:9px;min-width:38px;height:38px;padding:0;color:#303957;font-size:18px}
+ body.cp-signed-in #dashboard .cols>aside.sidebar{width:275px!important;max-width:85vw;transform:translateX(-101%);transition:transform .22s ease}
+ body.cp-signed-in.cp-mobile-open #dashboard .cols>aside.sidebar{transform:translateX(0)}
+ body.cp-signed-in.cp-mobile-open .cp-sidebar-backdrop{display:block;position:fixed;inset:0;z-index:45;background:rgba(8,14,31,.53);border:0;width:100%;height:100%}
+ body.cp-signed-in.cp-collapsed .cp-side-brand .cp-collapse-button,
+ body.cp-signed-in.cp-collapsed .cp-side-workspace,
+ body.cp-signed-in.cp-collapsed .cp-side-scroll>.cp-nav-group,
+ body.cp-signed-in.cp-collapsed .cp-side-scroll>.cp-nav-divider,
+ body.cp-signed-in.cp-collapsed .cp-account-info,
+ body.cp-signed-in.cp-collapsed .cp-account-chevron,
+ body.cp-signed-in.cp-collapsed .cp-brand-name{display:revert!important}
+ body.cp-signed-in.cp-collapsed .cp-side-scroll>button[data-section]{font-size:13px!important;justify-content:flex-start;gap:12px}
+ body.cp-signed-in.cp-collapsed .cp-side-scroll>button .cp-nav-icon{font-size:17px}
+ body.cp-signed-in .cp-sidebar-collapse-open{display:none!important}
+ body.cp-signed-in.cp-collapsed .cp-account-menu{left:0;right:0;bottom:calc(100% + 9px);width:auto}
+}
+@media(min-width:851px){body.cp-signed-in .cp-mobile-appbar{display:none!important}}
 </style></head><body>
 <div class="shell">
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
@@ -208,11 +295,13 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 <p id="authmsg" role="status" class="muted"></p>
 <div class="cp-divider"></div><p class="muted" style="font-size:12px;margin:0">Protected sign-in powered by Supabase Auth. Your business information stays within your workspace.</p>
 </div></div></section>
-<section id="dashboard"><div class="row"><div><div class="cp-overline">WORKSPACE / <strong id="headerWorkspace">Your business</strong></div>
+<section id="dashboard"><div class="cp-mobile-appbar"><button class="cp-mobile-menu" onclick="window.toggleSidebar()" aria-label="Open navigation">☰</button><div class="cp-mobile-brand">✦ Call<span>Pilot</span></div><button class="cp-mobile-account" onclick="window.section('account')" aria-label="My account">●</button></div><button id="cpSidebarBackdrop" class="cp-sidebar-backdrop" onclick="window.closeSidebar()" tabindex="-1" aria-label="Close navigation"></button><div class="row"><div><div class="cp-overline">WORKSPACE / <strong id="headerWorkspace">Your business</strong></div>
 <h1 id="pageTitle">Overview</h1><p id="welcome" class="muted">Everything you need to run your front desk.</p></div>
 <span class="pill" id="headerStatus"><span class="cp-stat-dot"></span> Business console</span></div>
-<div class="cols"><aside class="card sidebar" aria-label="Main navigation">
-<h3>Workspace</h3><select id="org" aria-label="Current business" onchange="window.loadWorkspace()"></select>
+<button class="cp-sidebar-collapse-open" onclick="window.toggleSidebar()" title="Expand navigation" aria-label="Expand sidebar">☰</button><div class="cols"><aside id="appSidebar" class="card sidebar" aria-label="Main navigation">
+<div class="cp-side-brand"><div class="cp-brand-lockup"><span class="cp-brand-glyph" aria-hidden="true">✦</span><span class="cp-brand-name">Call<span>Pilot</span></span></div><button class="cp-collapse-button" onclick="window.toggleSidebar()" aria-label="Collapse sidebar" title="Collapse sidebar">☰</button></div>
+<div class="cp-side-workspace"><label for="org">WORKSPACE</label><select id="org" aria-label="Current business" onchange="window.loadWorkspace()"></select></div>
+<div class="cp-side-scroll">
 <div class="cp-nav-group">WORKSPACE</div>
 <button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
 <button data-section="knowledge" onclick="window.section('knowledge')"><span class="cp-nav-icon">▤</span> Knowledge base</button>
@@ -222,10 +311,19 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 <div class="cp-nav-divider"></div><div class="cp-nav-group">MANAGEMENT</div>
 <button data-section="billing" onclick="window.section('billing')"><span class="cp-nav-icon">▧</span> Billing &amp; plans</button>
 <button data-section="workspace" onclick="window.section('workspace')"><span class="cp-nav-icon">⚙</span> Business settings</button>
-<button data-section="account" onclick="window.section('account')"><span class="cp-nav-icon">♙</span> My account</button>
 <button data-section="help" onclick="window.section('help')"><span class="cp-nav-icon">ⓘ</span> Help &amp; support</button>
-<div class="cp-sidebar-foot">CallPilot · Private beta<br>Built for the way teams work.</div></aside>
-<div>
+</div>
+<div class="cp-sidebar-bottom"><div id="cpAccountMenu" class="cp-account-menu" hidden>
+<button onclick="window.openAccountSettings()"><span aria-hidden="true">♙</span> Account settings</button>
+<button onclick="window.section('billing');window.closeAccountMenu()"><span aria-hidden="true">▤</span> Billing &amp; plans</button>
+<button onclick="window.section('help');window.closeAccountMenu()"><span aria-hidden="true">ⓘ</span> Help &amp; support</button>
+<div class="cp-menu-divider"></div>
+<button onclick="window.signOut()" class="cp-menu-signout"><span aria-hidden="true">⇥</span> Sign out</button>
+</div>
+<button id="cpAccountTrigger" class="cp-account-trigger" onclick="window.toggleAccountMenu()" aria-expanded="false" aria-controls="cpAccountMenu" aria-label="Account menu">
+<span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
+</button></div></aside>
+<div id="cpMainContent" class="cp-main-content">
 <div id="calls" class="panel">
   <div class="ci-head">
     <div><h2 style="font-size:24px;margin:0">Call intelligence</h2><p class="muted">Every conversation, the right follow-up. Based on real calls, not estimates.</p></div>
@@ -446,6 +544,35 @@ window.setRecoveredPassword=async()=>{
  await render();
 };
 window.signOut=async()=>{await sb.auth.signOut();current=null;activePage="calls";history.replaceState(null,"",location.pathname);await render()};
+window.toggleSidebar=()=>{
+ const small=window.matchMedia("(max-width: 850px)").matches;
+ if(small){
+  document.body.classList.toggle("cp-mobile-open");
+  const opened=document.body.classList.contains("cp-mobile-open");
+  $("cpSidebarBackdrop").setAttribute("aria-hidden",String(!opened));
+ }else{
+  document.body.classList.toggle("cp-collapsed");
+  try{localStorage.setItem("cp-sidebar-collapsed",document.body.classList.contains("cp-collapsed")?"1":"0")}catch{}
+ }
+};
+window.closeSidebar=()=>document.body.classList.remove("cp-mobile-open");
+window.closeAccountMenu=()=>{
+ const menu=$("cpAccountMenu");
+ if(menu){menu.hidden=true;$("cpAccountTrigger").setAttribute("aria-expanded","false")}
+};
+window.toggleAccountMenu=()=>{
+ const menu=$("cpAccountMenu");
+ const opening=menu.hidden;
+ menu.hidden=!opening;
+ $("cpAccountTrigger").setAttribute("aria-expanded",String(opening));
+};
+window.openAccountSettings=()=>{window.closeAccountMenu();window.closeSidebar();window.section("account")};
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape"){window.closeAccountMenu();window.closeSidebar()}
+});
+document.addEventListener("click",e=>{
+ if(!e.target.closest(".cp-sidebar-bottom"))window.closeAccountMenu();
+});
 const pageMeta={
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
@@ -460,6 +587,7 @@ const pageMeta={
 window.section=(x,options={})=>{
  if(!pageMeta[x])x="calls";
  activePage=x;
+ window.closeSidebar();window.closeAccountMenu();
  for(const id of Object.keys(pageMeta)){
    if($(id))$(id).style.display=id===x?"block":"none";
  }
@@ -480,6 +608,14 @@ window.section=(x,options={})=>{
 async function render(){
  const r=await sb.auth.getSession();
  current=r.data.session?.user||null;
+ document.body.classList.toggle("cp-signed-in",Boolean(current&&!recoveryMode));
+ if(current){
+  const name=current.user_metadata?.full_name||current.email?.split("@")[0]||"Account";
+  $("sideAvatar").textContent=name.split(/\\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("")||"CP";
+  $("sideAccountName").textContent=name;
+  $("sideAccountEmail").textContent=current.email||"";
+  try{if(localStorage.getItem("cp-sidebar-collapsed")==="1")document.body.classList.add("cp-collapsed");else document.body.classList.remove("cp-collapsed")}catch{}
+ }
  if(recoveryMode){
    $("auth").style.display="block";$("dashboard").style.display="none";
    $("authFields").style.display="none";$("authRecovery").style.display="block";
@@ -548,6 +684,7 @@ window.saveProfile=()=>safe(async()=>{
  if(error)throw error;
  current=data.user||current;
  $("topUserName").textContent=full_name;
+ $("sideAccountName").textContent=full_name;
  $("topAvatar").textContent=full_name.split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("");
  return "Profile saved.";
 });
