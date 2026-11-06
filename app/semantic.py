@@ -9,36 +9,37 @@ import httpx
 from fastapi import HTTPException
 from app.cloud import api
 
-MODEL="text-embedding-3-small"
-DIMENSIONS=1536
+MODEL="gte-small"
+DIMENSIONS=384
 # Provisional conservative limits. Calibrate on real positive and negative questions.
-MIN_SIMILARITY=0.78
-MIN_MARGIN=0.045
+MIN_SIMILARITY=0.76
+MIN_MARGIN=0.035
 
 def enabled():
-    return bool(os.getenv("OPENAI_API_KEY","").startswith("sk-"))
+    return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SECRET_KEY"))
 
 def embeddings(texts:list[str])->list[list[float]]:
     if not enabled():
-        raise HTTPException(503,"Semantic search requires OPENAI_API_KEY in Render.")
-    if not texts or any(not v.strip() or len(v)>4000 for v in texts):
+        raise HTTPException(503,"Semantic search requires a Supabase connection")
+    if not texts or any(not v.strip() or len(v)>3000 for v in texts):
         raise HTTPException(422,"Invalid text for embedding")
+    url=os.environ["SUPABASE_URL"].rstrip("/")+"/functions/v1/callpilot-embed"
+    secret=os.environ["SUPABASE_SECRET_KEY"]
+    vectors=[]
     try:
-        with httpx.Client(timeout=25) as c:
-            r=c.post("https://api.openai.com/v1/embeddings",
-                headers={"Authorization":"Bearer "+os.environ["OPENAI_API_KEY"],
-                         "Content-Type":"application/json"},
-                json={"model":MODEL,"input":texts,"encoding_format":"float"})
+        with httpx.Client(timeout=40) as c:
+            for value in texts:
+                r=c.post(url,headers={"x-callpilot-internal-key":secret,
+                                      "Content-Type":"application/json"},
+                         json={"input":value})
+                if r.status_code!=200:
+                    raise HTTPException(503,"Supabase embedding service unavailable (HTTP "+str(r.status_code)+")")
+                vector=r.json().get("embedding",[])
+                if len(vector)!=DIMENSIONS:
+                    raise HTTPException(502,"Embedding response had an unexpected size")
+                vectors.append(vector)
     except httpx.RequestError:
-        raise HTTPException(503,"Embedding service unavailable; no answer was generated")
-    if r.status_code!=200:
-        # No provider response body or credentials exposed to caller.
-        raise HTTPException(503,"Embedding provider rejected the request (HTTP "+str(r.status_code)+")")
-    payload=r.json().get("data",[])
-    payload.sort(key=lambda x:x["index"])
-    vectors=[item["embedding"] for item in payload]
-    if len(vectors)!=len(texts) or any(len(v)!=DIMENSIONS for v in vectors):
-        raise HTTPException(502,"Embedding response had an unexpected size")
+        raise HTTPException(503,"Embedding service unavailable")
     return vectors
 
 def to_pgvector(vector:list[float])->str:
@@ -46,7 +47,7 @@ def to_pgvector(vector:list[float])->str:
 
 def index_fact(organization_id:str,fact_id:str,question:str,approved_by:str|None=None):
     v=embeddings([question])[0]
-    data={"question_embedding":to_pgvector(v),"embedding_model":MODEL,
+    data={"question_embedding_384":to_pgvector(v),"embedding_model":MODEL,
           "embedded_at":datetime.now(timezone.utc).isoformat()}
     if approved_by:
         data.update({"approved_at":datetime.now(timezone.utc).isoformat(),"approved_by":approved_by})
@@ -56,13 +57,13 @@ def index_fact(organization_id:str,fact_id:str,question:str,approved_by:str|None
 
 def reindex_approved(organization_id:str)->dict:
     facts=api("knowledge_facts",params={"organization_id":"eq."+organization_id,
-        "approved_at":"not.is.null","question_embedding":"is.null",
+        "approved_at":"not.is.null","question_embedding_384":"is.null",
         "select":"id,question","limit":100})
     if not facts:return {"indexed":0,"remaining":0}
     vectors=embeddings([row["question"] for row in facts])
     for row,vector in zip(facts,vectors):
         api("knowledge_facts","PATCH",params={"organization_id":"eq."+organization_id,"id":"eq."+row["id"]},
-            data={"question_embedding":to_pgvector(vector),
+            data={"question_embedding_384":to_pgvector(vector),
                   "embedding_model":MODEL,"embedded_at":datetime.now(timezone.utc).isoformat()},
             prefer="return=minimal")
     return {"indexed":len(facts),"remaining":"run again if more than 100 approved facts"}
