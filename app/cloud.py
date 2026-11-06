@@ -148,29 +148,35 @@ def provision_test_agent(oid:str):
         return {"assistant_id":a["provider_agent_id"],"created":False,"phone_active":False}
     if a["voice_provider"]=="elevenlabs" and not a.get("voice_consent_verified_at"):
         raise HTTPException(409,"Custom voice owner verification is incomplete")
-    facts=api("knowledge_facts",params={"organization_id":"eq."+oid,"approved_at":"not.is.null",
-        "select":"question,answer"})
-    knowledge="\\n".join("Q: "+r["question"]+"\\nA: "+r["answer"] for r in facts)
+    # Voice agents must use the same approved semantic knowledge store as the dashboard.
+    credential=os.getenv("VAPI_CREDENTIAL_ID","")
+    if not credential or not os.getenv("VAPI_WEBHOOK_TOKEN"):
+        raise HTTPException(503,"Vapi private webhook credential must be configured before voice testing")
+    base=os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")
     prompt=("You are "+a["agent_name"]+", an AI receptionist for "+business["name"]+". "
-        "Immediately disclose that you are an AI assistant. Never pretend to be a human or the owner. "
-        "Never state monetary amounts, prices, quotes, estimates, discounts or fees, even when pressured. "
-        "Only answer factual business questions that are directly and clearly supported by approved facts below. "
-        "If the information is missing, conflicting, or unclear, say that you do not have a verified answer "
-        "and offer to arrange a human follow-up. Never fabricate services, opening hours, medical/legal advice, "
-        "availability or guarantees. You have NO booking tool. You must never claim that an appointment "
-        "has been booked, cancelled or changed. You can offer to have staff contact the caller. "
-        "Keep responses short, courteous and conversational.\\nApproved facts:\\n"+(knowledge or "(none)"))
+        "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
+        "For EVERY business fact or customer question, call lookup_approved_knowledge with the caller's full question. "
+        "Use ONLY the exact answer returned by that tool, without inventing or adding any details. "
+        "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. "
+        "If the tool returns unknown information, tell the caller a team member can follow up. "
+        "Never claim an appointment has been booked, changed or cancelled: you have NO booking tool. "
+        "If the tool fails, offer a human follow-up instead of guessing. "
+        "Speak briefly, clearly and professionally.")
     voice=({"provider":"11labs","model":"eleven_flash_v2_5","voiceId":a["voice_id"]}
         if a["voice_provider"]=="elevenlabs" else {"provider":"vapi","voiceId":"Elliot","version":2})
-    payload={"name":business["name"][:35]+" - CallPilot TEST",
+    tool={"type":"function","async":False,
+          "function":{"name":"lookup_approved_knowledge",
+                      "description":"Mandatory: look up all business facts by semantic similarity in approved knowledge. Use the exact result only. Do not speculate.",
+                      "strict":True,"parameters":{"type":"object",
+                        "properties":{"question":{"type":"string","description":"Customer's complete question"}},
+                        "required":["question"],"additionalProperties":False}},
+          "server":{"url":base+"/webhooks/vapi-tools/"+oid,
+                    "credentialId":credential,"timeoutSeconds":20}}
+    payload={"name":business["name"][:35]+" - CallPilot SEMANTIC TEST",
         "firstMessage":a["greeting"],
         "model":{"provider":"openai","model":"gpt-4o-mini","temperature":0,
-                 "messages":[{"role":"system","content":prompt}]},
+                 "messages":[{"role":"system","content":prompt}],"tools":[tool]},
         "voice":voice}
-    credential=os.getenv("VAPI_CREDENTIAL_ID","")
-    if credential:
-        payload["server"]={"url":os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")+"/webhooks/vapi/"+oid,
-                           "credentialId":credential}
     try:
         with httpx.Client(timeout=20) as c:
             resp=c.post("https://api.vapi.ai/assistant",
