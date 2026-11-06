@@ -160,3 +160,6 @@ def voice_preview(bid: str):
 # Cloud persistence is enabled only after server-side Supabase credentials are configured.
 from app.cloud import router as cloud_router
 app.include_router(cloud_router)
+
+from app.vapi import router as vapi_router
+app.include_router(vapi_router)
