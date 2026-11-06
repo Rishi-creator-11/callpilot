@@ -176,6 +176,7 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
 </style><style id="cp-app-shell-v3">
 /* 2026-11: Full-bleed professional app shell, independent scrollable sidebar and persistent account dock */
+.cp-sidebar-collapse-open{display:none}
 body.cp-signed-in{--cp-sidebar-w:264px;background:#f8f9fc}
 body.cp-signed-in .shell{min-height:100dvh;overflow:clip}
 body.cp-signed-in nav{display:none!important}
@@ -611,7 +612,7 @@ async function render(){
  document.body.classList.toggle("cp-signed-in",Boolean(current&&!recoveryMode));
  if(current){
   const name=current.user_metadata?.full_name||current.email?.split("@")[0]||"Account";
-  $("sideAvatar").textContent=name.split(/\\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("")||"CP";
+  $("sideAvatar").textContent=name.split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("")||"CP";
   $("sideAccountName").textContent=name;
   $("sideAccountEmail").textContent=current.email||"";
   try{if(localStorage.getItem("cp-sidebar-collapsed")==="1")document.body.classList.add("cp-collapsed");else document.body.classList.remove("cp-collapsed")}catch{}
