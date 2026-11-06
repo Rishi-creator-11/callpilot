@@ -57,6 +57,15 @@ async def vapi_event(organization_id:str, request:Request, authorization:str|Non
         "recordingUrl":msg.get("recordingUrl") or call.get("recordingUrl"),
         "transcript":msg.get("transcript") or call.get("transcript"),
     })
+    # Create unique in-dashboard usage warnings as calls complete.
+    try:
+        from app.usage import record_threshold_alerts
+        record_threshold_alerts(organization_id)
+    except Exception:
+        # A notification failure must not cause Vapi to retry/duplicate the call report.
+        import logging
+        logging.getLogger("uvicorn.error").warning(
+            "callpilot_usage_alerts_failed org=%s",organization_id)
     return {"ok":True}
 
 @router.post("/webhooks/vapi-tools/{organization_id}")
