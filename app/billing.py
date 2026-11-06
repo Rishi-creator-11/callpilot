@@ -215,11 +215,17 @@ async def stripe_webhook(request:Request):
             oid=subscriptions[0]["organization_id"]
             item=(obj.get("items",{}).get("data") or [{}])[0]
             p=item.get("price",{})
-            info={"stripe_subscription_id":obj.get("id"),"status":obj.get("status","unknown"),
+            info={"stripe_subscription_id":obj.get("id"),
+                "status":obj.get("status","unknown"),
                 "price_id":p.get("id"),
-                "selected_plan":(obj.get("metadata") or {}).get("plan"),
                 "updated_at":datetime.now(timezone.utc).isoformat()}
-            if obj.get("current_period_end"):info["current_period_end"]=datetime.fromtimestamp(obj["current_period_end"],timezone.utc).isoformat()
+            plan=(obj.get("metadata") or {}).get("plan")
+            if plan in PLANS:info["selected_plan"]=plan
+            # Stripe API versions may store the billing cycle on the item.
+            for field in ("current_period_start","current_period_end"):
+                epoch=obj.get(field) or item.get(field)
+                if isinstance(epoch,(int,float)) and epoch>0:
+                    info[field]=datetime.fromtimestamp(epoch,timezone.utc).isoformat()
             api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},data=info,prefer="return=minimal")
     api("stripe_webhook_events","POST",data={"id":eid,"event_type":e_type},prefer="return=minimal")
     return {"received":True}
