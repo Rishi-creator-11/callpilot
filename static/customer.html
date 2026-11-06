@@ -1,5 +1,51 @@
 <!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CallPilot — Your AI front desk</title>
-<style>*{box-sizing:border-box}body{margin:0;background:#080e1c;color:#eff3ff;font:15px/1.5 Inter,system-ui,-apple-system,sans-serif}a{color:#a6b7ff}button{border:0;cursor:pointer;background:#7569f8;color:white;padding:12px 18px;border-radius:11px;font-weight:700}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#283651}.shell{max-width:1150px;margin:auto;padding:26px}nav{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #263552;padding-bottom:20px}.brand{font-size:21px;font-weight:800;letter-spacing:-.7px}.brand span{color:#a49aff}.pill{border:1px solid #3b4a66;border-radius:20px;color:#b7c6e7;padding:5px 12px;font-size:12px}h1{font-size:clamp(28px,5vw,51px);letter-spacing:-1.4px;line-height:1.1;margin:22px 0}h2{font-size:20px;margin:0 0 10px}h3{margin:0 0 9px;font-size:16px}p{color:#a7b6d3}label{display:block;color:#bdc8e3;font-size:13px;margin:13px 0 6px}input,select,textarea{width:100%;border:1px solid #354565;background:#0c1427;border-radius:10px;padding:11px;color:white;font:inherit}textarea{min-height:95px}input:focus,textarea:focus{outline:2px solid #776df8}input[type=checkbox]{width:auto}.card{border:1px solid #2d3b59;border-radius:18px;padding:22px;background:#151e34}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.hero{max-width:880px;padding:35px 0 20px}.hero p{font-size:18px}.muted{font-size:13px;color:#a7b6d3}.status{color:#b4d6be}.error{color:#ffc7b5}.cols{display:grid;grid-template-columns:235px 1fr;gap:22px;margin-top:23px}.sidebar{padding:20px;align-self:start}.sidebar button{display:block;width:100%;margin:9px 0;text-align:left}.panel{margin:0 0 18px}.note{background:#101c35;border-left:3px solid #857aff;padding:12px 16px;color:#c5d2ee;border-radius:4px;margin:16px 0}#authBox{max-width:430px;margin:30px 0}#message{min-height:24px}#dashboard{display:none}#auth{display:none}#workspace{display:none}#billing{display:none}#knowledge{display:none}#voice{display:none}#appointments{display:none}#simulator{display:none}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.item{border-bottom:1px solid #2e3d58;padding:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1428;padding:14px;border-radius:9px}footer{padding:30px 0;color:#8c9dbd;font-size:12px}@media(max-width:800px){.grid,.grid3,.cols{grid-template-columns:1fr}.hero{padding-top:15px}.sidebar{display:flex;flex-wrap:wrap;gap:8px}.sidebar button{width:auto}.row{flex-wrap:wrap}}</style></head><body>
+<style>*{box-sizing:border-box}body{margin:0;background:#080e1c;color:#eff3ff;font:15px/1.5 Inter,system-ui,-apple-system,sans-serif}a{color:#a6b7ff}button{border:0;cursor:pointer;background:#7569f8;color:white;padding:12px 18px;border-radius:11px;font-weight:700}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#283651}.shell{max-width:1150px;margin:auto;padding:26px}nav{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #263552;padding-bottom:20px}.brand{font-size:21px;font-weight:800;letter-spacing:-.7px}.brand span{color:#a49aff}.pill{border:1px solid #3b4a66;border-radius:20px;color:#b7c6e7;padding:5px 12px;font-size:12px}h1{font-size:clamp(28px,5vw,51px);letter-spacing:-1.4px;line-height:1.1;margin:22px 0}h2{font-size:20px;margin:0 0 10px}h3{margin:0 0 9px;font-size:16px}p{color:#a7b6d3}label{display:block;color:#bdc8e3;font-size:13px;margin:13px 0 6px}input,select,textarea{width:100%;border:1px solid #354565;background:#0c1427;border-radius:10px;padding:11px;color:white;font:inherit}textarea{min-height:95px}input:focus,textarea:focus{outline:2px solid #776df8}input[type=checkbox]{width:auto}.card{border:1px solid #2d3b59;border-radius:18px;padding:22px;background:#151e34}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.hero{max-width:880px;padding:35px 0 20px}.hero p{font-size:18px}.muted{font-size:13px;color:#a7b6d3}.status{color:#b4d6be}.error{color:#ffc7b5}.cols{display:grid;grid-template-columns:235px 1fr;gap:22px;margin-top:23px}.sidebar{padding:20px;align-self:start}.sidebar button{display:block;width:100%;margin:9px 0;text-align:left}.panel{margin:0 0 18px}.note{background:#101c35;border-left:3px solid #857aff;padding:12px 16px;color:#c5d2ee;border-radius:4px;margin:16px 0}#authBox{max-width:430px;margin:30px 0}#message{min-height:24px}#dashboard{display:none}#auth{display:none}#workspace{display:none}#billing{display:none}#knowledge{display:none}#voice{display:none}#appointments{display:none}#simulator{display:none}#calls{display:none}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.item{border-bottom:1px solid #2e3d58;padding:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1428;padding:14px;border-radius:9px}footer{padding:30px 0;color:#8c9dbd;font-size:12px}@media(max-width:800px){.grid,.grid3,.cols{grid-template-columns:1fr}.hero{padding-top:15px}.sidebar{display:flex;flex-wrap:wrap;gap:8px}.sidebar button{width:auto}.row{flex-wrap:wrap}}
+
+/* Business Call Intelligence */
+.ci-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.ci-head p{margin:5px 0 0}.ci-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.ci-actions button,.ci-button{padding:10px 13px;font-size:13px}
+.ci-primary{background:#766af8}.ci-quiet{background:#26344f;color:#e7edff}
+.ci-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:21px}
+.ci-kpi{padding:18px 17px;background:#111b31;border:1px solid #2a3956;border-radius:14px;min-height:106px}
+.ci-kpi .num{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1.25}
+.ci-kpi .cap{font-size:12px;color:#a2b2d0;margin-top:9px}
+.ci-filters{display:flex;align-items:center;gap:9px;margin:8px 0 15px;flex-wrap:wrap}
+.ci-filters input{flex:1;min-width:180px;max-width:320px}
+.ci-filters select{width:auto;min-width:128px}
+.ci-filters input,.ci-filters select{padding:10px 11px;font-size:13px}
+.ci-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ci-table th{text-align:left;color:#9cadcb;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:12px 10px;border-bottom:1px solid #293954}
+.ci-table td{border-bottom:1px solid #263550;padding:15px 10px;vertical-align:middle;font-size:13px;color:#dce6fb}
+.ci-table tr[data-call]{cursor:pointer}.ci-table tr[data-call]:hover{background:#1b2942}
+.ci-table .call-secondary{font-size:11px;color:#9daccc;margin-top:4px}
+.ci-table td:first-child{font-weight:700}
+.ci-tag{display:inline-flex;align-items:center;gap:6px;border-radius:99px;border:1px solid #45536d;padding:5px 9px;font-size:11px;white-space:nowrap;font-weight:700}
+.ci-tag.hot{background:#3b252e;color:#ffb8bf;border-color:#7c3d50}
+.ci-tag.warm{background:#3d3424;color:#f2d69a;border-color:#78613b}
+.ci-tag.general{background:#1f3442;color:#a4d8ee;border-color:#35617a}
+.ci-tag.not_qualified{background:#273041;color:#b4bdce}
+.ci-tag.needs_review{background:#332b4a;color:#c6b7f5;border-color:#585079}
+.ci-empty{padding:44px 16px;text-align:center;color:#a7b6d3}
+.ci-empty strong{display:block;color:#e9effc;margin-bottom:5px}
+.ci-panel{border:1px solid #2c3b57;border-radius:16px;background:#111b31;padding:20px}
+.ci-connect{padding:18px 20px;background:#151f36;border:1px solid #33456b;border-radius:14px;margin:0 0 22px}
+.ci-connect h3{font-size:15px;margin-bottom:5px}.ci-connect p{margin:2px 0 12px;font-size:13px}
+.ci-connect-line{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.ci-connect-line select{width:min(100%,390px);padding:10px}
+.ci-details{margin-top:16px;padding:20px;background:#0d182d;border:1px solid #445577;border-radius:14px}
+.ci-details h3{font-size:18px;margin-bottom:7px}.ci-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 18px}
+.ci-detail-grid p{font-size:13px;margin:8px 0;overflow-wrap:anywhere}
+.ci-detail-grid strong{display:block;font-size:11px;color:#95a8c8;letter-spacing:.4px;text-transform:uppercase}
+.ci-details blockquote{margin:10px 0;background:#101c34;border-left:3px solid #766af8;padding:13px 14px;color:#e5ecff;white-space:pre-wrap}
+.ci-details textarea{min-height:70px}
+.ci-details audio{width:100%;max-width:500px;margin-top:10px}
+.ci-detail-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ci-transcript{max-height:340px;overflow:auto;white-space:pre-wrap;font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;color:#cbd8ef;background:#0b1428;padding:14px;border:1px solid #2a3b5b;border-radius:11px}
+.ci-footnote{font-size:12px;color:#98a9c7;margin:12px 0}
+@media(max-width:950px){.ci-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ci-table th:nth-child(4),.ci-table td:nth-child(4){display:none}}
+@media(max-width:560px){.ci-table th:nth-child(3),.ci-table td:nth-child(3){display:none}.ci-detail-grid{grid-template-columns:1fr}}
+</style></head><body>
 <div class="shell">
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row"><span class="pill">AI receptionist platform · Private beta</span><button id="logout" class="secondary" style="display:none" onclick="window.signOut()">Sign out</button></div></nav>
 <section id="auth"><div class="hero"><span class="pill">Built for businesses that never want to miss another opportunity</span><h1>Your front desk.<br>Powered by AI.</h1><p>Configure a personalized receptionist, approve what it can say, capture appointment requests, and keep customer information separate for every business.</p></div>
@@ -9,8 +55,53 @@
 <div class="row" style="margin-top:14px"><button onclick="window.authAction('signup')">Create account</button><button class="secondary" onclick="window.authAction('signin')">Sign in</button></div><p class="muted">If you sign up, check your email for verification before signing in.</p><p id="authmsg" role="status"></p></div>
 <div class="card" style="margin:30px 0"><h2>Built for trust</h2><p>✓ AI disclosure before conversations</p><p>✓ No automatic price quotes</p><p>✓ Only approved business answers</p><p>✓ Human handoff for unknown requests</p><p>✓ Customer-specific business workspaces</p><div class="note">Live calling and confirmed bookings are not enabled in this beta. No payment is charged at signup.</div></div></div></section>
 <section id="dashboard"><div class="row"><div><h1 style="font-size:32px">Your business console</h1><p id="welcome" class="muted"></p></div><span class="pill">Private beta</span></div>
-<div class="cols"><aside class="card sidebar"><h3>Workspace</h3><select id="org" onchange="window.loadWorkspace()"></select><button class="secondary" onclick="window.section('workspace')">Overview</button><button class="secondary" onclick="window.section('knowledge')">Verified knowledge</button><button class="secondary" onclick="window.section('voice')">Voice &amp; greeting</button><button class="secondary" onclick="window.section('simulator')">Policy test</button><button class="secondary" onclick="window.section('appointments')">Appointment requests</button><button class="secondary" onclick="window.section('billing')">Billing</button></aside>
-<div><div id="workspace" class="panel card"><h2>Business workspace</h2><div id="orgInfo" class="note"></div><h3>Create another business</h3><label>Business name</label><input id="bname" placeholder="Example Auto Care"><label>Industry</label><input id="industry" placeholder="Auto repair"><button onclick="window.createBusiness()">Create business</button></div>
+<div class="cols"><aside class="card sidebar"><h3>Workspace</h3><select id="org" onchange="window.loadWorkspace()"></select><button class="secondary" onclick="window.section('calls')">Calls &amp; leads</button><button class="secondary" onclick="window.section('workspace')">Workspace settings</button><button class="secondary" onclick="window.section('knowledge')">Verified knowledge</button><button class="secondary" onclick="window.section('voice')">Voice &amp; greeting</button><button class="secondary" onclick="window.section('simulator')">Policy test</button><button class="secondary" onclick="window.section('appointments')">Appointment requests</button><button class="secondary" onclick="window.section('billing')">Billing</button></aside>
+<div>
+<div id="calls" class="panel">
+  <div class="ci-head">
+    <div><h2 style="font-size:24px;margin:0">Call intelligence</h2><p class="muted">Every conversation, the right follow-up. Based on real calls, not estimates.</p></div>
+    <div class="ci-actions">
+      <button class="ci-quiet" onclick="window.showVapiSetup()">Connect assistant</button>
+      <button class="ci-primary" id="syncCallsButton" onclick="window.syncCalls()">↻ Sync Vapi calls</button>
+    </div>
+  </div>
+  <div id="ciConnection" class="ci-connect" style="display:none">
+    <h3>Connect your voice assistant</h3><p>Select an assistant from your connected Vapi account to securely import its calls into this business.</p>
+    <div class="ci-connect-line"><select id="ciAssistant"><option value="">Loading assistants...</option></select>
+      <button onclick="window.linkAssistant()">Link assistant</button>
+      <button class="ci-quiet" id="ciAnalysisBtn" onclick="window.enableCallAnalysis()">Enable AI call insights</button>
+    </div>
+    <p class="ci-footnote" id="ciSetupNote">Structured analysis applies to future calls. Past calls can still be reviewed and tagged manually.</p>
+  </div>
+  <div id="ciNotice" class="muted" role="status" style="min-height:21px;margin-bottom:13px"></div>
+  <div class="ci-kpis">
+    <div class="ci-kpi"><div class="num" id="ciTotal">—</div><div class="cap">Total calls</div></div>
+    <div class="ci-kpi"><div class="num" id="ciHot">—</div><div class="cap">Hot leads · AI suggestion or reviewed</div></div>
+    <div class="ci-kpi"><div class="num" id="ciWarm">—</div><div class="cap">Warm leads</div></div>
+    <div class="ci-kpi"><div class="num" id="ciFollow">—</div><div class="cap">Follow-ups pending</div></div>
+  </div>
+  <div class="ci-panel">
+    <div class="row"><h3 style="margin:0">All conversations</h3><span class="pill" id="ciReviewCount">No calls yet</span></div>
+    <div class="ci-filters">
+      <input id="ciSearch" aria-label="Search calls" placeholder="Search caller, product, summary..." oninput="window.filterCalls()">
+      <select id="ciStage" aria-label="Filter lead stage" onchange="window.filterCalls()">
+        <option value="all">All lead types</option>
+        <option value="hot">Hot leads</option><option value="warm">Warm leads</option>
+        <option value="general">General inquiry</option><option value="not_qualified">Not qualified</option><option value="needs_review">Needs review</option>
+      </select>
+      <select id="ciDays" aria-label="Date range" onchange="window.loadCalls()">
+        <option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option><option value="365">Last year</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto"><table class="ci-table" aria-label="Business call history"><thead><tr>
+      <th style="width:23%">Caller</th><th style="width:23%">Lead status</th><th style="width:32%">Conversation</th><th style="width:22%">Time</th>
+    </tr></thead><tbody id="ciRows"><tr><td colspan="4" class="ci-empty">Loading calls...</td></tr></tbody></table></div>
+    <div id="ciDetail" style="display:none" class="ci-details" aria-live="polite"></div>
+    <div class="ci-footnote">Hot and warm are indicators of expressed intent, not identity or ability-to-pay verification. Review recordings and transcripts before making a sales decision.</div>
+  </div>
+</div>
+<div id="workspace" class="panel card"><h2>Business workspace</h2><div id="orgInfo" class="note"></div><h3>Create another business</h3><label>Business name</label><input id="bname" placeholder="Example Auto Care"><label>Industry</label><input id="industry" placeholder="Auto repair"><button onclick="window.createBusiness()">Create business</button></div>
 <div id="knowledge" class="panel card"><h2>Verified business knowledge</h2><p>Answers need an approval before the agent can use them. Prices and estimates are prohibited.</p><label>Customer question</label><input id="faqQ" placeholder="What are your opening hours?"><label>Accurate, verified answer</label><textarea id="faqA" placeholder="Our business is open..."></textarea><button onclick="window.addFact()">Submit for approval</button><div id="facts"></div></div>
 <div id="voice" class="panel card"><h2>Agent voice &amp; identity</h2><div class="note"><strong>Standard voice:</strong> available for future test calls. <strong>Custom owner voice:</strong> requires the voice owner to complete identity and voice verification with the provider. Checking a consent box is not verification. This setting is inactive until that workflow is complete.</div><label>Agent name</label><input id="agent" placeholder="Alex"><label>First message</label><textarea id="greeting" placeholder="Hi, I'm the AI receptionist..."></textarea><button onclick="window.saveAgent()">Save greeting</button><p class="muted">For verified voice cloning, the owner must create and share an approved voice through ElevenLabs. We do not clone voice recordings from this page.</p><h3>Request a verified custom voice</h3><p class="muted">The voice owner must verify their own ElevenLabs voice and authorize its use. Requests are held pending review.</p><label>Voice owner contact email</label><input id="voiceOwnerEmail" type="email" placeholder="owner@company.com"><label>Shared, verified ElevenLabs voice ID</label><input id="voiceId" placeholder="Voice ID from ElevenLabs"><label><input type="checkbox" id="voiceConsent"> I confirm the voice owner explicitly authorized this request</label><button class="secondary" onclick="window.requestVoice()">Submit voice request</button><pre id="voiceResult">No voice request submitted.</pre><button class="secondary" onclick="window.testAssistant()">Create test assistant in Vapi</button><pre id="testAgentResult">No assistant provisioned yet.</pre><p class="muted">Test assistant only: no active phone number, live calendar booking or outbound calling.</p></div>
 <div id="simulator" class="panel card"><h2>Test what your assistant knows</h2><p>Semantic retrieval matches the meaning of customer questions against your approved knowledge. Unknown or ambiguous questions escalate instead of being guessed.</p><div class="note" id="semanticStatus">Checking semantic-search readiness...</div><button class="secondary" onclick="window.indexKnowledge()">Index approved knowledge</button><p class="muted">Run this once for answers approved before semantic search was added. New approved answers are automatically indexed.</p><label>Customer question</label><textarea id="question" placeholder="How much is an inspection?"></textarea><button onclick="window.ask()">Test safe answer</button><pre id="reply">Ask a question.</pre></div>
@@ -28,11 +119,11 @@ async function request(url,method="GET",data){if(!current)throw Error("Please si
 async function safe(fn){try{msg("");const result=await fn();if(typeof result==="string")msg(result)}catch(e){msg(e instanceof Error?e.message:String(e),true)}}
 window.authAction=async mode=>{const email=v("email"),password=v("password");$("authmsg").textContent="Processing...";try{const r=mode==="signup"?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+"/app"}}):await sb.auth.signInWithPassword({email,password});if(r.error)throw r.error;$("authmsg").textContent=mode==="signup"?"Check your email to confirm your account, then sign in.":"Signed in.";if(mode==="signin")await render()}catch(e){$("authmsg").textContent=e.message}};
 window.signOut=async()=>{await sb.auth.signOut();current=null;await render()};
-window.section=x=>{for(let id of ["workspace","knowledge","voice","simulator","appointments","billing"])$(id).style.display=id===x?"block":"none"};
+window.section=x=>{for(let id of ["calls","workspace","knowledge","voice","simulator","appointments","billing"])$(id).style.display=id===x?"block":"none"};
 async function render(){const r=await sb.auth.getSession();current=r.data.session?.user||null;$("auth").style.display=current?"none":"block";$("dashboard").style.display=current?"block":"none";$("logout").style.display=current?"block":"none";if(current){$("welcome").textContent=current.email;await loadOrganizations()}}
 async function loadOrganizations(){let result=await request("/me");orgs=result.organizations;$("org").innerHTML=orgs.length?orgs.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):'<option value="">Create a business</option>';if(orgs.length){await window.loadWorkspace()}else{$("orgInfo").textContent="Create your first business to begin";window.section("workspace")}}
 window.createBusiness=()=>safe(async()=>{const o=await request("/organizations","POST",{name:v("bname"),industry:v("industry")||"General"});await loadOrganizations();$("org").value=o.id;await window.loadWorkspace()});
-window.loadWorkspace=async()=>{if(!organization())return;await safe(async()=>{const o=orgs.find(x=>x.id===organization());$("orgInfo").textContent=(o?.name||"Business")+" · "+(o?.industry||"General")+" · "+(o?.status||"draft");await Promise.all([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);window.section("workspace")})};
+window.loadWorkspace=async()=>{if(!organization())return;await safe(async()=>{const o=orgs.find(x=>x.id===organization());$("orgInfo").textContent=(o?.name||"Business")+" · "+(o?.industry||"General")+" · "+(o?.status||"draft");await Promise.all([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);window.section("calls");await window.loadCalls()})};
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
 async function loadFacts(){let facts=await request("/organizations/"+organization()+"/knowledge");$("facts").innerHTML=facts.map(f=>'<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p><span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+(!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+'</div>').join("")||'<p>No approved knowledge yet.</p>';$("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)))}
@@ -54,6 +145,113 @@ window.requestVoice=()=>safe(async()=>{$("voiceResult").textContent=JSON.stringi
 window.testAssistant=()=>safe(async()=>{$("testAgentResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/test-assistant","POST"),null,2)})
 window.checkout=()=>safe(async()=>{const r=await request("/organizations/"+organization()+"/checkout","POST");location.href=r.url});
 window.billingPortal=()=>safe(async()=>{const r=await request("/organizations/"+organization()+"/billing-portal","POST");location.href=r.url});
+
+/* Call intelligence — real authenticated per-workspace records. */
+let ciCalls=[],ciSelected=null;
+const ciStageLabels={hot:"Hot lead",warm:"Warm lead",general:"General inquiry",not_qualified:"Not qualified",needs_review:"Needs review"};
+const ciTag=(stage)=>'<span class="ci-tag '+(ciStageLabels[stage]?stage:"needs_review")+'">'+esc(ciStageLabels[stage]||"Needs review")+'</span>';
+const ciDate=(value)=>{if(!value)return "Unknown date";const d=new Date(value);return Number.isNaN(d.getTime())?"Unknown date":d.toLocaleString([], {dateStyle:"medium",timeStyle:"short"})};
+const ciDuration=(sec)=>sec==null?"—":Math.floor(sec/60)+"m "+String(sec%60).padStart(2,"0")+"s";
+window.loadCalls=async()=>{
+  if(!organization())return;
+  $("ciNotice").textContent="Loading real call records...";
+  try{
+    const days=Number(v("ciDays")||30);
+    const r=await request("/organizations/"+organization()+"/calls?days="+days);
+    ciCalls=r.calls||[];
+    $("ciTotal").textContent=r.total??0;
+    $("ciHot").textContent=r.counts?.hot??0;
+    $("ciWarm").textContent=r.counts?.warm??0;
+    $("ciFollow").textContent=r.follow_ups??0;
+    $("ciReviewCount").textContent=(r.counts?.needs_review??0)+" need review";
+    $("ciNotice").textContent=ciCalls.length?"Showing "+ciCalls.length+" recorded calls. Sync to refresh.":"No imported calls yet. Connect your Vapi assistant, then sync calls.";
+    window.filterCalls();
+  }catch(e){$("ciNotice").textContent=e.message;$("ciRows").innerHTML='<tr><td colspan="4" class="ci-empty">Unable to load calls.</td></tr>'}
+};
+window.filterCalls=()=>{
+  const q=v("ciSearch").trim().toLowerCase(),stage=v("ciStage");
+  const filtered=ciCalls.filter(c=>(stage==="all"||c.lead_stage===stage)&&
+    (!q||[c.caller_phone,c.caller_name,c.summary,c.product_interest].some(x=>String(x||"").toLowerCase().includes(q))));
+  $("ciRows").innerHTML=filtered.length?filtered.map(c=>'<tr data-call="'+esc(c.id)+'" tabindex="0" role="button" aria-label="View call">'+
+   '<td>'+esc(c.caller_name||c.caller_phone||"Unknown caller")+'<div class="call-secondary">'+esc(c.caller_name?c.caller_phone||"":"Inbound call")+'</div></td>'+
+   '<td>'+ciTag(c.lead_stage)+'<div class="call-secondary">'+esc(c.lead_source==="human_reviewed"?"Human reviewed":c.lead_source==="ai_suggested"?"AI suggested":"Not yet reviewed")+'</div></td>'+
+   '<td>'+esc((c.summary||c.product_interest||"Recording / transcript available when provided by Vapi").slice(0,160))+'</td>'+
+   '<td>'+esc(ciDate(c.started_at))+'<div class="call-secondary">'+esc(ciDuration(c.duration_seconds))+'</div></td></tr>').join(""):
+   '<tr><td colspan="4"><div class="ci-empty"><strong>No calls match these filters</strong>Try a broader search, or sync calls from Vapi.</div></td></tr>';
+  $("ciRows").querySelectorAll("[data-call]").forEach(row=>{
+    const open=()=>window.openCall(row.dataset.call);
+    row.addEventListener("click",open);
+    row.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}});
+  });
+  if(ciSelected&&!filtered.some(c=>c.id===ciSelected))$("ciDetail").style.display="none";
+};
+window.openCall=async id=>{
+  ciSelected=id;
+  $("ciDetail").style.display="block";
+  $("ciDetail").innerHTML='<p class="muted">Loading call details...</p>';
+  try{
+    const c=await request("/organizations/"+organization()+"/calls/"+encodeURIComponent(id));
+    if(ciSelected!==id)return;
+    const allowedUrl=(x)=>typeof x==="string"&&x.startsWith("https://")?x:null;
+    const fields=[["Caller",c.caller_name||c.caller_phone||"Not provided"],["Product interest",c.product_interest||"Not captured"],
+     ["Quantity",c.quantity_interest||"Not captured"],["Destination",c.destination||"Not captured"],
+     ["Purchase timeline",c.purchase_timeline||"Not captured"],["Call duration",ciDuration(c.duration_seconds)]];
+    $("ciDetail").innerHTML='<div class="row"><h3>Call details</h3><button class="ci-quiet" id="ciClose">Close ✕</button></div>'+
+      '<div class="ci-detail-grid">'+fields.map(([a,b])=>'<p><strong>'+esc(a)+'</strong>'+esc(b)+'</p>').join("")+'</div>'+
+      '<h3 style="margin-top:18px">Call summary</h3><blockquote>'+esc(c.summary||"No AI summary available for this call. Review the transcript and categorize it manually.")+'</blockquote>'+
+      '<p class="muted">'+esc(c.lead_reason||"No qualification evidence captured.")+' · '+esc(c.lead_source==="human_reviewed"?"Reviewed by team":c.lead_source==="ai_suggested"?"AI suggested, not verified":"Needs human review")+'</p>'+
+      (allowedUrl(c.recording_url)?'<h3>Recording</h3><audio controls preload="none" src="'+esc(c.recording_url)+'"></audio><p class="ci-footnote">Recordings are available only if enabled and retained by your voice provider.</p>':'<p class="muted">Recording unavailable from Vapi.</p>')+
+      '<h3 style="margin-top:20px">Transcript</h3><div class="ci-transcript">'+esc(c.transcript||"No transcript was supplied for this call.")+'</div>'+
+      '<h3 style="margin-top:20px">Qualify and follow up</h3>'+
+      '<div class="ci-detail-grid"><div><label>Lead category</label><select id="ciReviewStage">'+
+      Object.entries(ciStageLabels).map(([key,value])=>'<option value="'+key+'"'+(key===c.lead_stage?' selected':'')+'>'+esc(value)+'</option>').join("")+'</select></div>'+
+      '<div><label>Follow-up status</label><select id="ciFollowStatus">'+
+      [["none","No follow-up"],["todo","To do"],["in_progress","In progress"],["done","Completed"]].map(([k,t])=>'<option value="'+k+'"'+(k===c.follow_up_status?' selected':'')+'>'+t+'</option>').join("")+'</select></div></div>'+
+      '<label><input id="ciNeedsFollow" type="checkbox" '+(c.follow_up_needed?'checked':'')+'> Follow-up needed</label>'+
+      '<label>Why this lead category?</label><textarea id="ciReason" maxlength="600" placeholder="Quote the specific evidence in the conversation...">'+esc(c.lead_reason||"")+'</textarea>'+
+      '<label>Next action / notes</label><textarea id="ciNote" maxlength="1000" placeholder="E.g. Call back to confirm shipping destination">'+esc(c.follow_up_note||"")+'</textarea>'+
+      '<div class="ci-detail-actions"><button id="ciSaveReview">Save review</button><span id="ciSaveStatus" class="muted"></span></div>';
+    $("ciClose").addEventListener("click",()=>{$("ciDetail").style.display="none";ciSelected=null});
+    $("ciSaveReview").addEventListener("click",()=>window.saveCallReview(id));
+  }catch(e){$("ciDetail").textContent="Unable to load this call: "+e.message}
+};
+window.saveCallReview=async id=>{
+ const button=$("ciSaveReview");button.disabled=true;$("ciSaveStatus").textContent="Saving...";
+ try{
+   await request("/organizations/"+organization()+"/calls/"+encodeURIComponent(id),"PATCH",{
+     lead_stage:v("ciReviewStage"),lead_reason:v("ciReason"),follow_up_needed:$("ciNeedsFollow").checked,
+     follow_up_status:v("ciFollowStatus"),follow_up_note:v("ciNote")});
+   $("ciSaveStatus").textContent="Saved ✓";
+   await window.loadCalls();
+ }catch(e){$("ciSaveStatus").textContent=e.message}finally{button.disabled=false}
+};
+window.showVapiSetup=()=>safe(async()=>{
+ const box=$("ciConnection");box.style.display=box.style.display==="none"?"block":"none";
+ if(box.style.display==="none")return;
+ $("ciAssistant").innerHTML='<option value="">Loading Vapi assistants...</option>';
+ const data=await request("/organizations/"+organization()+"/voice-assistants");
+ $("ciAssistant").innerHTML='<option value="">Choose a Vapi assistant...</option>'+
+   data.assistants.map(a=>'<option value="'+esc(a.id)+'"'+(a.id===data.linked?' selected':'')+'>'+esc(a.name)+'</option>').join("");
+ $("ciSetupNote").textContent=data.linked?"An assistant is connected. Sync calls to import its history.":"Choose the assistant that answers this business's phone number.";
+});
+window.linkAssistant=()=>safe(async()=>{
+ if(!v("ciAssistant"))throw Error("Select an assistant first");
+ await request("/organizations/"+organization()+"/voice-assistants/link","POST",{assistant_id:v("ciAssistant")});
+ await window.loadCalls();return "Assistant connected. Select Sync Vapi calls to import its history.";
+});
+window.syncCalls=()=>safe(async()=>{
+ const btn=$("syncCallsButton");btn.disabled=true;btn.textContent="Syncing...";
+ try{const r=await request("/organizations/"+organization()+"/calls/sync","POST");
+ await window.loadCalls();return "Imported/updated "+r.synced+" calls from Vapi.";
+ }finally{btn.disabled=false;btn.textContent="↻ Sync Vapi calls"}
+});
+window.enableCallAnalysis=()=>safe(async()=>{
+ const b=$("ciAnalysisBtn");b.disabled=true;
+ try{const r=await request("/organizations/"+organization()+"/calls/enable-analysis","POST");
+ return r.message+" New calls will be analyzed after they end.";
+ }finally{b.disabled=false}
+});
+
 async function boot(){try{const r=await fetch("/api/account/config");const c=await r.json();if(!c.supabase_url||!c.supabase_publishable_key)throw Error("Authentication is not configured on server");sb=createClient(c.supabase_url,c.supabase_publishable_key);sb.auth.onAuthStateChange((event)=>{if(event==="SIGNED_IN"||event==="SIGNED_OUT"){setTimeout(()=>render().catch(e=>msg(e.message,true)),0)}});await render()}catch(e){$("auth").style.display="block";$("authmsg").textContent="Authentication setup incomplete: "+e.message}}
 boot();
 </script></body></html>
