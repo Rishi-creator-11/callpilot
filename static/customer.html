@@ -196,6 +196,8 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 <label for="email">Work email</label><input id="email" type="email" autocomplete="email" required placeholder="you@company.com">
 <div id="passwordRow"><label for="password">Password</label><input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="Enter your password"></div>
 <div class="row" style="margin-top:22px"><button id="authSubmit" onclick="window.authAction('signin')">Sign in</button></div>
+<div style="display:flex;align-items:center;gap:12px;margin:15px 0;color:#99a5b7;font-size:11px"><span style="height:1px;flex:1;background:#e9eaf1"></span>or<span style="height:1px;flex:1;background:#e9eaf1"></span></div>
+<button id="authMagic" class="secondary" style="width:100%;border:1px solid #e1e5ed" onclick="window.magicLink()">Continue with email link</button>
 <div class="cp-inline-actions" style="justify-content:space-between;margin-top:14px">
 <button id="authSwap" class="cp-top-link" onclick="window.authMode('signup')">Create a free account</button>
 <button id="authForgot" class="cp-top-link" onclick="window.authMode('reset')">Forgot password?</button></div>
@@ -347,6 +349,7 @@ window.authMode=mode=>{
  $("authSwap").textContent=isSignUp||isReset?"Back to sign in":"Create a free account";
  $("authSwap").setAttribute("onclick",isSignUp||isReset?"window.authMode('signin')":"window.authMode('signup')");
  $("authForgot").style.display=isReset?"none":"inline-block";
+ $("authMagic").style.display=isReset?"none":"block";
  $("authmsg").textContent="";
  $("password").setAttribute("autocomplete",isSignUp?"new-password":"current-password");
 };
@@ -363,6 +366,18 @@ window.authAction=async mode=>{
    $("authmsg").textContent=mode==="signup"?"Check your inbox to verify your account, then sign in.":"Signed in.";
    if(mode==="signin")await render();
  }catch(e){$("authmsg").textContent=e.message||"Unable to sign in"}
+};
+window.magicLink=async()=>{
+ const email=v("email").trim();
+ if(!email||!email.includes("@")){$("authmsg").textContent="Enter your email address first.";return}
+ $("authmsg").textContent="Sending secure email link...";
+ try{
+  const {error}=await sb.auth.signInWithOtp({email,options:{
+   emailRedirectTo:location.origin+"/app",shouldCreateUser:false
+  }});
+  if(error)throw error;
+  $("authmsg").textContent="If the account exists, a sign-in link will arrive in your inbox.";
+ }catch(e){$("authmsg").textContent="Email link sign-in isn't available: "+e.message}
 };
 window.sendReset=async fromProfile=>{
  const email=fromProfile?(current?.email||""):v("email").trim();
