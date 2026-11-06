@@ -121,6 +121,11 @@ def approve_fact(oid:str,fid:str,user=Depends(current_user)):
 def simulate(oid:str,body:Question,user=Depends(current_user)):
     membership(oid,user)
     if PRICE.search(body.question):return {"answer":NO_PRICE,"source":"policy"}
+    # Lazy backfill for FAQs approved before embeddings were introduced.
+    pending=api("knowledge_facts",params={"organization_id":"eq."+oid,
+        "approved_at":"not.is.null","question_embedding_384":"is.null","select":"id","limit":1})
+    if pending:
+        reindex_approved(oid)
     fact,metadata=retrieve(oid,body.question)
     if fact:
         if MONEY.search(fact["answer"]):return {"answer":NO_PRICE,"source":"policy"}
