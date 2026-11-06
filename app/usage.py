@@ -85,8 +85,14 @@ def business_phone(oid:str,user=Depends(current_user)):
                 "number_id":None,"provisioning":"not_connected"}
     rows=api("phone_assignments",params={"organization_id":"eq."+oid,
         "provider_phone_id":"eq."+number_id,"select":"provider_number,status","limit":1})
+    detail=api("phone_assignments",params={"organization_id":"eq."+oid,
+        "provider_phone_id":"eq."+number_id,
+        "select":"fallback_enabled,fallback_number","limit":1})
+    config=detail[0] if detail else {}
     return {"connected":True,"provider":"vapi","number_id":number_id,
         "phone_number":rows[0].get("provider_number") if rows else None,
+        "fallback_enabled":bool(config.get("fallback_enabled")),
+        "fallback_number":config.get("fallback_number"),
         "provisioning":"linked"}
 
 @router.get("/api/account/organizations/{oid}/phone/options")
@@ -173,8 +179,41 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
     if (usage["minutes_remaining"]<=0 or
         usage["seconds_used"]+usage["seconds_active"]>=usage["minutes_included"]*60 or
         usage["subscription_status"] not in ("active","trialing")):
-        return {"error":"The automated receptionist is unavailable right now. Please contact the business directly."}
+        fallback=api("phone_assignments",params={"organization_id":"eq."+oid,
+            "provider_phone_id":"eq."+phone_id,
+            "select":"fallback_enabled,fallback_number","limit":1})
+        config=fallback[0] if fallback else {}
+        # The owner must explicitly opt in to carrier-billed human forwarding.
+        if config.get("fallback_enabled") and config.get("fallback_number"):
+            return {"destination":{"type":"number","number":config["fallback_number"],
+                    "message":"Connecting you to the business team."}}
+        return {"error":"The AI receptionist is currently unavailable. Please contact the business directly or try again later."}
     return {"assistantId":agent_id}
+
+class HumanFallback(BaseModel):
+    number:str|None=None
+    enabled:bool=False
+
+@router.put("/api/account/organizations/{oid}/phone/fallback")
+def configure_fallback(oid:str,body:HumanFallback,user=Depends(current_user)):
+    """Optional human transfer. Never enabled without explicit owner action."""
+    membership(oid,user,("owner",))
+    import re
+    number=(body.number or "").strip() or None
+    if body.enabled and (not number or not re.fullmatch(r"\\+[1-9]\\d{7,14}",number)):
+        raise HTTPException(422,"Enter a valid international-format phone number, such as +12125551234")
+    cfg=agent_config(oid)
+    pid=cfg.get("provider_phone_id")
+    if not pid:raise HTTPException(409,"Link a business phone number first")
+    rows=api("phone_assignments",params={"organization_id":"eq."+oid,
+        "provider_phone_id":"eq."+pid,"select":"id"})
+    if not rows:raise HTTPException(409,"Business number not verified")
+    api("phone_assignments","PATCH",params={"organization_id":"eq."+oid,
+        "provider_phone_id":"eq."+pid},
+        data={"fallback_enabled":body.enabled,"fallback_number":number},
+        prefer="return=minimal")
+    return {"saved":True,"fallback_enabled":body.enabled,
+        "warning":"Forwarded calls may incur telephony charges even when AI minutes are exhausted."}
 
 class ActivateRequest(BaseModel):
     confirm:bool=False
