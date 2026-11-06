@@ -179,7 +179,7 @@ async def stripe_webhook(request:Request):
     if event.get("livemode") != (billing_mode()=="live"):
         raise HTTPException(400,"Wrong Stripe payment environment")
     obj=event.get("data",{}).get("object",{})
-    if e_type=="checkout.session.completed" and obj.get("mode")=="subscription":
+    if e_type in ("checkout.session.completed","checkout.session.async_payment_succeeded") and obj.get("mode")=="subscription":
         oid=(obj.get("metadata") or {}).get("organization_id")
         customer=obj.get("customer")
         if oid and customer and obj.get("payment_status")=="paid":
@@ -195,6 +195,16 @@ async def stripe_webhook(request:Request):
                 api("billing_accounts","PATCH",
                     params={"organization_id":"eq."+str(oid),"stripe_customer_id":"eq."+str(customer)},
                     data=patch,prefer="return=minimal")
+    if e_type=="checkout.session.async_payment_failed" and obj.get("mode")=="subscription":
+        customer=obj.get("customer")
+        if customer:
+            rows=api("billing_accounts",params={"stripe_customer_id":"eq."+str(customer),
+                  "select":"organization_id","limit":1})
+            if rows:
+                api("billing_accounts","PATCH",
+                    params={"organization_id":"eq."+rows[0]["organization_id"]},
+                    data={"status":"incomplete","updated_at":datetime.now(timezone.utc).isoformat()},
+                    prefer="return=minimal")
     if e_type=="invoice.payment_failed":
         customer=obj.get("customer")
         subscription=obj.get("subscription")
@@ -220,6 +230,13 @@ async def stripe_webhook(request:Request):
                 "price_id":p.get("id"),
                 "updated_at":datetime.now(timezone.utc).isoformat()}
             plan=(obj.get("metadata") or {}).get("plan")
+            # Stripe's customer portal can change the price without changing metadata.
+            # The actual fixed live Price ID is authoritative when present.
+            if billing_mode()=="live":
+                for name in PLANS:
+                    if p.get("id")==os.getenv("STRIPE_PRICE_"+name.upper()):
+                        plan=name
+                        break
             if plan in PLANS:info["selected_plan"]=plan
             # Stripe API versions may store the billing cycle on the item.
             for field in ("current_period_start","current_period_end"):
