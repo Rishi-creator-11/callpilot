@@ -14,7 +14,7 @@ def require_config():
         raise HTTPException(503,"Supabase cloud storage not configured")
 def api(table, method="GET", params=None, data=None, prefer=None):
     require_config()
-    headers={"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json"}
+    headers={"apikey":KEY,"Content-Type":"application/json"}
     if prefer: headers["Prefer"]=prefer
     try:
         with httpx.Client(timeout=12) as client:
