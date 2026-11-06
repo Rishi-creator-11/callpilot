@@ -357,6 +357,21 @@ body[data-app-state="ready"] #cpBootSplash{display:none!important}
  body.cp-signed-in.cp-collapsed #dashboard>.row{padding-left:clamp(74px,8vw,118px)!important}
 }
 @media(max-width:850px){body.cp-signed-in.cp-collapsed{--cp-sidebar-w:0px!important}}
+</style><style id="cp-recording-design">
+/* Audio playback controls and compact, accessible detail actions */
+.cp-recording-panel{display:flex;flex-direction:column;align-items:flex-start;gap:10px;
+  margin:18px 0 10px;padding:17px 19px;background:#f6f7fc;border:1px solid #e3e7f0;border-radius:13px}
+.cp-recording-panel h3{margin:0;font-size:15px;color:#1b2540}
+.cp-recording-panel p{margin:2px 0;font-size:12px}
+.cp-recording-panel #ciLoadRecording{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+  padding:11px 16px;border:1px solid #d9dded;border-radius:9px;font-size:13px;font-weight:720;white-space:nowrap}
+.cp-recording-panel audio{border-radius:9px;height:48px;max-width:100%}
+.cp-recording-status{min-height:18px;color:#66738e;font-size:12px}
+.ci-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ci-detail-actions button{min-height:42px;line-height:1.25;white-space:normal;max-width:100%}
+body.cp-signed-in.cp-collapsed .cp-sidebar-collapse-open{display:grid;align-items:center;justify-content:center;padding:0!important;
+border-radius:11px;min-height:46px;min-width:46px}
+@media(max-width:600px){.ci-detail-actions button{flex:1;min-width:115px}.cp-recording-panel{padding:15px}}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
@@ -975,6 +990,7 @@ window.filterCalls=()=>{
   if(ciSelected&&!filtered.some(c=>c.id===ciSelected))$("ciDetail").style.display="none";
 };
 window.openCall=async id=>{
+  clearRecording();
   ciSelected=id;
   const currentRow=Array.from(document.querySelectorAll("[data-call]")).find(el=>el.dataset.call===id);
   if(currentRow)window.__callReturnFocus=currentRow;
@@ -991,7 +1007,7 @@ window.openCall=async id=>{
       '<div class="ci-detail-grid">'+fields.map(([a,b])=>'<p><strong>'+esc(a)+'</strong>'+esc(b)+'</p>').join("")+'</div>'+
       '<h3 style="margin-top:18px">Call summary</h3><blockquote>'+esc(c.summary||"No AI summary available for this call. Review the transcript and categorize it manually.")+'</blockquote>'+
       '<p class="muted">'+esc(c.lead_reason||"No qualification evidence captured.")+' · '+esc(c.lead_source==="human_reviewed"?"Reviewed by team":c.lead_source==="ai_suggested"?"AI suggested, not verified":"Needs human review")+'</p>'+
-      (allowedUrl(c.recording_url)?'<h3>Recording</h3><audio controls preload="none" src="'+esc(c.recording_url)+'"></audio><p class="ci-footnote">Recordings are available only if enabled and retained by your voice provider.</p>':'<p class="muted">Recording unavailable from Vapi.</p>')+
+      (allowedUrl(c.recording_url)?'<div class="cp-recording-panel"><div><h3>Call recording</h3><p class="muted">Listen to the original conversation privately.</p></div><button id="ciLoadRecording" class="secondary" type="button">▶ Play recording</button><audio id="ciAudio" controls preload="none" style="display:none;width:100%" aria-label="Call recording"></audio><p id="ciAudioStatus" class="cp-recording-status" role="status"></p></div>':'<div class="cp-recording-panel"><h3>Call recording</h3><p class="muted">No recording is available for this call.</p></div>')+
       '<h3 style="margin-top:20px">Transcript</h3><div class="ci-transcript">'+esc(c.transcript||"No transcript was supplied for this call.")+'</div>'+
       '<h3 style="margin-top:20px">Qualify and follow up</h3>'+
       '<div class="ci-detail-grid"><div><label>Lead category</label><select id="ciReviewStage">'+
@@ -1005,10 +1021,55 @@ window.openCall=async id=>{
       '<div class="ci-detail-actions"><button id="ciSaveReview">Save review</button><button class="ci-quiet" id="ciRunAI">Run AI analysis</button><span id="ciSaveStatus" class="muted"></span></div>';
     $("ciClose").addEventListener("click",()=>{$("ciDetail").style.display="none";ciSelected=null;if(window.__callReturnFocus?.isConnected)window.__callReturnFocus.focus({preventScroll:true})});
     $("ciSaveReview").addEventListener("click",()=>window.saveCallReview(id));
+    if($("ciLoadRecording"))$("ciLoadRecording").addEventListener("click",()=>window.playCallRecording(id));
     $("ciDetail").focus({preventScroll:true});
     $("ciRunAI").addEventListener("click",()=>window.analyzeCall(id));
     if(c.analysis_requested_at){$("ciRunAI").disabled=true;$("ciRunAI").textContent="AI analysis requested";}
   }catch(e){$("ciDetail").textContent="Unable to load this call: "+e.message}
+};
+let activeRecordingObjectUrl=null;
+function clearRecording(){
+ if(activeRecordingObjectUrl){
+   URL.revokeObjectURL(activeRecordingObjectUrl);
+   activeRecordingObjectUrl=null;
+ }
+}
+window.playCallRecording=async id=>{
+ const btn=$("ciLoadRecording"),status=$("ciAudioStatus"),audio=$("ciAudio");
+ if(!btn||!status||!audio)return;
+ btn.disabled=true;btn.textContent="Loading recording…";
+ status.textContent="Retrieving the audio securely from Vapi.";
+ try{
+   const {data:{session}}=await sb.auth.getSession();
+   if(!session)throw Error("Please sign in again.");
+   const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),70000);
+   let response;
+   try{
+     response=await fetch("/api/account/organizations/"+encodeURIComponent(organization())+
+       "/calls/"+encodeURIComponent(id)+"/recording",{
+        headers:{"Authorization":"Bearer "+session.access_token},signal:ctrl.signal,cache:"no-store"
+       });
+   }finally{clearTimeout(timer)}
+   if(!response.ok){
+     let data=await response.json().catch(()=>({}));
+     throw Error(typeof data.detail==="string"?data.detail:"Unable to retrieve this recording.");
+   }
+   const blob=await response.blob();
+   if(!blob.size)throw Error("The recording is empty.");
+   if(ciSelected!==id)return;
+   clearRecording();
+   activeRecordingObjectUrl=URL.createObjectURL(blob);
+   audio.src=activeRecordingObjectUrl;
+   audio.style.display="block";
+   audio.onended=()=>{btn.disabled=false;btn.textContent="▶ Replay recording"};
+   audio.onerror=()=>{status.textContent="Your browser could not play this recording format. Try a different browser.";btn.disabled=false;btn.textContent="Retry recording"};
+   status.textContent="Recording ready. Use the player to pause, seek, or replay.";
+   btn.textContent="▶ Replay recording";btn.disabled=false;
+   await audio.play().catch(()=>{status.textContent="Recording ready. Press Play in the audio player to start listening."});
+ }catch(e){
+   status.textContent=e?.name==="AbortError"?"Recording download timed out. Please retry.":e.message;
+   btn.disabled=false;btn.textContent="Retry recording";
+ }
 };
 window.analyzeCall=async id=>{
   const button=$("ciRunAI");button.disabled=true;button.textContent="Requesting AI analysis...";
