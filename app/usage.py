@@ -177,6 +177,8 @@ def activate_limits(oid:str,body:ActivateRequest,user=Depends(current_user)):
         billing.get("selected_plan") not in PLANS or
         not billing.get("setup_paid_at")):
         raise HTTPException(409,"A fully paid subscription and setup fee are required")
+    if not os.getenv("VAPI_WEBHOOK_TOKEN"):
+        raise HTTPException(503,"Secure Vapi webhook token is not configured")
     credential=os.getenv("VAPI_CREDENTIAL_ID","")
     if not credential:
         raise HTTPException(503,"Secure Vapi routing credential is not configured")
