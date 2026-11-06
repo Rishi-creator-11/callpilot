@@ -232,6 +232,18 @@ def check_integrations_on_boot():
                         configured=configure_analysis(org["id"])
                         log.info("callpilot_call_analysis_enabled=%s reused=%s",
                                  configured["enabled"],configured.get("existing",False))
+                        # Backfill analysis once on existing calls that predate the new feature.
+                        from app.call_intel import request_call_analysis
+                        old_calls=cloud_api("call_insights",params={
+                            "organization_id":"eq."+org["id"],
+                            "analysis_requested_at":"is.null","lead_source":"eq.unreviewed",
+                            "select":"provider_call_id","limit":3})
+                        for item in old_calls:
+                            try:
+                                outcome=request_call_analysis(org["id"],item["provider_call_id"])
+                                log.info("callpilot_historical_analysis_queued=%s",outcome.get("queued"))
+                            except Exception as inner:
+                                log.warning("callpilot_historical_analysis_blocked error_type=%s",type(inner).__name__)
                     except Exception as e:
                         log.warning("callpilot_call_analysis_blocked error_type=%s",type(e).__name__)
         except Exception as e:
