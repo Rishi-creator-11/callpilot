@@ -282,10 +282,57 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 <div class="cp-form-grid"><div><label for="bname">Business name</label><input id="bname" placeholder="Example Auto Care"></div><div><label for="industry">Industry</label><input id="industry" placeholder="Auto repair"></div></div>
 <button class="secondary" onclick="window.createBusiness()">Create another workspace</button></div>
 </div>
-<div id="knowledge" class="panel card"><h2>Verified business knowledge</h2><p>Answers need an approval before the agent can use them. Prices and estimates are prohibited.</p><label>Customer question</label><input id="faqQ" placeholder="What are your opening hours?"><label>Accurate, verified answer</label><textarea id="faqA" placeholder="Our business is open..."></textarea><button onclick="window.addFact()">Submit for approval</button><div id="facts"></div></div>
-<div id="voice" class="panel card"><h2>Agent voice &amp; identity</h2><div class="note"><strong>Standard voice:</strong> available for future test calls. <strong>Custom owner voice:</strong> requires the voice owner to complete identity and voice verification with the provider. Checking a consent box is not verification. This setting is inactive until that workflow is complete.</div><label>Agent name</label><input id="agent" placeholder="Alex"><label>First message</label><textarea id="greeting" placeholder="Hi, I'm the AI receptionist..."></textarea><button onclick="window.saveAgent()">Save greeting</button><p class="muted">For verified voice cloning, the owner must create and share an approved voice through ElevenLabs. We do not clone voice recordings from this page.</p><h3>Request a verified custom voice</h3><p class="muted">The voice owner must verify their own ElevenLabs voice and authorize its use. Requests are held pending review.</p><label>Voice owner contact email</label><input id="voiceOwnerEmail" type="email" placeholder="owner@company.com"><label>Shared, verified ElevenLabs voice ID</label><input id="voiceId" placeholder="Voice ID from ElevenLabs"><label><input type="checkbox" id="voiceConsent"> I confirm the voice owner explicitly authorized this request</label><button class="secondary" onclick="window.requestVoice()">Submit voice request</button><pre id="voiceResult">No voice request submitted.</pre><button class="secondary" onclick="window.testAssistant()">Create test assistant in Vapi</button><pre id="testAgentResult">No assistant provisioned yet.</pre><p class="muted">Test assistant only: no active phone number, live calendar booking or outbound calling.</p></div>
-<div id="simulator" class="panel card"><h2>Test what your assistant knows</h2><p>Semantic retrieval matches the meaning of customer questions against your approved knowledge. Unknown or ambiguous questions escalate instead of being guessed.</p><div class="note" id="semanticStatus">Checking semantic-search readiness...</div><button class="secondary" onclick="window.indexKnowledge()">Index approved knowledge</button><p class="muted">Run this once for answers approved before semantic search was added. New approved answers are automatically indexed.</p><label>Customer question</label><textarea id="question" placeholder="How much is an inspection?"></textarea><button onclick="window.ask()">Test safe answer</button><pre id="reply">Ask a question.</pre></div>
-<div id="appointments" class="panel card"><h2>Appointments and Google Calendar</h2><p id="calendarStatus" class="muted">Checking calendar configuration...</p><button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button><h3 style="margin-top:24px">Create an internal test appointment</h3><p>Only available after Google Calendar is authorized. The system checks live availability before creating an event.</p><div class="grid"><div><label>Name</label><input id="cname" placeholder="Test customer"><label>Contact</label><input id="ccontact" placeholder="test@example.com"></div><div><label>Service</label><input id="cservice" placeholder="Consultation"><label>Date and time</label><input type="datetime-local" id="cstart"></div></div><label>Duration (minutes)</label><select id="cduration"><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select><button class="secondary" onclick="window.checkAvailability()">Check availability</button><button onclick="window.bookTest()">Create test booking</button><pre id="calendarResult">No calendar test yet.</pre><h3 style="margin-top:24px">Existing requests</h3><p>Legacy requests are not confirmed appointments.</p><pre id="bookings">No bookings loaded.</pre></div>
+<div id="knowledge" class="panel card">
+<div class="cp-panel-heading"><div><h2>Verified business knowledge</h2><p class="muted">Teach your AI the facts it can safely share. Nothing is used until you approve it.</p></div><span class="pill" id="knowledgeCount">Approved facts</span></div>
+<div class="cp-section-box"><h3>Add a new answer</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
+<label for="faqQ">Customer question</label><input id="faqQ" placeholder="Can I order less than a full container?">
+<label for="faqA">Verified answer</label><textarea id="faqA" placeholder="Write the exact information your team has approved..."></textarea>
+<div class="cp-inline-actions"><button onclick="window.addFact()">Submit for approval</button><span class="muted">Pricing and estimates are never shared by the agent.</span></div></div>
+<div class="cp-section-box"><div class="cp-panel-heading"><div><h3>Knowledge library</h3><p>Review and approve individual answers below.</p></div></div><div id="facts"></div></div>
+</div>
+<div id="voice" class="panel card">
+<div class="cp-panel-heading"><div><h2>AI receptionist</h2><p class="muted">Set how your business greets callers and connects to its voice assistant.</p></div><span class="pill">AI assistant</span></div>
+<div class="cp-section-box"><h3>Assistant identity</h3><p>A short and friendly introduction that makes it clear the caller is speaking to AI.</p>
+<div class="cp-form-grid"><div><label for="agent">Assistant name</label><input id="agent" placeholder="Alex"></div>
+<div><label>Voice type</label><input value="Standard professional AI voice" disabled></div></div>
+<label for="greeting">Welcome greeting</label><textarea id="greeting" placeholder="Hi, I'm the AI receptionist. How can I help you today?"></textarea>
+<button onclick="window.saveAgent()">Save assistant settings</button></div>
+<div class="cp-section-box"><h3>Live voice connection</h3><p>CallPilot uses Vapi for phone calls. The business's connected assistant appears under Calls &amp; Leads.</p>
+<div class="cp-inline-actions"><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage Vapi connection</button>
+<button class="secondary" onclick="window.testAssistant()">Create new Vapi test assistant</button></div>
+<p class="cp-footnote muted">Creating a new assistant does not automatically reassign a phone number. Existing live phone assignments stay unchanged.</p>
+<pre id="testAgentResult" role="status">No new assistant has been provisioned from this page.</pre></div>
+<div class="cp-section-box"><h3>Custom voice request</h3><p>For voice cloning, the actual voice owner must authorize and verify the voice with the provider. A checkbox alone is not verification.</p>
+<label for="voiceOwnerEmail">Voice owner's contact email</label><input id="voiceOwnerEmail" type="email" placeholder="owner@company.com">
+<label for="voiceId">Verified ElevenLabs voice ID</label><input id="voiceId" placeholder="Voice ID">
+<label><input type="checkbox" id="voiceConsent"> The voice owner has explicitly authorized this request</label>
+<button class="secondary" onclick="window.requestVoice()">Submit verification request</button>
+<pre id="voiceResult" role="status">No custom voice request has been submitted.</pre>
+</div></div>
+<div id="simulator" class="panel card">
+<div class="cp-panel-heading"><div><h2>Test assistant</h2><p>Check what your receptionist would say before taking a real customer call.</p></div><span class="pill">Safe-answer simulator</span></div>
+<div class="cp-section-box"><h3>Semantic knowledge search</h3>
+<div class="note" id="semanticStatus" role="status">Checking knowledge-index status...</div>
+<p>Different phrasings can retrieve the same approved fact. Unknown or ambiguous questions are escalated instead of guessed.</p>
+<button class="secondary" onclick="window.indexKnowledge()">Reindex approved knowledge</button>
+<p class="muted" style="font-size:12px">Only needed when older approved facts are missing from the semantic index.</p></div>
+<div class="cp-section-box"><h3>Ask your assistant</h3>
+<label for="question">Customer's question</label><textarea id="question" placeholder="Can I buy just one item?"></textarea>
+<button onclick="window.ask()">Test safe answer</button>
+<h3 style="margin-top:19px">Assistant response</h3><pre id="reply" role="status" style="font-family:inherit;font-size:14px;line-height:1.65">Ask a question to preview the answer.</pre></div></div>
+<div id="appointments" class="panel card">
+<div class="cp-panel-heading"><div><h2>Appointments</h2><p class="muted">Connect your calendar and test scheduling before relying on live appointment bookings.</p></div></div>
+<div class="cp-section-box"><h3>Calendar connection</h3><p id="calendarStatus" class="muted">Checking Google Calendar configuration...</p>
+<button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button></div>
+<div class="cp-section-box"><h3>Create a test appointment</h3><p>CallPilot checks calendar availability before adding an internal test event. This is not a public customer booking form.</p>
+<div class="cp-form-grid"><div><label for="cname">Customer name</label><input id="cname" placeholder="Test customer"></div>
+<div><label for="cservice">Appointment type</label><input id="cservice" placeholder="Consultation"></div>
+<div><label for="ccontact">Contact</label><input id="ccontact" placeholder="test@example.com"></div>
+<div><label for="cstart">Date and time</label><input type="datetime-local" id="cstart"></div></div>
+<label for="cduration">Duration</label><select id="cduration"><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select>
+<div class="cp-inline-actions" style="margin-top:12px"><button class="secondary" onclick="window.checkAvailability()">Check availability</button>
+<button onclick="window.bookTest()">Create test booking</button></div><pre id="calendarResult" role="status">No calendar tests yet.</pre></div>
+<div class="cp-section-box"><h3>Appointment requests</h3><p>Legacy requests are not confirmed calendar bookings.</p><pre id="bookings">No requests loaded.</pre></div></div>
 <div id="billing" class="panel card"><div class="cp-panel-heading"><div>
 <h2>Billing &amp; subscription</h2><p class="muted">Manage your CallPilot plan, payment method and billing history.</p></div>
 <span class="cp-billing-status" id="billingState">Loading</span></div>
@@ -539,7 +586,7 @@ window.saveWorkspace=()=>safe(async()=>{
 });
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
-async function loadFacts(){let facts=await request("/organizations/"+organization()+"/knowledge");$("facts").innerHTML=facts.map(f=>'<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p><span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+(!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+'</div>').join("")||'<p>No approved knowledge yet.</p>';$("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)))}
+async function loadFacts(){let facts=await request("/organizations/"+organization()+"/knowledge");$("knowledgeCount").textContent=facts.filter(f=>f.approved_at).length+" approved facts";$("facts").innerHTML=facts.map(f=>'<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p><span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+(!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+'</div>').join("")||'<p>No approved knowledge yet.</p>';$("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)))}
 window.addFact=()=>safe(async()=>{const question=v("faqQ").trim(),answer=v("faqA").trim();if(question.length<3){$("faqQ").focus();throw Error("Enter a customer question (at least 3 characters). The grey example text is only a placeholder.")}if(answer.length<2){$("faqA").focus();throw Error("Enter the verified answer (at least 2 characters).")}await request("/organizations/"+organization()+"/knowledge","POST",{question,answer});$("faqQ").value="";$("faqA").value="";await loadFacts();return "Fact saved. Review and approve it below before the AI can use it."});
 window.approveFact=id=>safe(async()=>{await request("/organizations/"+organization()+"/knowledge/"+id+"/approve","POST");await loadFacts();msg("Fact approved.")});
 async function loadSemanticStatus(){const result=await request("/organizations/"+organization()+"/semantic-status");$("semanticStatus").textContent=result.configured?
