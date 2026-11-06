@@ -1,0 +1,168 @@
+"""CallPilot monthly voice allowances and business phone-number management.
+
+All usage originates from real completed Vapi calls. No invented call counts.
+Provider admission is opt-in per business after an inbound-routing test.
+"""
+from __future__ import annotations
+import os, hmac, calendar, re
+from datetime import datetime,timezone,timedelta
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field
+from app.account import current_user, membership
+from app.cloud import api
+from app.billing import PLANS, account
+from app.call_intel import vapi, agent_config
+
+router=APIRouter(tags=["voice-usage"])
+
+def billing_window(row,now=None):
+    now=now or datetime.now(timezone.utc)
+    stop_text=(row or {}).get("current_period_end")
+    if stop_text:
+        try:
+            stop=datetime.fromisoformat(stop_text.replace("Z","+00:00"))
+            if stop.tzinfo is None: stop=stop.replace(tzinfo=timezone.utc)
+            if stop>now:
+                year=stop.year-(1 if stop.month==1 else 0)
+                month=12 if stop.month==1 else stop.month-1
+                start=stop.replace(year=year,month=month,
+                                   day=min(stop.day,calendar.monthrange(year,month)[1]))
+                if start<=now:return start,stop
+        except (ValueError,TypeError):pass
+    # If no active subscription cycle is recorded, show this month's illustrative usage.
+    start=now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
+    year=start.year+(start.month==12)
+    month=1 if start.month==12 else start.month+1
+    return start,start.replace(year=year,month=month)
+
+def compute_usage(oid):
+    a=account(oid) or {}
+    plan=(a.get("selected_plan") or "").lower()
+    if plan not in PLANS:plan=None
+    start,end=billing_window(a)
+    result=api("rpc/callpilot_usage_summary","POST",data={
+        "org":oid,"since":start.isoformat(),"until":end.isoformat()})
+    row=result[0] if isinstance(result,list) and result else {}
+    seconds=int(row.get("used_seconds") or 0)
+    active_seconds=int(row.get("live_seconds") or 0)
+    calls=int(row.get("call_count") or 0)
+    max_seconds=PLANS[plan]["included_minutes"]*60 if plan else None
+    percentage=round(100*seconds/max_seconds,1) if max_seconds else None
+    warning="none"
+    if percentage is not None:
+        if percentage>=100:warning="exhausted"
+        elif percentage>=95:warning="critical"
+        elif percentage>=80:warning="warning"
+    eligible=bool(a.get("status") in ("active","trialing") and
+                  a.get("enforcement_enabled") and max_seconds)
+    return {
+        "plan":plan,"subscription_status":a.get("status") or "not_configured",
+        "period_start":start.isoformat(),"period_end":end.isoformat(),
+        "minutes_included":PLANS[plan]["included_minutes"] if plan else None,
+        "calls_completed":calls,"estimated_calls_at_2min":(PLANS[plan]["included_minutes"]//2 if plan else None),
+        "seconds_used":seconds,"minutes_used":round(seconds/60,2),
+        "seconds_active":active_seconds,
+        "minutes_remaining":round(max(0,(max_seconds or 0)-seconds)/60,2) if max_seconds is not None else None,
+        "usage_percent":percentage,
+        "alert":warning,"enforcement_enabled":eligible,
+        "usage_status":"enforced" if eligible else "not_enforced",
+        "scope":"Inbound connected AI calls. Overage billing is disabled.",
+        "note":"Estimated call counts assume two minutes per call. Actual allowance is measured in minutes."
+    }
+
+@router.get("/api/account/organizations/{oid}/usage")
+def usage(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    return compute_usage(oid)
+
+@router.get("/api/account/organizations/{oid}/phone")
+def business_phone(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    config=agent_config(oid)
+    number_id=config.get("provider_phone_id")
+    if not number_id:
+        return {"connected":False,"provider":"vapi","phone_number":None,
+                "number_id":None,"provisioning":"not_connected"}
+    rows=api("phone_assignments",params={"organization_id":"eq."+oid,
+        "provider_phone_id":"eq."+number_id,"select":"provider_number,status","limit":1})
+    return {"connected":True,"provider":"vapi","number_id":number_id,
+        "phone_number":rows[0].get("provider_number") if rows else None,
+        "provisioning":"linked"}
+
+class PhoneLink(BaseModel):
+    provider_phone_id:str=Field(min_length=5,max_length=150)
+
+@router.post("/api/account/organizations/{oid}/phone/link")
+def link_phone(oid:str,body:PhoneLink,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    agent=agent_config(oid).get("provider_agent_id")
+    if not agent:raise HTTPException(409,"Connect the business's Vapi assistant first")
+    phone=vapi("GET","/phone-number/"+body.provider_phone_id)
+    if phone.get("id")!=body.provider_phone_id:
+        raise HTTPException(404,"Vapi number not found")
+    if phone.get("assistantId")!=agent:
+        raise HTTPException(409,"This number is not assigned to this business's Vapi assistant")
+    assigned=api("phone_assignments",params={"provider_phone_id":"eq."+body.provider_phone_id,
+       "select":"organization_id","limit":5})
+    if any(row["organization_id"]!=oid for row in assigned):
+        raise HTTPException(409,"That phone number is already assigned to another business")
+    number=phone.get("number") if isinstance(phone.get("number"),str) else None
+    api("phone_assignments","POST",params={"on_conflict":"provider_phone_id"},
+        data={"organization_id":oid,"provider_phone_id":body.provider_phone_id,
+              "provider_number":number,"status":"linked"},
+        prefer="resolution=merge-duplicates,return=minimal")
+    api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+        data={"provider_phone_id":body.provider_phone_id},prefer="return=minimal")
+    return {"linked":True,"number":number,"number_id":body.provider_phone_id,
+            "admission_control":"not_enabled_on_phone"}
+
+@router.post("/webhooks/vapi-admission/{oid}")
+async def inbound_admission(oid:str,request:Request,authorization:str|None=Header(default=None)):
+    token=os.getenv("VAPI_WEBHOOK_TOKEN","")
+    if not token or not authorization or not hmac.compare_digest(authorization,"Bearer "+token):
+        raise HTTPException(401,"Invalid provider credential")
+    raw=await request.body()
+    if len(raw)>16384:raise HTTPException(413,"Payload too large")
+    try:
+        import json
+        message=json.loads(raw).get("message",{})
+    except (ValueError,TypeError):
+        raise HTTPException(400,"Invalid provider payload")
+    if message.get("type")!="assistant-request":
+        return {"error":"Unsupported call routing request"}
+    config=agent_config(oid)
+    phone_id=config.get("provider_phone_id")
+    provided=(message.get("phoneNumber") or {}).get("id") or (message.get("call") or {}).get("phoneNumberId")
+    if not phone_id or provided!=phone_id:
+        return {"error":"This number is not configured for this business."}
+    assigned=api("phone_assignments",params={"provider_phone_id":"eq."+phone_id,
+        "organization_id":"eq."+oid,"select":"id","limit":1})
+    if not assigned:return {"error":"This business line is unavailable."}
+    agent_id=config.get("provider_agent_id")
+    if not agent_id:return {"error":"This business line is not ready."}
+    try:
+        usage=compute_usage(oid)
+    except Exception:
+        # For production admission, fail closed on temporary billing data failures
+        # rather than allowing unmetered calls.
+        return {"error":"This line is temporarily unavailable. Please call again later."}
+    if usage["usage_status"]!="enforced":
+        # Only configure this endpoint on a phone after paying account,
+        # verified plan and enforcement have been enabled.
+        return {"error":"This business line has not been activated yet."}
+    if usage["minutes_remaining"]<=0 or usage["subscription_status"] not in ("active","trialing"):
+        return {"error":"The automated receptionist is unavailable right now. Please contact the business directly."}
+    return {"assistantId":agent_id}
+
+@router.get("/api/account/organizations/{oid}/phone/setup-guide")
+def phone_setup_guide(oid:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    return {
+        "steps":["Choose a U.S. business number with a supported carrier such as Twilio, or forward an existing number.",
+                 "Import the number into Vapi and assign the business's AI assistant.",
+                 "Connect the provider phone-number ID to this workspace.",
+                 "Test inbound calls before enabling billing-enforced routing."],
+        "note":"CallPilot does not buy numbers or activate enforcement without a tested configuration.",
+        "free_vapi_numbers_per_basic_account":1,
+        "paid_numbers":"Additional numbers have provider charges; usage/concurrency is separate."
+    }
