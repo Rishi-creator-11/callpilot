@@ -206,6 +206,9 @@ def check_integrations_on_boot():
                     fact,metadata=retrieve(organization["id"],"Can I buy half container?")
                     log.info("callpilot_semantic_smoke matched=%s reason=%s score=%s",
                              bool(fact),metadata.get("reason"),metadata.get("similarity","n/a"))
+                    minimum_fact,minimum_meta=retrieve(organization["id"],"Can I buy 1 product?")
+                    log.info("callpilot_minimum_order_smoke matched=%s policy=%s",
+                             bool(minimum_fact),minimum_meta.get("reason")=="approved_policy_entailment")
                     unrelated,negative=retrieve(organization["id"],"Do you repair cars and motorcycles?")
                     log.info("callpilot_semantic_negative unknown=%s reason=%s score=%s",
                              unrelated is None,negative.get("reason"),negative.get("similarity","n/a"))
