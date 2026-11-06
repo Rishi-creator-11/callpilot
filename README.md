@@ -1,25 +1,59 @@
-# CallPilot — AI Receptionist Studio
+# CallPilot — Multi-business AI Receptionist Platform
 
-Protected engineering demo for a multi-business AI receptionist and appointment workflow. **No selling prices are configured.** This repository contains no production credentials.
+## Current state
+Internal preproduction preview deployed to Render. Dedicated Supabase database has been created and migrations applied. No customer-facing calls, verified custom voices, or confirmed calendar bookings are active.
 
-## Features
-- Create separate business workspaces and approved knowledge bases.
-- Configure standard voice agent metadata; owner voice requires verified owner consent and a provider voice ID (future live integration).
-- Simulate conservative responses with explicit no-price policy and escalation for unknown questions.
-- Record appointment *requests* without claiming bookings are confirmed.
-- Fail-closed operator API protected by `ADMIN_TOKEN`.
+- Live console: https://callpilot-internal.onrender.com
+- Supabase project: https://supabase.com/dashboard/project/ftltlmigdokfzqazrsrt
+- Render service: https://dashboard.render.com/web/srv-dbmkk03m8hqs73ao29s0
 
-## Run locally
-```
-python -m venv .venv && source .venv/bin/activate
+## Security configuration (Render → Environment)
+Set the following values in **Render server-side environment variables**. Never send private keys in chat, paste them into browser-side code, or commit them to this GitHub repo.
+
+| Variable | Purpose |
+| --- | --- |
+| ADMIN_TOKEN | Strong random string, authorizes the internal operator console |
+| SUPABASE_URL | https://ftltlmigdokfzqazrsrt.supabase.co (already configured in Render) |
+| SUPABASE_SECRET_KEY | Copy `sb_secret_...` from Supabase project Settings → API Keys; bypasses RLS and is server-only |
+| VAPI_API_KEY | Vapi private API key, used only on backend to create the TEST assistant |
+| VAPI_WEBHOOK_TOKEN | Optional, random secret for authenticated event webhooks |
+| VAPI_CREDENTIAL_ID | Optional Vapi server credential ID; configure same bearer token as VAPI_WEBHOOK_TOKEN |
+| PUBLIC_BASE_URL | Optional https://callpilot-internal.onrender.com |
+
+### Where to find the key
+Supabase project dashboard → Settings → API Keys → Secret keys. If no modern secret key exists, create one there. Only use a *secret* key on the backend, not a publishable key.
+
+Vapi dashboard → API Keys → Private key. Paste into Render as `VAPI_API_KEY` and save. This is not a GitHub credential and does **not** belong in a repository secret unless CI needs it.
+
+### How to test
+1. Open the console URL and enter ADMIN_TOKEN.
+2. Click Connect; it should report persistent storage configured.
+3. Create a test business and add one approved business FAQ. Click Approve on its pending answer.
+4. In policy simulator ask that precise question; the approved answer should appear.
+5. Ask "How much does this cost?" and confirm the answer refuses to quote.
+6. When VAPI_API_KEY is configured, select the business and click Create Vapi test assistant. Inspect resulting assistant ID in Vapi dashboard.
+7. Do not assign a live phone number until voice prompt behavior, caller disclosure, accuracy, recording law and human fallback have been reviewed.
+
+## Architecture
+- FastAPI backend; Render hosting, protected by ADMIN_TOKEN for internal demo
+- Supabase Postgres (separate CallPilot project), seven tenant-scoped core tables, RLS enabled and public table grants revoked
+- Server-only privileged PostgREST adapter in `app/cloud.py`; no secret keys sent to browser
+- `app/vapi.py` receives authenticated end-of-call events and stores **metadata only**, not recordings
+- `static/cloud.html` is the persistent operator console
+- Legacy `static/index.html` and SQLite demo remain for local development but are **not persistent on Render**
+- Vapi test assistant creator uses approved FAQs. It has NO booking tools; therefore it must never say it booked an appointment.
+- Custom voice cannot be provisioned until verified voice-owner consent is recorded. A checkbox alone does not authorize cloning.
+
+## Important remaining production work
+Implement Supabase Auth and tenant-aware authorization replacing the single shared admin token, robust booking/calendar tool with idempotency, signed OAuth integrations, voice consent-verification workflow, provider tool-call validation, contact routing, customer-specific knowledge ingestion, policy-validation testing, observability and retention policies. No guarantee of zero hallucinations is possible for a generative agent; live calls must be tested and supervised before customer launch. Outbound calls remain disabled.
+
+## Local run
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-export ADMIN_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export ADMIN_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 uvicorn app.main:app --reload
 ```
-Visit http://localhost:8000 and enter your ADMIN_TOKEN. For a cloud preview, set a random ADMIN_TOKEN in server-side Render environment settings; never commit it or a Vapi private key. A preview on Render's ephemeral filesystem will lose SQLite records on redeploy.
 
-## Production blockers
-This application is **not yet a live phone agent**. Live telephony, signed Vapi webhooks, real calendar availability and confirmation, customer login/RLS, persistent Supabase Postgres, verified voice cloning, recording disclosures, robust policy enforcement, monitoring and billing are not yet implemented. Do not enter real customer information or expose it as customer-ready SaaS. The no-price simulator is not a guarantee about any external LLM.
-
-## Next step
-Deploy protected internal preview, provision a dedicated Supabase project, wire Vapi server-side with secure keys, and add calendar auth and idempotent booking transactions. Do not activate outbound calling by default.
+Python 3.11 is pinned for Render.
