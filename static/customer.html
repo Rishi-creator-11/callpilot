@@ -211,10 +211,20 @@ window.openCall=async id=>{
       '<label><input id="ciBuyerVerified" type="checkbox" '+(c.buyer_verified?'checked':'')+'> Buyer identity / purchasing ability independently verified by our team</label>'+
       '<label>Why this lead category?</label><textarea id="ciReason" maxlength="600" placeholder="Quote the specific evidence in the conversation...">'+esc(c.lead_reason||"")+'</textarea>'+
       '<label>Next action / notes</label><textarea id="ciNote" maxlength="1000" placeholder="E.g. Call back to confirm shipping destination">'+esc(c.follow_up_note||"")+'</textarea>'+
-      '<div class="ci-detail-actions"><button id="ciSaveReview">Save review</button><span id="ciSaveStatus" class="muted"></span></div>';
+      '<div class="ci-detail-actions"><button id="ciSaveReview">Save review</button><button class="ci-quiet" id="ciRunAI">Run AI analysis</button><span id="ciSaveStatus" class="muted"></span></div>';
     $("ciClose").addEventListener("click",()=>{$("ciDetail").style.display="none";ciSelected=null});
     $("ciSaveReview").addEventListener("click",()=>window.saveCallReview(id));
+    $("ciRunAI").addEventListener("click",()=>window.analyzeCall(id));
+    if(c.analysis_requested_at){$("ciRunAI").disabled=true;$("ciRunAI").textContent="AI analysis requested";}
   }catch(e){$("ciDetail").textContent="Unable to load this call: "+e.message}
+};
+window.analyzeCall=async id=>{
+  const button=$("ciRunAI");button.disabled=true;button.textContent="Requesting AI analysis...";
+  try{
+    const r=await request("/organizations/"+organization()+"/calls/"+id+"/analyze","POST");
+    $("ciSaveStatus").textContent=r.already_requested?"Analysis already requested. Sync calls to see results.":"Analysis queued. Sync calls after processing.";
+    button.textContent="AI analysis requested";
+  }catch(e){button.disabled=false;button.textContent="Run AI analysis";$("ciSaveStatus").textContent=e.message}
 };
 window.saveCallReview=async id=>{
  const button=$("ciSaveReview");button.disabled=true;$("ciSaveStatus").textContent="Saving...";
