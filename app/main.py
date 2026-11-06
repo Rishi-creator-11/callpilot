@@ -214,6 +214,20 @@ def check_integrations_on_boot():
                              unrelated is None,negative.get("reason"),negative.get("similarity","n/a"))
         except Exception as e:
             log.warning("callpilot_semantic_rollout error_type=%s",type(e).__name__)
+    # Import initial historical calls once for clearly matched, configured workspaces.
+    # A private assistant is linked only when its name uniquely matches the business.
+    if db_url and db_secret and vapi_key:
+        try:
+            from app.call_intel import sync_org_calls
+            from app.cloud import api as cloud_api
+            for org in cloud_api("organizations",params={"select":"id","limit":5}):
+                existing=cloud_api("call_insights",params={
+                    "organization_id":"eq."+org["id"],"select":"id","limit":1})
+                if not existing:
+                    result=sync_org_calls(org["id"],limit=20)
+                    log.info("callpilot_call_intelligence_initial_sync imported=%s",result["synced"])
+        except Exception as e:
+            log.warning("callpilot_call_intelligence_initial_sync blocked=%s",type(e).__name__)
     stripe_key=os.getenv("STRIPE_SECRET_KEY","")
     price_id=os.getenv("STRIPE_PRICE_ID","")
     if stripe_key.startswith("sk_test_") and price_id.startswith("price_"):
