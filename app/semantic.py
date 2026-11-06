@@ -74,7 +74,7 @@ def infer_container_minimum(question:str, approved_facts:list[dict]):
     import re
     q=question.casefold()
     small=bool(re.search(r"\b(?:one|1|single|individual|half|partial|one piece|one item|one product|few items|one unit)\b",q))
-    goods=bool(re.search(r"\b(?:product|item|piece|unit|container|garment|clothing|shirt|jacket|pants|order)\b",q))
+    goods=bool(re.search(r"\b(?:products?|items?|pieces?|units?|containers?|garments?|clothing|shirts?|jackets?|pants|orders?)\b",q))
     buy=bool(re.search(r"\b(?:buy|purchase|order|get|sell|available|can i|can we|do you)\b",q))
     if not(small and goods and buy):
         return None
