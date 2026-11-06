@@ -176,15 +176,53 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
 </style></head><body>
 <div class="shell">
-<nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row"><span class="pill">AI receptionist platform · Private beta</span><button id="logout" class="secondary" style="display:none" onclick="window.signOut()">Sign out</button></div></nav>
-<section id="auth"><div class="hero"><span class="pill">Built for businesses that never want to miss another opportunity</span><h1>Your front desk.<br>Powered by AI.</h1><p>Configure a personalized receptionist, approve what it can say, capture appointment requests, and keep customer information separate for every business.</p></div>
-<div class="grid"><div id="authBox" class="card"><h2>Get started</h2><p class="muted">Sign up for your private workspace or sign in to an existing account.</p>
-<label>Email</label><input id="email" type="email" autocomplete="email" required placeholder="you@business.com">
-<label>Password</label><input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="At least 8 characters">
-<div class="row" style="margin-top:14px"><button onclick="window.authAction('signup')">Create account</button><button class="secondary" onclick="window.authAction('signin')">Sign in</button></div><p class="muted">If you sign up, check your email for verification before signing in.</p><p id="authmsg" role="status"></p></div>
-<div class="card" style="margin:30px 0"><h2>Built for trust</h2><p>✓ AI disclosure before conversations</p><p>✓ No automatic price quotes</p><p>✓ Only approved business answers</p><p>✓ Human handoff for unknown requests</p><p>✓ Customer-specific business workspaces</p><div class="note">Live calling and confirmed bookings are not enabled in this beta. No payment is charged at signup.</div></div></div></section>
-<section id="dashboard"><div class="row"><div><h1 style="font-size:32px">Your business console</h1><p id="welcome" class="muted"></p></div><span class="pill">Private beta</span></div>
-<div class="cols"><aside class="card sidebar"><h3>Workspace</h3><select id="org" onchange="window.loadWorkspace()"></select><button class="secondary" onclick="window.section('calls')">Calls &amp; leads</button><button class="secondary" onclick="window.section('workspace')">Workspace settings</button><button class="secondary" onclick="window.section('knowledge')">Verified knowledge</button><button class="secondary" onclick="window.section('voice')">Voice &amp; greeting</button><button class="secondary" onclick="window.section('simulator')">Policy test</button><button class="secondary" onclick="window.section('appointments')">Appointment requests</button><button class="secondary" onclick="window.section('billing')">Billing</button></aside>
+<nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
+<span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
+<button id="topProfile" class="cp-top-user" style="display:none" onclick="window.section('account')" aria-label="Open your account">
+<span id="topAvatar" class="cp-avatar">CP</span><span id="topUserName" class="cp-top-user-name">My account</span><span aria-hidden="true">⌄</span>
+</button><button id="logout" class="secondary" style="display:none" onclick="window.signOut()">Sign out</button>
+</div></nav>
+<section id="auth"><div class="cp-auth-wrap">
+<div class="hero"><span class="pill">The AI front desk built for growing businesses</span>
+<h1>Every call.<br><span>A real opportunity.</span></h1>
+<p>Turn your business phone into a better customer experience. Answer questions, capture qualified leads, review every conversation, and manage follow-ups—all in one workspace.</p>
+<div class="cp-auth-benefits"><div><i>✓</i> An AI receptionist that knows your business</div>
+<div><i>✓</i> Call intelligence, recordings and lead follow-ups</div>
+<div><i>✓</i> Private, secure business workspaces</div></div>
+<p class="cp-auth-footnote">No payment required to create your account. Calling and subscription features depend on your configuration.</p></div>
+<div class="card" id="authBox"><div class="cp-overline">WELCOME TO CALLPILOT</div>
+<h2 id="authTitle">Welcome back</h2><p id="authSubtitle" class="muted">Sign in to manage your business and conversations.</p>
+<div id="authFields">
+<label for="email">Work email</label><input id="email" type="email" autocomplete="email" required placeholder="you@company.com">
+<div id="passwordRow"><label for="password">Password</label><input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="Enter your password"></div>
+<div class="row" style="margin-top:22px"><button id="authSubmit" onclick="window.authAction('signin')">Sign in</button></div>
+<div class="cp-inline-actions" style="justify-content:space-between;margin-top:14px">
+<button id="authSwap" class="cp-top-link" onclick="window.authMode('signup')">Create a free account</button>
+<button id="authForgot" class="cp-top-link" onclick="window.authMode('reset')">Forgot password?</button></div>
+</div>
+<div id="authRecovery" style="display:none"><label for="recoveryPassword">New password</label>
+<input id="recoveryPassword" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+<button style="margin-top:15px;width:100%" onclick="window.setRecoveredPassword()">Set new password</button></div>
+<p id="authmsg" role="status" class="muted"></p>
+<div class="cp-divider"></div><p class="muted" style="font-size:12px;margin:0">Protected sign-in powered by Supabase Auth. Your business information stays within your workspace.</p>
+</div></div></section>
+<section id="dashboard"><div class="row"><div><div class="cp-overline">WORKSPACE / <strong id="headerWorkspace">Your business</strong></div>
+<h1 id="pageTitle">Overview</h1><p id="welcome" class="muted">Everything you need to run your front desk.</p></div>
+<span class="pill" id="headerStatus"><span class="cp-stat-dot"></span> Business console</span></div>
+<div class="cols"><aside class="card sidebar" aria-label="Main navigation">
+<h3>Workspace</h3><select id="org" aria-label="Current business" onchange="window.loadWorkspace()"></select>
+<div class="cp-nav-group">WORKSPACE</div>
+<button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
+<button data-section="knowledge" onclick="window.section('knowledge')"><span class="cp-nav-icon">▤</span> Knowledge base</button>
+<button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
+<button data-section="simulator" onclick="window.section('simulator')"><span class="cp-nav-icon">◇</span> Test assistant</button>
+<button data-section="appointments" onclick="window.section('appointments')"><span class="cp-nav-icon">▣</span> Appointments</button>
+<div class="cp-nav-divider"></div><div class="cp-nav-group">MANAGEMENT</div>
+<button data-section="billing" onclick="window.section('billing')"><span class="cp-nav-icon">▧</span> Billing &amp; plans</button>
+<button data-section="workspace" onclick="window.section('workspace')"><span class="cp-nav-icon">⚙</span> Business settings</button>
+<button data-section="account" onclick="window.section('account')"><span class="cp-nav-icon">♙</span> My account</button>
+<button data-section="help" onclick="window.section('help')"><span class="cp-nav-icon">ⓘ</span> Help &amp; support</button>
+<div class="cp-sidebar-foot">CallPilot · Private beta<br>Built for the way teams work.</div></aside>
 <div>
 <div id="calls" class="panel">
   <div class="ci-head">
@@ -230,13 +268,64 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
     <div class="ci-footnote">Hot and warm are indicators of expressed intent, not identity or ability-to-pay verification. Review recordings and transcripts before making a sales decision.</div>
   </div>
 </div>
-<div id="workspace" class="panel card"><h2>Business workspace</h2><div id="orgInfo" class="note"></div><h3>Create another business</h3><label>Business name</label><input id="bname" placeholder="Example Auto Care"><label>Industry</label><input id="industry" placeholder="Auto repair"><button onclick="window.createBusiness()">Create business</button></div>
+<div id="workspace" class="panel card">
+<div class="cp-panel-heading"><div><h2>Business settings</h2><p class="muted">Keep your workspace accurate and easy to manage.</p></div><span class="pill">Workspace</span></div>
+<div class="cp-section-box"><h3>Business profile</h3><p>These details identify the business this assistant represents.</p>
+<div class="cp-form-grid"><div><label for="wsName">Business name</label><input id="wsName" maxlength="120" autocomplete="organization" placeholder="Your company"></div>
+<div><label for="wsIndustry">Industry</label><input id="wsIndustry" maxlength="80" placeholder="e.g. Wholesale clothing"></div></div>
+<div id="orgInfo" class="cp-subnav" style="margin-top:13px"></div><button onclick="window.saveWorkspace()">Save business details</button></div>
+<div class="cp-section-box"><h3>Team access</h3><p>Your workspace is private. Access is limited to authorized team members.</p>
+<div id="wsTeam" class="muted">Loading team members...</div></div>
+<div class="cp-section-box"><h3>Additional businesses</h3><p>Manage multiple business workspaces independently.</p>
+<div class="cp-form-grid"><div><label for="bname">Business name</label><input id="bname" placeholder="Example Auto Care"></div><div><label for="industry">Industry</label><input id="industry" placeholder="Auto repair"></div></div>
+<button class="secondary" onclick="window.createBusiness()">Create another workspace</button></div>
+</div>
 <div id="knowledge" class="panel card"><h2>Verified business knowledge</h2><p>Answers need an approval before the agent can use them. Prices and estimates are prohibited.</p><label>Customer question</label><input id="faqQ" placeholder="What are your opening hours?"><label>Accurate, verified answer</label><textarea id="faqA" placeholder="Our business is open..."></textarea><button onclick="window.addFact()">Submit for approval</button><div id="facts"></div></div>
 <div id="voice" class="panel card"><h2>Agent voice &amp; identity</h2><div class="note"><strong>Standard voice:</strong> available for future test calls. <strong>Custom owner voice:</strong> requires the voice owner to complete identity and voice verification with the provider. Checking a consent box is not verification. This setting is inactive until that workflow is complete.</div><label>Agent name</label><input id="agent" placeholder="Alex"><label>First message</label><textarea id="greeting" placeholder="Hi, I'm the AI receptionist..."></textarea><button onclick="window.saveAgent()">Save greeting</button><p class="muted">For verified voice cloning, the owner must create and share an approved voice through ElevenLabs. We do not clone voice recordings from this page.</p><h3>Request a verified custom voice</h3><p class="muted">The voice owner must verify their own ElevenLabs voice and authorize its use. Requests are held pending review.</p><label>Voice owner contact email</label><input id="voiceOwnerEmail" type="email" placeholder="owner@company.com"><label>Shared, verified ElevenLabs voice ID</label><input id="voiceId" placeholder="Voice ID from ElevenLabs"><label><input type="checkbox" id="voiceConsent"> I confirm the voice owner explicitly authorized this request</label><button class="secondary" onclick="window.requestVoice()">Submit voice request</button><pre id="voiceResult">No voice request submitted.</pre><button class="secondary" onclick="window.testAssistant()">Create test assistant in Vapi</button><pre id="testAgentResult">No assistant provisioned yet.</pre><p class="muted">Test assistant only: no active phone number, live calendar booking or outbound calling.</p></div>
 <div id="simulator" class="panel card"><h2>Test what your assistant knows</h2><p>Semantic retrieval matches the meaning of customer questions against your approved knowledge. Unknown or ambiguous questions escalate instead of being guessed.</p><div class="note" id="semanticStatus">Checking semantic-search readiness...</div><button class="secondary" onclick="window.indexKnowledge()">Index approved knowledge</button><p class="muted">Run this once for answers approved before semantic search was added. New approved answers are automatically indexed.</p><label>Customer question</label><textarea id="question" placeholder="How much is an inspection?"></textarea><button onclick="window.ask()">Test safe answer</button><pre id="reply">Ask a question.</pre></div>
 <div id="appointments" class="panel card"><h2>Appointments and Google Calendar</h2><p id="calendarStatus" class="muted">Checking calendar configuration...</p><button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button><h3 style="margin-top:24px">Create an internal test appointment</h3><p>Only available after Google Calendar is authorized. The system checks live availability before creating an event.</p><div class="grid"><div><label>Name</label><input id="cname" placeholder="Test customer"><label>Contact</label><input id="ccontact" placeholder="test@example.com"></div><div><label>Service</label><input id="cservice" placeholder="Consultation"><label>Date and time</label><input type="datetime-local" id="cstart"></div></div><label>Duration (minutes)</label><select id="cduration"><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select><button class="secondary" onclick="window.checkAvailability()">Check availability</button><button onclick="window.bookTest()">Create test booking</button><pre id="calendarResult">No calendar test yet.</pre><h3 style="margin-top:24px">Existing requests</h3><p>Legacy requests are not confirmed appointments.</p><pre id="bookings">No bookings loaded.</pre></div>
-<div id="billing" class="panel card"><h2>Billing & subscriptions</h2><p id="billingInfo">Subscriptions are not yet offered. No prices or charges are configured.</p><button id="checkout" onclick="window.checkout()" disabled>Subscribe (not yet available)</button><button id="portal" class="secondary" onclick="window.billingPortal()" style="display:none">Manage billing</button></div>
-<p id="message" role="status"></p></div></div></section><footer>CallPilot private beta · No public pricing configured · Live calls and booking confirmation pending</footer></div>
+<div id="billing" class="panel card"><div class="cp-panel-heading"><div>
+<h2>Billing &amp; subscription</h2><p class="muted">Manage your CallPilot plan, payment method and billing history.</p></div>
+<span class="cp-billing-status" id="billingState">Loading</span></div>
+<div class="cp-section-box"><div class="cp-overline">YOUR SUBSCRIPTION</div>
+<h3 id="billingHeading" style="font-size:22px">CallPilot subscription</h3>
+<p id="billingInfo" class="muted">Checking your billing information...</p>
+<div class="cp-inline-actions">
+<button id="checkout" onclick="window.checkout()" disabled>Start subscription</button>
+<button id="portal" class="secondary" onclick="window.billingPortal()" style="display:none">Manage billing in Stripe ↗</button>
+<button class="secondary" onclick="window.loadBilling()">Refresh status</button>
+</div></div>
+<div class="cp-section-box"><h3>Payment methods, invoices &amp; cancellations</h3>
+<p>For security, payment details are managed through Stripe's hosted customer portal. CallPilot does not store your card numbers.</p>
+<div class="cp-help">Your available cards, wallets, and other payment options are determined by Stripe, your country, and the configured checkout settings. We never display methods that aren't actually available.</div></div></div>
+<div id="account" class="panel card" style="display:none">
+<div class="cp-panel-heading"><div><h2>My account</h2><p class="muted">Manage your profile, email, password and sign-in security.</p></div>
+<span class="pill">Personal settings</span></div>
+<div class="cp-section-box"><h3>Profile information</h3><p>Your profile is separate from your business workspace.</p>
+<div class="cp-form-grid"><div><label for="profileName">Display name</label><input id="profileName" autocomplete="name" maxlength="80" placeholder="Your name"></div>
+<div><label for="profileEmailRead">Email address</label><input id="profileEmailRead" disabled></div></div>
+<div class="cp-inline-actions"><button onclick="window.saveProfile()">Save profile</button><span class="muted" id="profileStatus"></span></div></div>
+<div class="cp-section-box"><h3>Account email</h3><p>Changing your email can require confirmation from both your current and new addresses.</p>
+<label for="profileEmail">New email address</label><input id="profileEmail" type="email" autocomplete="email" placeholder="name@company.com">
+<button class="secondary" onclick="window.changeEmail()">Request email change</button></div>
+<div class="cp-section-box"><h3>Password &amp; security</h3><p>Choose a unique password. You may be asked to confirm your identity before sensitive changes.</p>
+<div class="cp-form-grid"><div><label for="newPassword">New password</label><input id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></div>
+<div><label for="confirmPassword">Confirm new password</label><input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Repeat password"></div></div>
+<div class="cp-inline-actions"><button class="secondary" onclick="window.changePassword()">Update password</button>
+<button class="secondary" onclick="window.sendReset(true)">Email me a reset link</button></div></div>
+<div class="cp-section-box"><h3>Account access</h3><p>Sign out of this device when you are done. Your profile can be used with multiple business workspaces.</p>
+<button class="secondary" onclick="window.signOut()">Sign out</button></div>
+</div>
+<div id="help" class="panel card" style="display:none">
+<div class="cp-panel-heading"><div><h2>Help &amp; support</h2><p class="muted">Quick answers for managing your CallPilot business.</p></div></div>
+<div class="cp-section-box"><h3>Getting started</h3>
+<p><strong>1.</strong> Create your business workspace and update its details.</p>
+<p><strong>2.</strong> Add and approve accurate business knowledge.</p>
+<p><strong>3.</strong> Configure your assistant's greeting, voice and Vapi integration.</p>
+<p><strong>4.</strong> Review calls, qualified leads, and follow-up actions.</p></div>
+<div class="cp-section-box"><h3>Security &amp; payments</h3><p>Manage your password and email in <strong>My account</strong>. If Stripe Checkout is enabled for your business, payment methods and invoices are managed in its secure customer portal.</p>
+<div class="cp-inline-actions"><button class="secondary" onclick="window.section('account')">Account settings</button><button class="secondary" onclick="window.section('billing')">Billing settings</button></div></div>
+<div class="cp-section-box"><h3>Contact support</h3><p>For technical support, save the time and symptoms of any issue. Support contact information will be published once the service's support channel is configured.</p></div></div><p id="message" role="status"></p></div></div></section><footer>© 2026 CallPilot · Business operations platform · Private beta</footer></div>
 <script type="module">
 import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.1/+esm";
 let sb=null,current=null,orgs=[];
