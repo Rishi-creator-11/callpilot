@@ -530,7 +530,7 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
    $("wsName").value=o?.name||"";
    $("wsIndustry").value=o?.industry||"";
-   await Promise.all([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);
+   await Promise.allSettled([loadFacts(),loadAgent(),loadBookings(),loadBilling(),loadCalendar(),loadSemanticStatus()]);
    const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"calls";
    window.section(destination);
  });
