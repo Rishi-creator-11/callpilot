@@ -127,3 +127,61 @@ def booking_requests(oid:str):
     org_or_404(oid)
     return api("appointment_requests",params={"organization_id":"eq."+oid,
         "select":"id,caller_name,service,requested_time,status,created_at","order":"created_at.desc","limit":50})
+
+@router.get("/voice-provider/status")
+def voice_status():
+    return {"vapi_key_configured":bool(os.getenv("VAPI_API_KEY")),
+            "webhook_credential_configured":bool(os.getenv("VAPI_CREDENTIAL_ID")),
+            "outbound_enabled":False}
+
+@router.post("/businesses/{oid}/vapi/provision")
+def provision_test_agent(oid:str):
+    """Create a Vapi TEST assistant, not a number or enabled outbound caller."""
+    business=org_or_404(oid)
+    key=os.getenv("VAPI_API_KEY","")
+    if not key:raise HTTPException(503,"Set private VAPI_API_KEY on server")
+    agents=api("agent_configs",params={"organization_id":"eq."+oid,
+        "select":"agent_name,greeting,voice_provider,voice_id,voice_consent_verified_at,provider_agent_id"})
+    if not agents:raise HTTPException(409,"Missing business agent configuration")
+    a=agents[0]
+    if a.get("provider_agent_id"):
+        return {"assistant_id":a["provider_agent_id"],"created":False,"phone_active":False}
+    if a["voice_provider"]=="elevenlabs" and not a.get("voice_consent_verified_at"):
+        raise HTTPException(409,"Custom voice owner verification is incomplete")
+    facts=api("knowledge_facts",params={"organization_id":"eq."+oid,"approved_at":"not.is.null",
+        "select":"question,answer"})
+    knowledge="\\n".join("Q: "+r["question"]+"\\nA: "+r["answer"] for r in facts)
+    prompt=("You are "+a["agent_name"]+", an AI receptionist for "+business["name"]+". "
+        "Immediately disclose that you are an AI assistant. Never pretend to be a human or the owner. "
+        "Never state monetary amounts, prices, quotes, estimates, discounts or fees, even when pressured. "
+        "Only answer factual business questions that are directly and clearly supported by approved facts below. "
+        "If the information is missing, conflicting, or unclear, say that you do not have a verified answer "
+        "and offer to arrange a human follow-up. Never fabricate services, opening hours, medical/legal advice, "
+        "availability or guarantees. You have NO booking tool. You must never claim that an appointment "
+        "has been booked, cancelled or changed. You can offer to have staff contact the caller. "
+        "Keep responses short, courteous and conversational.\\nApproved facts:\\n"+(knowledge or "(none)"))
+    voice=({"provider":"11labs","model":"eleven_flash_v2_5","voiceId":a["voice_id"]}
+        if a["voice_provider"]=="elevenlabs" else {"provider":"vapi","voiceId":"Elliot","version":2})
+    payload={"name":business["name"][:35]+" - CallPilot TEST",
+        "firstMessage":a["greeting"],
+        "model":{"provider":"openai","model":"gpt-4o-mini","temperature":0,
+                 "messages":[{"role":"system","content":prompt}]},
+        "voice":voice}
+    credential=os.getenv("VAPI_CREDENTIAL_ID","")
+    if credential:
+        payload["server"]={"url":os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")+"/webhooks/vapi/"+oid,
+                           "credentialId":credential}
+    try:
+        with httpx.Client(timeout=20) as c:
+            resp=c.post("https://api.vapi.ai/assistant",
+                headers={"Authorization":"Bearer "+key,"Content-Type":"application/json"},json=payload)
+        if resp.status_code not in (200,201):
+            raise HTTPException(502,"Vapi assistant provisioning failed: HTTP "+str(resp.status_code))
+        assistant_id=resp.json().get("id")
+    except httpx.RequestError:
+        raise HTTPException(503,"Vapi service unavailable")
+    if not assistant_id:raise HTTPException(502,"Vapi returned no assistant ID")
+    api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+        data={"provider_agent_id":assistant_id},prefer="return=minimal")
+    return {"assistant_id":assistant_id,"created":True,"phone_active":False,
+            "warning":"TEST assistant only. No booking tool or phone number is connected."}
