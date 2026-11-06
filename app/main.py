@@ -203,3 +203,6 @@ def customer_app():
 @app.get('/operator',response_class=HTMLResponse)
 def operator_app():
     return (ROOT/'static'/'cloud.html').read_text()
+
+from app.calendar import router as calendar_router
+app.include_router(calendar_router)
