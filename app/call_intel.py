@@ -167,7 +167,10 @@ def call_detail(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
     rows=api("call_insights",params={"organization_id":"eq."+oid,"id":"eq."+str(call_id),
         "select":"*"})
     if not rows:raise HTTPException(404,"Call not found")
-    return rows[0]
+    result=rows[0]
+    result["has_recording"]=bool(result.get("recording_url"))
+    result.pop("recording_url",None)
+    return result
 
 @router.get("/calls/{call_id}/recording")
 async def call_recording(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
@@ -209,10 +212,10 @@ async def call_recording(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
                     if size>60_000_000:
                         raise HTTPException(413,"Recording is too large for browser playback")
                     chunks.append(chunk)
-    except httpx.RequestError:
-        raise HTTPException(503,"Recording service is temporarily unavailable")
     except httpx.TimeoutException:
         raise HTTPException(504,"Recording download timed out")
+    except httpx.RequestError:
+        raise HTTPException(503,"Recording service is temporarily unavailable")
     if not chunks:
         raise HTTPException(404,"Recording file is empty")
     return Response(content=b"".join(chunks),
