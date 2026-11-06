@@ -182,3 +182,22 @@ def semantic_status(oid:str,user=Depends(current_user)):
 def semantic_reindex(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     return reindex_approved(oid)
+
+class WorkspaceUpdate(BaseModel):
+    name:str=Field(min_length=2,max_length=120)
+    industry:str=Field(min_length=2,max_length=80)
+
+@router.patch("/organizations/{oid}/settings")
+def workspace_settings(oid:str,body:WorkspaceUpdate,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    api("organizations","PATCH",params={"id":"eq."+oid},
+        data={"name":body.name.strip(),"industry":body.industry.strip()},prefer="return=minimal")
+    return {"saved":True}
+
+@router.get("/organizations/{oid}/team")
+def workspace_team(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    members=api("organization_members",params={"organization_id":"eq."+oid,
+        "select":"role,user_id","limit":100})
+    return {"members":[{"role":m["role"],"is_you":m["user_id"]==user["id"]} for m in members],
+            "note":"Team invitations are not available yet. Existing members are shown without exposing other users' private contact details."}
