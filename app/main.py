@@ -203,6 +203,9 @@ def check_integrations_on_boot():
                     fact,metadata=retrieve(organization["id"],"Can I buy half container?")
                     log.info("callpilot_semantic_smoke matched=%s reason=%s score=%s",
                              bool(fact),metadata.get("reason"),metadata.get("similarity","n/a"))
+                    unrelated,negative=retrieve(organization["id"],"Do you repair cars and motorcycles?")
+                    log.info("callpilot_semantic_negative unknown=%s reason=%s score=%s",
+                             unrelated is None,negative.get("reason"),negative.get("similarity","n/a"))
         except Exception as e:
             log.warning("callpilot_semantic_rollout error_type=%s",type(e).__name__)
     stripe_key=os.getenv("STRIPE_SECRET_KEY","")
