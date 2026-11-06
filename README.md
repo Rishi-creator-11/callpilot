@@ -57,3 +57,38 @@ uvicorn app.main:app --reload
 ```
 
 Python 3.11 is pinned for Render.
+
+## Customer login (new)
+Public customer app: https://callpilot-internal.onrender.com/app
+Internal admin console moved to: https://callpilot-internal.onrender.com/operator
+The customer UI uses Supabase Auth, verified-email JWTs and server-enforced organization membership. No shared admin token is used by customer APIs.
+
+Supabase Authentication → URL Configuration:
+- Site URL: `https://callpilot-internal.onrender.com`
+- Redirect allowlist: `https://callpilot-internal.onrender.com/app`
+
+Supabase hosted projects require verified email. The built-in SMTP sender is limited to organization team email addresses and a tiny rate limit; configure a production SMTP provider before public signup. Never disable email verification merely to bypass email setup.
+
+## Stripe billing
+A signed webhook and hosted Checkout/Customer Portal integration are in `app/billing.py`. It is deliberately disabled until subscription prices have been explicitly approved and Stripe test credentials are configured. Only `sk_test_...` keys are accepted; live charges cannot be initiated by this code path.
+- `STRIPE_BILLING_ENABLED=false` (configured on Render)
+- Later test configuration: `STRIPE_MODE=test`, `STRIPE_SECRET_KEY=sk_test_...`, `STRIPE_WEBHOOK_SECRET=whsec_...`, `STRIPE_PRICE_ID=price_...`
+- Webhook endpoint: `https://callpilot-internal.onrender.com/webhooks/stripe`
+- Events: `customer.subscription.created`, `.updated`, `.deleted`
+- After price approval and sandbox testing, review paid entitlements, price validation and cancellation scenarios before any live billing.
+
+## Calendar integration
+OAuth start and callback plus live availability and internal test bookings are implemented but disabled until Google OAuth configuration:
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GOOGLE_TOKEN_ENCRYPTION_KEY`: generate using `python3 -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())"`
+- Authorized Google OAuth redirect URI: `https://callpilot-internal.onrender.com/api/oauth/google/callback`
+- Calendar API enabled in Google Cloud project; consent screen configured for test users.
+- User grants calendar.events and calendar.events.freebusy scopes.
+This is a pilot booking flow. Concurrency handling, retries/reconciliation, consent and business-hour rules must be hardened before letting autonomous voice agents book customers.
+
+## Verified owner voice
+Customer app can submit a custom-voice request with an ElevenLabs shared voice ID. This request stays PENDING until verified by the provider; the UI checkbox acknowledges authorization but is **not** proof of identity and cannot activate voice cloning. Voice impersonation is not allowed.
+
+## Still outstanding before a public launch
+Real business email SMTP, domain and website terms, password reset and account recovery UX, billing sandbox integration and prices, Google OAuth keys, production voice-provider tool calls, phone number connection and inbound call QA, provider-verified voice activation, legal compliance/recording policy, webhook idempotency across failures, calendar reservation concurrency and conflict reconciliation, monitoring, consent flows, abuse protection, security review and pilot acceptance tests.
