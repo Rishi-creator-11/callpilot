@@ -647,7 +647,7 @@ window.exportCalls=()=>{
     ["Lead status","lead_stage"],["Qualification","lead_source"],["Summary","summary"],
     ["Product","product_interest"],["Duration (seconds)","duration_seconds"],["Follow-up","follow_up_status"]];
   const quote=x=>{
-    let value=String(x??"").replace(/^[\s]*[=+@\-]/,"'&");
+    let value=String(x??"");if(/^[\s]*[=+@\-]/.test(value))value="'"+value;
     return '"'+value.replace(/"/g,'""')+'"';
   };
   const lines=[fields.map(x=>quote(x[0])).join(","),
