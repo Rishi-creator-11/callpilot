@@ -283,6 +283,21 @@ def check_integrations_on_boot():
             with httpx.Client(timeout=5) as c:
                 r=c.get("https://api.vapi.ai/assistant",params={"limit":"1"},headers={"Authorization":"Bearer "+vapi_key})
             log.info("callpilot_vapi_probe http_status=%s authenticated=%s",r.status_code,r.status_code==200)
+            # Verify the authenticated recording endpoint without downloading audio
+            # or logging private presigned URLs.
+            try:
+                from app.cloud import api as cloud_api
+                recorded=cloud_api("call_insights",params={
+                    "recording_url":"not.is.null","select":"provider_call_id","limit":1})
+                if recorded:
+                    with httpx.Client(timeout=10,follow_redirects=False) as c:
+                        response=c.get("https://api.vapi.ai/call/"+
+                            recorded[0]["provider_call_id"]+"/mono-recording",
+                            headers={"Authorization":"Bearer "+vapi_key})
+                    log.info("callpilot_recording_auth_probe http_status=%s redirect_issued=%s",
+                             response.status_code,response.status_code in (301,302,303,307,308))
+            except Exception as exc:
+                log.warning("callpilot_recording_auth_probe error_type=%s",type(exc).__name__)
         except Exception as e:
             log.warning("callpilot_vapi_probe failed error_type=%s",type(e).__name__)
 
