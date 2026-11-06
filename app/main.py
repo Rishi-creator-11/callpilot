@@ -237,6 +237,10 @@ def check_integrations_on_boot():
                             quiet=disable_knowledge_filler(org["id"])
                             log.info("callpilot_voice_filler_fix updated=%s reason=%s",
                                      quiet["updated"],quiet["reason"])
+                            from app.call_intel import apply_call_duration_policy
+                            cap=apply_call_duration_policy(org["id"])
+                            log.info("callpilot_4min_policy configured=%s changed=%s",
+                                     cap.get("configured"),cap.get("changed"))
                         except Exception as voice_error:
                             log.warning("callpilot_voice_filler_fix failed=%s",type(voice_error).__name__)
                         # Backfill analysis once on existing calls that predate the new feature.
