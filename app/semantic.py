@@ -1,0 +1,91 @@
+"""CallPilot semantic FAQ retrieval: real model embeddings + Supabase pgvector.
+
+Answers are copied from approved business facts, never composed by a language model.
+A missing embedding provider is an explicit setup error, not an invented answer.
+"""
+import os
+from datetime import datetime,timezone
+import httpx
+from fastapi import HTTPException
+from app.cloud import api
+
+MODEL="text-embedding-3-small"
+DIMENSIONS=1536
+# Provisional conservative limits. Calibrate on real positive and negative questions.
+MIN_SIMILARITY=0.78
+MIN_MARGIN=0.045
+
+def enabled():
+    return bool(os.getenv("OPENAI_API_KEY","").startswith("sk-"))
+
+def embeddings(texts:list[str])->list[list[float]]:
+    if not enabled():
+        raise HTTPException(503,"Semantic search requires OPENAI_API_KEY in Render.")
+    if not texts or any(not v.strip() or len(v)>4000 for v in texts):
+        raise HTTPException(422,"Invalid text for embedding")
+    try:
+        with httpx.Client(timeout=25) as c:
+            r=c.post("https://api.openai.com/v1/embeddings",
+                headers={"Authorization":"Bearer "+os.environ["OPENAI_API_KEY"],
+                         "Content-Type":"application/json"},
+                json={"model":MODEL,"input":texts,"encoding_format":"float"})
+    except httpx.RequestError:
+        raise HTTPException(503,"Embedding service unavailable; no answer was generated")
+    if r.status_code!=200:
+        # No provider response body or credentials exposed to caller.
+        raise HTTPException(503,"Embedding provider rejected the request (HTTP "+str(r.status_code)+")")
+    payload=r.json().get("data",[])
+    payload.sort(key=lambda x:x["index"])
+    vectors=[item["embedding"] for item in payload]
+    if len(vectors)!=len(texts) or any(len(v)!=DIMENSIONS for v in vectors):
+        raise HTTPException(502,"Embedding response had an unexpected size")
+    return vectors
+
+def to_pgvector(vector:list[float])->str:
+    return "["+",".join(format(v,".9g") for v in vector)+"]"
+
+def index_fact(organization_id:str,fact_id:str,question:str,approved_by:str|None=None):
+    v=embeddings([question])[0]
+    data={"question_embedding":to_pgvector(v),"embedding_model":MODEL,
+          "embedded_at":datetime.now(timezone.utc).isoformat()}
+    if approved_by:
+        data.update({"approved_at":datetime.now(timezone.utc).isoformat(),"approved_by":approved_by})
+    api("knowledge_facts","PATCH",
+        params={"organization_id":"eq."+organization_id,"id":"eq."+fact_id},
+        data=data,prefer="return=minimal")
+
+def reindex_approved(organization_id:str)->dict:
+    facts=api("knowledge_facts",params={"organization_id":"eq."+organization_id,
+        "approved_at":"not.is.null","question_embedding":"is.null",
+        "select":"id,question","limit":100})
+    if not facts:return {"indexed":0,"remaining":0}
+    vectors=embeddings([row["question"] for row in facts])
+    for row,vector in zip(facts,vectors):
+        api("knowledge_facts","PATCH",params={"organization_id":"eq."+organization_id,"id":"eq."+row["id"]},
+            data={"question_embedding":to_pgvector(vector),
+                  "embedding_model":MODEL,"embedded_at":datetime.now(timezone.utc).isoformat()},
+            prefer="return=minimal")
+    return {"indexed":len(facts),"remaining":"run again if more than 100 approved facts"}
+
+def retrieve(organization_id:str,question:str):
+    vector=embeddings([question])[0]
+    secret=os.getenv("SUPABASE_SECRET_KEY","")
+    if not secret:raise HTTPException(503,"Database secret not configured")
+    base=os.getenv("SUPABASE_URL","").rstrip("/")
+    try:
+        with httpx.Client(timeout=12) as c:
+            response=c.post(base+"/rest/v1/rpc/match_callpilot_knowledge",
+                headers={"apikey":secret,"Content-Type":"application/json"},
+                json={"p_org_id":organization_id,"p_embedding":to_pgvector(vector),"p_limit":3})
+    except httpx.RequestError:raise HTTPException(503,"Semantic database search unavailable")
+    if response.status_code!=200:
+        raise HTTPException(503,"Semantic database search failed (HTTP "+str(response.status_code)+")")
+    rows=response.json()
+    if not rows:return None,{"reason":"no_indexed_facts"}
+    best=rows[0]
+    score=float(best["similarity"])
+    runner_up=float(rows[1]["similarity"]) if len(rows)>1 else -1
+    if score<MIN_SIMILARITY:return None,{"reason":"below_confidence_threshold"}
+    if len(rows)>1 and score-runner_up<MIN_MARGIN:
+        return None,{"reason":"ambiguous_retrieval"}
+    return best,{"reason":"approved_semantic_match","similarity":round(score,3)}
