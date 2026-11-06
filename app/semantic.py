@@ -95,6 +95,10 @@ def _approved_policy_fallback(organization_id:str,question:str,reason:str):
     return None,{"reason":reason}
 
 def retrieve(organization_id:str,question:str):
+    # Explicit approved minimum-order policy overrides misleading product-topic similarity.
+    policy,metadata=_approved_policy_fallback(organization_id,question,"no_policy_inference")
+    if policy is not None:
+        return policy,metadata
     vector=embeddings([question])[0]
     secret=os.getenv("SUPABASE_SECRET_KEY","")
     if not secret:raise HTTPException(503,"Database secret not configured")
