@@ -11,7 +11,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from app.account import current_user, membership
-from app.cloud import api
+from app.cloud import api, org_or_404
 
 router = APIRouter(prefix="/api/account/organizations/{oid}", tags=["call-intelligence"])
 VALID_STAGES = {"hot","warm","general","not_qualified","needs_review"}
@@ -220,7 +220,23 @@ def sync_calls(oid:str,user=Depends(current_user)):
     config=agent_config(oid)
     assistant=config.get("provider_agent_id")
     if not assistant:
-        raise HTTPException(409,"Connect your Vapi assistant first, then sync calls")
+        # Safely auto-discover only one explicitly named CallPilot assistant for this workspace.
+        business=org_or_404(oid)
+        available=vapi("GET","/assistant",params={"limit":100})
+        prefix=(business["name"]+" - CallPilot").casefold()
+        matches=[x for x in available if isinstance(x,dict)
+                 and isinstance(x.get("name"),str)
+                 and x["name"].casefold().startswith(prefix)]
+        if len(matches)==1:
+            proposed=matches[0]["id"]
+            others=api("agent_configs",params={"provider_agent_id":"eq."+proposed,
+                "select":"organization_id","limit":10})
+            if not any(x["organization_id"]!=oid for x in others):
+                api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+                    data={"provider_agent_id":proposed},prefer="return=minimal")
+                assistant=proposed
+        if not assistant:
+            raise HTTPException(409,"Choose the correct Vapi assistant under Connect assistant, then sync calls")
     result=vapi("GET","/call",params={"assistantId":assistant,"limit":100})
     if not isinstance(result,list):
         raise HTTPException(502,"Unexpected Vapi call list format")
