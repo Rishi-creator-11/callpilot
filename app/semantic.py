@@ -68,6 +68,32 @@ def reindex_approved(organization_id:str)->dict:
             prefer="return=minimal")
     return {"indexed":len(facts),"remaining":"run again if more than 100 approved facts"}
 
+
+def infer_container_minimum(question:str, approved_facts:list[dict]):
+    """Use only explicit, approved full-container minimum-order policy."""
+    import re
+    q=question.casefold()
+    small=bool(re.search(r"\b(?:one|1|single|individual|half|partial|one piece|one item|one product|few items|one unit)\b",q))
+    goods=bool(re.search(r"\b(?:product|item|piece|unit|container|garment|clothing|shirt|jacket|pants|order)\b",q))
+    buy=bool(re.search(r"\b(?:buy|purchase|order|get|sell|available|can i|can we|do you)\b",q))
+    if not(small and goods and buy):
+        return None
+    matched=[]
+    for fact in approved_facts:
+        a=fact["answer"].casefold()
+        if ("only" in a and re.search(r"\bfull containers?\b",a)
+                and re.search(r"\b(?:sell|do|offer|ship|accept)\b",a)):
+            matched.append(fact)
+    return matched[0] if len(matched)==1 else None
+
+def _approved_policy_fallback(organization_id:str,question:str,reason:str):
+    facts=api("knowledge_facts",params={"organization_id":"eq."+organization_id,
+        "approved_at":"not.is.null","select":"question,answer","limit":100})
+    match=infer_container_minimum(question,facts)
+    if match:
+        return match,{"reason":"approved_policy_entailment","similarity":None}
+    return None,{"reason":reason}
+
 def retrieve(organization_id:str,question:str):
     vector=embeddings([question])[0]
     secret=os.getenv("SUPABASE_SECRET_KEY","")
@@ -82,11 +108,11 @@ def retrieve(organization_id:str,question:str):
     if response.status_code!=200:
         raise HTTPException(503,"Semantic database search failed (HTTP "+str(response.status_code)+")")
     rows=response.json()
-    if not rows:return None,{"reason":"no_indexed_facts"}
+    if not rows:return _approved_policy_fallback(organization_id,question,"no_indexed_facts")
     best=rows[0]
     score=float(best["similarity"])
     runner_up=float(rows[1]["similarity"]) if len(rows)>1 else -1
-    if score<MIN_SIMILARITY:return None,{"reason":"below_confidence_threshold"}
+    if score<MIN_SIMILARITY:return _approved_policy_fallback(organization_id,question,"below_confidence_threshold")
     if len(rows)>1 and score-runner_up<MIN_MARGIN:
-        return None,{"reason":"ambiguous_retrieval"}
+        return _approved_policy_fallback(organization_id,question,"ambiguous_retrieval")
     return best,{"reason":"approved_semantic_match","similarity":round(score,3)}
