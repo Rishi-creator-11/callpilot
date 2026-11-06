@@ -173,6 +173,7 @@ class Review(BaseModel):
     lead_stage:Literal["hot","warm","general","not_qualified","needs_review"]
     lead_reason:str=Field(default="",max_length=600)
     follow_up_needed:bool=False
+    buyer_verified:bool=False
     follow_up_status:Literal["none","todo","in_progress","done"]="none"
     follow_up_note:str=Field(default="",max_length=1000)
 
