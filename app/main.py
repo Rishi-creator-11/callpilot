@@ -163,3 +163,30 @@ app.include_router(cloud_router)
 
 from app.vapi import router as vapi_router
 app.include_router(vapi_router)
+
+# Startup diagnostics only log status codes and flags; they never log credentials.
+@app.on_event("startup")
+def check_integrations_on_boot():
+    import logging
+    import httpx
+    log=logging.getLogger("uvicorn.error")
+    db_url=os.getenv("SUPABASE_URL","").rstrip("/")
+    db_secret=os.getenv("SUPABASE_SECRET_KEY","")
+    vapi_key=os.getenv("VAPI_API_KEY","")
+    log.info("callpilot_integrations configured supabase_url=%s supabase_secret=%s vapi_key=%s admin_token=%s",
+             bool(db_url),bool(db_secret),bool(vapi_key),bool(os.getenv("ADMIN_TOKEN")))
+    if db_url and db_secret:
+        try:
+            with httpx.Client(timeout=5) as c:
+                r=c.get(db_url+"/rest/v1/organizations",
+                        params={"select":"id","limit":"1"},headers={"apikey":db_secret})
+            log.info("callpilot_supabase_probe http_status=%s connected=%s",r.status_code,r.status_code==200)
+        except Exception as e:
+            log.warning("callpilot_supabase_probe failed error_type=%s",type(e).__name__)
+    if vapi_key:
+        try:
+            with httpx.Client(timeout=5) as c:
+                r=c.get("https://api.vapi.ai/assistant",params={"limit":"1"},headers={"Authorization":"Bearer "+vapi_key})
+            log.info("callpilot_vapi_probe http_status=%s authenticated=%s",r.status_code,r.status_code==200)
+        except Exception as e:
+            log.warning("callpilot_vapi_probe failed error_type=%s",type(e).__name__)
