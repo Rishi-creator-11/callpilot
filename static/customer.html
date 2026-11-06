@@ -397,6 +397,16 @@ border-radius:11px;min-height:46px;min-width:46px}
 .cp-public-pricing p{margin:11px 0 0;font-size:11px;color:#8b96aa}
 @media(max-width:970px){.cp-pricing-grid{grid-template-columns:1fr}.cp-pricing-card{padding:19px}.cp-pricing-card .cp-price{font-size:31px}}
 @media(max-width:520px){.cp-public-plans{grid-template-columns:1fr 1fr;gap:12px}.cp-public-pricing{padding:14px}}
+</style><style id="cp-minute-usage">
+.cp-usage-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:19px 0}
+.cp-usage-stats>div{background:#f5f6fb;border-radius:12px;border:1px solid #e5e8f2;padding:17px;min-width:0}
+.cp-usage-stats small{display:block;font-size:11px;color:#75849c;margin-bottom:7px}
+.cp-usage-stats strong{font-size:23px;color:#172342;font-weight:850;letter-spacing:-.5px;overflow-wrap:anywhere}
+.cp-usage-track{height:12px;border-radius:99px;background:#e8eaf4;overflow:hidden;margin:7px 0 12px}
+.cp-usage-fill{height:100%;background:#685dea;transition:width .2s ease;border-radius:99px}
+.cp-usage-fill.cp-usage-warning{background:#d18b38}
+.cp-price-calls{font-size:12px!important;color:#5c4dd2!important;font-weight:750;margin-top:-4px!important}
+@media(max-width:550px){.cp-usage-stats{grid-template-columns:1fr 1fr}.cp-usage-stats>div{padding:13px}}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
@@ -415,7 +425,7 @@ border-radius:11px;min-height:46px;min-width:46px}
 <p class="cp-auth-footnote">Simple plans from $49 per month plus a one-time $100 professional setup per business.</p>
 <div class="cp-public-pricing"><div class="cp-public-heading">Straightforward monthly plans</div>
 <div class="cp-public-plans"><span><strong>$49</strong> Starter · 100 min</span><span><strong>$99</strong> Growth · 300 min</span><span><strong>$179</strong> Business · 600 min</span></div>
-<p>Every plan has a $100 one-time setup fee. Phone calling and billing are activated after setup.</p></div></div>
+<p>Estimated call counts assume two-minute calls. Actual monthly limits are based on total call minutes. A $100 one-time setup fee applies.</p></div></div>
 <div class="card" id="authBox"><div class="cp-overline">WELCOME TO CALLPILOT</div>
 <h2 id="authTitle">Welcome back</h2><p id="authSubtitle" class="muted">Sign in to manage your business and conversations.</p>
 <div id="authFields">
@@ -449,6 +459,7 @@ border-radius:11px;min-height:46px;min-width:46px}
 <button data-section="simulator" onclick="window.section('simulator')"><span class="cp-nav-icon">◇</span> Test assistant</button>
 <button data-section="appointments" onclick="window.section('appointments')"><span class="cp-nav-icon">▣</span> Appointments</button>
 <div class="cp-nav-divider"></div><div class="cp-nav-group">MANAGEMENT</div>
+<button data-section="usage" onclick="window.section('usage')"><span class="cp-nav-icon">◷</span> Usage &amp; phone</button>
 <button data-section="billing" onclick="window.section('billing')"><span class="cp-nav-icon">▧</span> Billing &amp; plans</button>
 <button data-section="workspace" onclick="window.section('workspace')"><span class="cp-nav-icon">⚙</span> Business settings</button>
 <button data-section="help" onclick="window.section('help')"><span class="cp-nav-icon">ⓘ</span> Help &amp; support</button>
@@ -572,6 +583,29 @@ border-radius:11px;min-height:46px;min-width:46px}
 <div class="cp-inline-actions" style="margin-top:12px"><button class="secondary" onclick="window.checkAvailability()">Check availability</button>
 <button onclick="window.bookTest()">Create test booking</button></div><pre id="calendarResult" role="status">No calendar tests yet.</pre></div>
 <div class="cp-section-box"><h3>Appointment requests</h3><p>Legacy requests are not confirmed calendar bookings.</p><pre id="bookings">No requests loaded.</pre></div></div>
+<div id="usage" class="panel card" style="display:none">
+<div class="cp-panel-heading"><div><h2>Usage &amp; business phone</h2><p class="muted">See exactly how many AI minutes your business uses, and connect its phone number.</p></div><span class="pill">Monthly allowance</span></div>
+<div class="cp-section-box">
+ <h3>Your monthly calling allowance</h3>
+ <div class="cp-usage-stats"><div><small>Minutes used</small><strong id="usageMinutes">—</strong></div>
+ <div><small>Minutes remaining</small><strong id="usageRemaining">—</strong></div>
+ <div><small>Calls completed</small><strong id="usageCalls">—</strong></div></div>
+ <div class="cp-usage-track"><div id="usageProgress" class="cp-usage-fill" style="width:0%"></div></div>
+ <p id="usageMessage" role="status" class="muted">Loading actual usage from completed calls…</p>
+ <p id="usagePeriod" class="muted" style="font-size:12px"></p>
+ <button class="secondary" onclick="window.loadUsage()">Refresh usage</button>
+</div>
+<div class="cp-section-box"><h3>Usage alerts and limits</h3>
+<p>Alerts appear at 80%, 95%, and 100% of your included minutes. We never bill additional minutes without your approval.</p>
+<div class="cp-help" id="usageGuardStatus" role="status">Checking whether automatic inbound-call limits are active…</div>
+<p class="muted" style="font-size:12px">Once inbound routing is tested and enabled, the system can decline new AI calls after the monthly allowance is exhausted. It does not interrupt an already connected call. No daily cap is imposed.</p></div>
+<div class="cp-section-box"><h3>Your business phone number</h3>
+<p>Each business has its own AI assistant and number. You can use an imported provider number, or forward your existing business number.</p>
+<div class="cp-help" id="usagePhoneStatus" role="status">Checking your business number…</div>
+<label for="usagePhoneId">Existing Vapi phone-number ID</label><input id="usagePhoneId" maxlength="150" placeholder="Paste an existing Vapi phone number ID">
+<button class="secondary" onclick="window.linkBusinessPhone()">Connect existing number</button>
+<p class="muted" style="font-size:12px">This only links a number already assigned to your business's assistant in Vapi. It does not purchase a number, change carrier routing or enable new charges.</p>
+<p><a href="https://dashboard.vapi.ai" target="_blank" rel="noopener noreferrer">Open Vapi dashboard ↗</a></p></div></div>
 <div id="billing" class="panel card">
 <div class="cp-panel-heading"><div><h2>Plans &amp; billing</h2>
 <p class="muted">Simple monthly subscriptions, with one professional setup for every business.</p></div>
@@ -582,9 +616,9 @@ border-radius:11px;min-height:46px;min-width:46px}
  <p>Every plan includes the AI receptionist, knowledge management, call recordings when available, transcripts, lead insights and business dashboard.</p>
 </div>
 <div class="cp-pricing-grid" id="pricingCards">
- <div class="cp-pricing-card"><h3>Starter</h3><div class="cp-price">$49 <small>/ month</small></div><strong>100 minutes / month</strong><p>For smaller businesses getting started.</p><button class="secondary" data-plan="starter" onclick="window.pickPlan('starter')">Choose Starter</button></div>
- <div class="cp-pricing-card cp-pricing-featured"><span class="cp-pricing-tag">POPULAR CHOICE</span><h3>Growth</h3><div class="cp-price">$99 <small>/ month</small></div><strong>300 minutes / month</strong><p>For growing teams managing customer inquiries.</p><button data-plan="growth" onclick="window.pickPlan('growth')">Choose Growth</button></div>
- <div class="cp-pricing-card"><h3>Business</h3><div class="cp-price">$179 <small>/ month</small></div><strong>600 minutes / month</strong><p>For businesses with more incoming calls.</p><button class="secondary" data-plan="business" onclick="window.pickPlan('business')">Choose Business</button></div>
+ <div class="cp-pricing-card"><h3>Starter</h3><div class="cp-price">$49 <small>/ month</small></div><strong>100 minutes / month</strong><p class="cp-price-calls">About 50 calls at 2 minutes each</p><p>For smaller businesses getting started.</p><button class="secondary" data-plan="starter" onclick="window.pickPlan('starter')">Choose Starter</button></div>
+ <div class="cp-pricing-card cp-pricing-featured"><span class="cp-pricing-tag">POPULAR CHOICE</span><h3>Growth</h3><div class="cp-price">$99 <small>/ month</small></div><strong>300 minutes / month</strong><p class="cp-price-calls">About 150 calls at 2 minutes each</p><p>For growing teams managing customer inquiries.</p><button data-plan="growth" onclick="window.pickPlan('growth')">Choose Growth</button></div>
+ <div class="cp-pricing-card"><h3>Business</h3><div class="cp-price">$179 <small>/ month</small></div><strong>600 minutes / month</strong><p class="cp-price-calls">About 300 calls at 2 minutes each</p><p>For businesses with more incoming calls.</p><button class="secondary" data-plan="business" onclick="window.pickPlan('business')">Choose Business</button></div>
 </div>
 <div class="cp-setup-strip"><span class="cp-setup-icon">✓</span><div><strong>One-time professional setup: $100 per business</strong>
 <p>Includes business setup, initial knowledge configuration, phone-number connection assistance and launch testing. Collected with your first subscription payment, never at renewal.</p></div></div>
@@ -597,7 +631,7 @@ border-radius:11px;min-height:46px;min-width:46px}
  </div>
  <p id="billingCheckoutNote" class="muted cp-price-disclaimer">Billing activation requires a verified Stripe integration. No payments are taken directly by CallPilot.</p>
 </div>
-<div class="cp-section-box"><h3>Billing details</h3><p>Stripe securely handles payment methods, invoices and subscription cancellation. Included minutes reset monthly. Overage pricing and automatic limits are not enabled yet.</p></div>
+<div class="cp-section-box"><h3>Billing details</h3><p>Stripe securely handles payment methods, invoices and subscription cancellation. Monthly minutes are measured across completed inbound AI calls, regardless of call count. Automatic enforcement is enabled per business only after verified inbound routing and active billing. No overage charges are enabled.</p><button class="secondary" onclick="window.section('usage')">View minutes and number</button></div>
 </div>
 <div id="account" class="panel card" style="display:none">
 <div class="cp-panel-heading"><div><h2>My account</h2><p class="muted">Manage your profile, email, password and sign-in security.</p></div>
@@ -750,6 +784,7 @@ document.addEventListener("click",e=>{
 });
 const pageMeta={
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
+ usage:["Usage & phone","Track included minutes, alerts and your business number."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
  voice:["AI receptionist","Choose the identity, greeting and voice for your front desk."],
  simulator:["Test assistant","Test approved answers before customers hear them."],
@@ -762,7 +797,7 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   calls:()=>window.loadCalls(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>loadSemanticStatus(),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),workspace:()=>window.fillWorkspace()
  }[id];
@@ -947,6 +982,49 @@ const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Numb
 window.checkAvailability=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/availability","POST",slot()),null,2)});
 window.bookTest=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/book-test","POST",{...slot(),caller_name:v("cname"),caller_contact:v("ccontact"),service:v("cservice")}),null,2);await loadBookings()});
 async function loadBookings(){$("bookings").textContent=JSON.stringify(await request("/organizations/"+organization()+"/bookings"),null,2)}
+
+window.loadUsage=async()=>{
+ if(!organization())return;
+ $("usageMessage").textContent="Reading completed call usage…";
+ try{
+  const [u,p]=await Promise.all([
+   request("/organizations/"+organization()+"/usage"),
+   request("/organizations/"+organization()+"/phone")]);
+  $("usageMinutes").textContent=u.minutes_used.toFixed(1)+(u.minutes_included!=null?" / "+u.minutes_included:"");
+  $("usageRemaining").textContent=u.minutes_remaining==null?"No active plan":u.minutes_remaining.toFixed(1);
+  $("usageCalls").textContent=String(u.calls_completed);
+  $("usageProgress").style.width=Math.min(100,Math.max(0,u.usage_percent||0))+"%";
+  $("usageProgress").classList.toggle("cp-usage-warning",u.alert!=="none");
+  const alerts={warning:"You've used at least 80% of your monthly minutes.",
+    critical:"You've used at least 95% of your monthly minutes.",
+    exhausted:"You've used all included minutes. New calls can be restricted once enforcement is activated."};
+  $("usageMessage").textContent=alerts[u.alert]||
+   (u.minutes_included?"Your allowance is measured by minutes, not the number of calls.":"No paid calling plan is assigned to this workspace yet.");
+  $("usagePeriod").textContent="Usage period: "+new Date(u.period_start).toLocaleDateString()+
+    " – "+new Date(u.period_end).toLocaleDateString()+
+    ". Typical calls: "+(u.estimated_calls_at_2min==null?"not configured":"about "+u.estimated_calls_at_2min)+
+    " at 2 minutes each; actual duration varies.";
+  $("usageGuardStatus").textContent=u.enforcement_enabled?
+   "Inbound monthly allowance enforcement is active.":
+   "Usage tracking is active. Automatic limits are NOT yet enforcing calls on this number. Setup and billing must be validated first.";
+  $("usagePhoneStatus").textContent=p.connected?
+   "Connected Vapi number"+(p.phone_number?": "+p.phone_number:" (number ID linked)")+
+   ". Inbound quota enforcement is separate from number assignment.":
+   "No provider number is linked here yet. Existing test calling may still work in Vapi.";
+ }catch(e){
+  $("usageMessage").textContent="Unable to load usage: "+e.message;
+  $("usageGuardStatus").textContent="Automatic calling limits could not be verified.";
+ }
+};
+window.linkBusinessPhone=()=>safe(async()=>{
+ const phoneId=v("usagePhoneId").trim();
+ if(phoneId.length<5)throw Error("Paste a valid Vapi phone-number ID.");
+ const r=await request("/organizations/"+organization()+"/phone/link","POST",
+  {provider_phone_id:phoneId});
+ await window.loadUsage();
+ return "Existing number linked"+(r.number?": "+r.number:"")+". Inbound enforcement remains off until tested.";
+});
+
 let billingPlan="growth";
 function updatePlanSelection(){
  document.querySelectorAll("[data-plan]").forEach(button=>{
