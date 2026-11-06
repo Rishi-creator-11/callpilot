@@ -372,6 +372,31 @@ body[data-app-state="ready"] #cpBootSplash{display:none!important}
 body.cp-signed-in.cp-collapsed .cp-sidebar-collapse-open{display:grid;align-items:center;justify-content:center;padding:0!important;
 border-radius:11px;min-height:46px;min-width:46px}
 @media(max-width:600px){.ci-detail-actions button{flex:1;min-width:115px}.cp-recording-panel{padding:15px}}
+</style><style id="callpilot-approved-pricing">
+/* Pricing — clear subscription and one-time activation disclosure */
+.cp-pricing-head{margin:10px 0 24px}.cp-price-eyebrow{font-size:10px;color:#625add;font-weight:850;letter-spacing:1.4px}
+.cp-pricing-head h3{font-size:24px;line-height:1.25;max-width:620px;margin:8px 0 9px;letter-spacing:-.7px}
+.cp-pricing-head p{font-size:13px;max-width:740px}
+.cp-pricing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.cp-pricing-card{position:relative;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:12px;background:#fff;border:1px solid #e1e5ef;border-radius:15px;padding:24px 20px;box-shadow:0 8px 26px rgba(20,27,61,.035)}
+.cp-pricing-card h3{font-size:17px;margin:0}.cp-pricing-card .cp-price{font-size:37px;font-weight:820;letter-spacing:-1.4px;line-height:1.16;color:#171e36}
+.cp-pricing-card .cp-price small{font-size:12px;font-weight:600;color:#8792a7;letter-spacing:0}
+.cp-pricing-card strong{font-size:12px;color:#2d3553}.cp-pricing-card p{font-size:12px;flex:1;margin:0}
+.cp-pricing-card button{width:100%;min-height:45px;margin-top:8px}
+.cp-pricing-featured{border:2px solid #7065ea;background:#fcfbff;box-shadow:0 12px 32px rgba(93,80,202,.11)}
+.cp-pricing-tag{align-self:flex-start;color:#6558c2;font-size:10px;font-weight:850;letter-spacing:1px}
+.cp-pricing-card button.cp-selected-plan:not(:disabled){outline:2px solid #6d61e9;outline-offset:2px}
+.cp-setup-strip{display:flex;gap:15px;align-items:flex-start;border:1px solid #dfe2fa;background:#f2f2ff;padding:18px 19px;border-radius:13px;margin:18px 0 25px}
+.cp-setup-strip strong{font-size:14px;color:#33316d}.cp-setup-strip p{font-size:12px;margin:5px 0 0;color:#626a86}
+.cp-setup-icon{background:#e5e1ff;color:#5c4dbb;display:grid;place-items:center;width:34px;height:34px;min-width:34px;border-radius:11px;font-weight:850}
+.cp-price-disclaimer{font-size:12px}
+.cp-public-pricing{background:#fff;border:1px solid #e4e6ee;border-radius:13px;padding:17px;margin-top:24px}
+.cp-public-heading{font-weight:800;font-size:13px;color:#273148;margin-bottom:12px}
+.cp-public-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cp-public-plans span{font-size:11px;color:#5f6f88}.cp-public-plans strong{display:block;font-size:20px;color:#5a50d8}
+.cp-public-pricing p{margin:11px 0 0;font-size:11px;color:#8b96aa}
+@media(max-width:970px){.cp-pricing-grid{grid-template-columns:1fr}.cp-pricing-card{padding:19px}.cp-pricing-card .cp-price{font-size:31px}}
+@media(max-width:520px){.cp-public-plans{grid-template-columns:1fr 1fr;gap:12px}.cp-public-pricing{padding:14px}}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
@@ -387,7 +412,10 @@ border-radius:11px;min-height:46px;min-width:46px}
 <div class="cp-auth-benefits"><div><i>✓</i> An AI receptionist that knows your business</div>
 <div><i>✓</i> Call intelligence, recordings and lead follow-ups</div>
 <div><i>✓</i> Private, secure business workspaces</div></div>
-<p class="cp-auth-footnote">No payment required to create your account. Calling and subscription features depend on your configuration.</p></div>
+<p class="cp-auth-footnote">Simple plans from $49 per month plus a one-time $100 professional setup per business.</p>
+<div class="cp-public-pricing"><div class="cp-public-heading">Straightforward monthly plans</div>
+<div class="cp-public-plans"><span><strong>$49</strong> Starter · 100 min</span><span><strong>$99</strong> Growth · 300 min</span><span><strong>$179</strong> Business · 600 min</span></div>
+<p>Every plan has a $100 one-time setup fee. Phone calling and billing are activated after setup.</p></div></div>
 <div class="card" id="authBox"><div class="cp-overline">WELCOME TO CALLPILOT</div>
 <h2 id="authTitle">Welcome back</h2><p id="authSubtitle" class="muted">Sign in to manage your business and conversations.</p>
 <div id="authFields">
@@ -544,20 +572,33 @@ border-radius:11px;min-height:46px;min-width:46px}
 <div class="cp-inline-actions" style="margin-top:12px"><button class="secondary" onclick="window.checkAvailability()">Check availability</button>
 <button onclick="window.bookTest()">Create test booking</button></div><pre id="calendarResult" role="status">No calendar tests yet.</pre></div>
 <div class="cp-section-box"><h3>Appointment requests</h3><p>Legacy requests are not confirmed calendar bookings.</p><pre id="bookings">No requests loaded.</pre></div></div>
-<div id="billing" class="panel card"><div class="cp-panel-heading"><div>
-<h2>Billing &amp; subscription</h2><p class="muted">Manage your CallPilot plan, payment method and billing history.</p></div>
-<span class="cp-billing-status" id="billingState">Loading</span></div>
-<div class="cp-section-box"><div class="cp-overline">YOUR SUBSCRIPTION</div>
-<h3 id="billingHeading" style="font-size:22px">CallPilot subscription</h3>
-<p id="billingInfo" class="muted">Checking your billing information...</p>
-<div class="cp-inline-actions">
-<button id="checkout" onclick="window.checkout()" disabled>Start subscription</button>
-<button id="portal" class="secondary" onclick="window.billingPortal()" style="display:none">Manage billing in Stripe ↗</button>
-<button class="secondary" onclick="window.loadBilling()">Refresh status</button>
-</div></div>
-<div class="cp-section-box"><h3>Payment methods, invoices &amp; cancellations</h3>
-<p>For security, payment details are managed through Stripe's hosted customer portal. CallPilot does not store your card numbers.</p>
-<div class="cp-help">Your available cards, wallets, and other payment options are determined by Stripe, your country, and the configured checkout settings. We never display methods that aren't actually available.</div></div></div>
+<div id="billing" class="panel card">
+<div class="cp-panel-heading"><div><h2>Plans &amp; billing</h2>
+<p class="muted">Simple monthly subscriptions, with one professional setup for every business.</p></div>
+<span class="cp-billing-status" id="billingState">Checking status</span></div>
+<div class="cp-pricing-head">
+ <span class="cp-price-eyebrow">TRANSPARENT PRICING</span>
+ <h3>Choose the right amount of calling for your business.</h3>
+ <p>Every plan includes the AI receptionist, knowledge management, call recordings when available, transcripts, lead insights and business dashboard.</p>
+</div>
+<div class="cp-pricing-grid" id="pricingCards">
+ <div class="cp-pricing-card"><h3>Starter</h3><div class="cp-price">$49 <small>/ month</small></div><strong>100 minutes / month</strong><p>For smaller businesses getting started.</p><button class="secondary" data-plan="starter" onclick="window.pickPlan('starter')">Choose Starter</button></div>
+ <div class="cp-pricing-card cp-pricing-featured"><span class="cp-pricing-tag">POPULAR CHOICE</span><h3>Growth</h3><div class="cp-price">$99 <small>/ month</small></div><strong>300 minutes / month</strong><p>For growing teams managing customer inquiries.</p><button data-plan="growth" onclick="window.pickPlan('growth')">Choose Growth</button></div>
+ <div class="cp-pricing-card"><h3>Business</h3><div class="cp-price">$179 <small>/ month</small></div><strong>600 minutes / month</strong><p>For businesses with more incoming calls.</p><button class="secondary" data-plan="business" onclick="window.pickPlan('business')">Choose Business</button></div>
+</div>
+<div class="cp-setup-strip"><span class="cp-setup-icon">✓</span><div><strong>One-time professional setup: $100 per business</strong>
+<p>Includes business setup, initial knowledge configuration, phone-number connection assistance and launch testing. Collected with your first subscription payment, never at renewal.</p></div></div>
+<div class="cp-section-box">
+ <h3 id="billingHeading">Subscription status</h3>
+ <p id="billingInfo">Checking your subscription…</p>
+ <div class="cp-inline-actions">
+  <button id="portal" class="secondary" onclick="window.billingPortal()" style="display:none">Manage in Stripe ↗</button>
+  <button class="secondary" onclick="window.loadBilling()">Refresh billing status</button>
+ </div>
+ <p id="billingCheckoutNote" class="muted cp-price-disclaimer">Billing activation requires a verified Stripe integration. No payments are taken directly by CallPilot.</p>
+</div>
+<div class="cp-section-box"><h3>Billing details</h3><p>Stripe securely handles payment methods, invoices and subscription cancellation. Included minutes reset monthly. Overage pricing and automatic limits are not enabled yet.</p></div>
+</div>
 <div id="account" class="panel card" style="display:none">
 <div class="cp-panel-heading"><div><h2>My account</h2><p class="muted">Manage your profile, email, password and sign-in security.</p></div>
 <span class="pill">Personal settings</span></div>
@@ -906,23 +947,47 @@ const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Numb
 window.checkAvailability=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/availability","POST",slot()),null,2)});
 window.bookTest=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/book-test","POST",{...slot(),caller_name:v("cname"),caller_contact:v("ccontact"),service:v("cservice")}),null,2);await loadBookings()});
 async function loadBookings(){$("bookings").textContent=JSON.stringify(await request("/organizations/"+organization()+"/bookings"),null,2)}
+let billingPlan="growth";
+function updatePlanSelection(){
+ document.querySelectorAll("[data-plan]").forEach(button=>{
+  const active=button.dataset.plan===billingPlan;
+  button.classList.toggle("cp-selected-plan",active);
+  button.setAttribute("aria-pressed",String(active));
+ });
+}
+window.pickPlan=plan=>{
+ if(!["starter","growth","business"].includes(plan))return;
+ billingPlan=plan;updatePlanSelection();
+ if(!window.callpilotCheckoutEnabled){
+   msg("Plans are published. Secure checkout will open after billing is enabled.",true);
+   return;
+ }
+ window.checkout();
+};
 async function loadBilling(){
  const b=await request("/organizations/"+organization()+"/billing");
  const active=["active","trialing"].includes(b.status);
- $("billingState").textContent=(b.status||"unconfigured").replaceAll("_"," ");
- $("billingHeading").textContent=active?"Your subscription is "+b.status:"Your CallPilot subscription";
+ window.callpilotCheckoutEnabled=Boolean(b.checkout_enabled&&!active);
+ $("billingState").textContent=active?"Subscription "+b.status:(b.mode==="sandbox"?"Sandbox checkout":"Checkout unavailable");
+ $("billingHeading").textContent=active?"Your subscription is "+b.status:"Your subscription";
  $("billingInfo").textContent=active?
-    "Your Stripe test subscription is recorded as "+b.status+". Manage payment methods and invoices securely in Stripe.":
-    b.has_customer?"A billing customer exists, but an active subscription is not confirmed. You can manage the account in Stripe.":
-    b.checkout_enabled?"Sandbox checkout is available. All checkout payments are simulated.":"Checkout is not currently configured for your workspace.";
- $("checkout").disabled=!b.checkout_enabled||active;
- $("checkout").style.display=active?"none":"inline-block";
- $("checkout").textContent=b.checkout_enabled?"Continue to secure Stripe Checkout (test)":"Subscription checkout unavailable";
+  "Your subscription is recorded. Use Stripe to manage invoices and payment details.":
+  b.has_customer?"A Stripe customer exists, but an active subscription isn't confirmed. Please check the Stripe portal before starting another checkout.":
+  "Choose a plan above. Monthly subscriptions have one mandatory $100 setup payment for new businesses.";
+ $("billingCheckoutNote").textContent=b.mode==="sandbox"?
+  "Sandbox test only — no real payment is charged. Your first checkout includes $100 setup, followed by the plan's monthly charge.":
+  "Plan pricing is final, but live charging remains disabled until billing and usage limits are verified.";
  $("portal").style.display=b.has_customer?"inline-block":"none";
+ if(b.selected_plan&&["starter","growth","business"].includes(b.selected_plan))billingPlan=b.selected_plan;
+ updatePlanSelection();
+ document.querySelectorAll("[data-plan]").forEach(button=>{
+  button.disabled=active||!b.checkout_enabled;
+  button.textContent=active?"Subscription active":b.checkout_enabled?"Choose "+button.dataset.plan[0].toUpperCase()+button.dataset.plan.slice(1)+" (test)":"Checkout coming soon";
+ });
 }
 window.requestVoice=()=>safe(async()=>{$("voiceResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/voice-requests","POST",{owner_contact:v("voiceOwnerEmail"),provider_voice_id:v("voiceId"),consent_acknowledged:$("voiceConsent").checked}),null,2)});
 window.testAssistant=()=>safe(async()=>{$("testAgentResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/test-assistant","POST"),null,2)})
-window.checkout=()=>safe(async()=>{const r=await request("/organizations/"+organization()+"/checkout","POST");location.href=r.url});
+window.checkout=()=>safe(async()=>{const r=await request("/organizations/"+organization()+"/checkout","POST",{plan:billingPlan});location.href=r.url});
 window.billingPortal=()=>safe(async()=>{const r=await request("/organizations/"+organization()+"/billing-portal","POST");location.href=r.url});
 
 /* Call intelligence — real authenticated per-workspace records. */
