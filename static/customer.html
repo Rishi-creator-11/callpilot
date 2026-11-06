@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CallPilot — Your AI front desk</title>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111827"><meta name="description" content="CallPilot helps businesses manage AI phone calls, leads and follow-ups."><title>CallPilot — Your AI front desk</title>
 <style>*{box-sizing:border-box}body{margin:0;background:#080e1c;color:#eff3ff;font:15px/1.5 Inter,system-ui,-apple-system,sans-serif}a{color:#a6b7ff}button{border:0;cursor:pointer;background:#7569f8;color:white;padding:12px 18px;border-radius:11px;font-weight:700}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#283651}.shell{max-width:1150px;margin:auto;padding:26px}nav{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #263552;padding-bottom:20px}.brand{font-size:21px;font-weight:800;letter-spacing:-.7px}.brand span{color:#a49aff}.pill{border:1px solid #3b4a66;border-radius:20px;color:#b7c6e7;padding:5px 12px;font-size:12px}h1{font-size:clamp(28px,5vw,51px);letter-spacing:-1.4px;line-height:1.1;margin:22px 0}h2{font-size:20px;margin:0 0 10px}h3{margin:0 0 9px;font-size:16px}p{color:#a7b6d3}label{display:block;color:#bdc8e3;font-size:13px;margin:13px 0 6px}input,select,textarea{width:100%;border:1px solid #354565;background:#0c1427;border-radius:10px;padding:11px;color:white;font:inherit}textarea{min-height:95px}input:focus,textarea:focus{outline:2px solid #776df8}input[type=checkbox]{width:auto}.card{border:1px solid #2d3b59;border-radius:18px;padding:22px;background:#151e34}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.hero{max-width:880px;padding:35px 0 20px}.hero p{font-size:18px}.muted{font-size:13px;color:#a7b6d3}.status{color:#b4d6be}.error{color:#ffc7b5}.cols{display:grid;grid-template-columns:235px 1fr;gap:22px;margin-top:23px}.sidebar{padding:20px;align-self:start}.sidebar button{display:block;width:100%;margin:9px 0;text-align:left}.panel{margin:0 0 18px}.note{background:#101c35;border-left:3px solid #857aff;padding:12px 16px;color:#c5d2ee;border-radius:4px;margin:16px 0}#authBox{max-width:430px;margin:30px 0}#message{min-height:24px}#dashboard{display:none}#auth{display:none}#workspace{display:none}#billing{display:none}#knowledge{display:none}#voice{display:none}#appointments{display:none}#simulator{display:none}#calls{display:none}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.item{border-bottom:1px solid #2e3d58;padding:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1428;padding:14px;border-radius:9px}footer{padding:30px 0;color:#8c9dbd;font-size:12px}@media(max-width:800px){.grid,.grid3,.cols{grid-template-columns:1fr}.hero{padding-top:15px}.sidebar{display:flex;flex-wrap:wrap;gap:8px}.sidebar button{width:auto}.row{flex-wrap:wrap}}
 
 /* Business Call Intelligence */
@@ -262,8 +262,67 @@ body.cp-signed-in .cp-sidebar-collapse-open:hover{background:#354468}
  body.cp-signed-in.cp-collapsed .cp-account-menu{left:0;right:0;bottom:calc(100% + 9px);width:auto}
 }
 @media(min-width:851px){body.cp-signed-in .cp-mobile-appbar{display:none!important}}
+</style><style id="cp-experience-polish">
+/* 2026-11 CallPilot UI/UX pass: researched Vercel interaction rules, Anthropic design skill and WCAG 2.2 */
+:root {font-synthesis:none}
+html {scroll-padding-top:30px}
+button,a,select,[role="button"]{touch-action:manipulation;-webkit-tap-highlight-color:rgba(99,91,221,.12)}
+:where(button,a,input,textarea,select,[role="button"],[tabindex="0"]):focus-visible{outline:3px solid #8078f9!important;outline-offset:3px!important}
+.cp-skip-link{position:fixed;left:12px;top:-90px;z-index:200;padding:12px 18px;background:#191a47;color:#fff;border-radius:10px;font-size:14px;font-weight:750;transition:top .15s ease}
+.cp-skip-link:focus{top:12px}
+body.cp-signed-in .cp-main-content{scroll-margin-top:26px}
+#dashboard .ci-head h2{font-size:clamp(23px,2.2vw,30px)!important;font-weight:800;letter-spacing:-.8px}
+.ci-kpi{transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.ci-kpi:hover{border-color:#c8c5f7;box-shadow:0 12px 30px rgba(38,32,88,.07);transform:translateY(-2px)}
+.ci-kpi:nth-child(2) .num{color:#8d4051}
+.ci-kpi:nth-child(3) .num{color:#976d23}
+.ci-kpi:nth-child(4) .num{color:#514cc2}
+.ci-panel{border-radius:16px}
+.ci-panel>.row:first-child{margin-bottom:10px}
+.ci-table{min-width:550px}
+.ci-table tbody tr{transition:background .12s ease}
+.ci-table tbody tr[role="button"]:focus-visible{outline:2px solid #7669fa;outline-offset:-2px;background:#f1efff}
+.ci-table td{line-height:1.55}
+.ci-table .call-secondary{line-height:1.4}
+.cp-workspace-tip{background:linear-gradient(110deg,#f3f1ff 0%,#fafbff 90%);border:1px solid #e3e0fb;align-items:center;gap:15px;border-radius:13px;padding:16px 18px;margin-bottom:20px}
+.cp-workspace-tip strong{display:block;color:#332d78;font-size:13px;font-weight:760}
+.cp-workspace-tip p{margin:4px 0 0;font-size:12px;color:#686c95}
+.cp-workspace-tip button{flex:none}
+.cp-tip-mark{height:37px;width:37px;min-width:37px;display:grid;place-items:center;background:#e2ddff;border-radius:12px;color:#5e50c7;font-size:19px}
+#ciDetail{scroll-margin-top:25px}
+#ciDetail .ci-detail-grid{gap:6px 18px}
+#message{line-height:1.5;max-width:min(92vw,440px);pointer-events:none}
+#authBox button:disabled{opacity:.58;cursor:progress}
+#authBox label{line-height:1.4}
+#authBox input:focus-visible{box-shadow:0 0 0 4px rgba(104,96,235,.12)}
+.cp-panel-heading h2{letter-spacing:-.4px}
+.sidebar [data-section] .cp-nav-icon{font-family:system-ui}
+@media(max-width:850px){
+ input,textarea,select{font-size:16px!important}
+ #dashboard .cp-mobile-menu,#dashboard .cp-mobile-account{min-width:44px;min-height:44px}
+ body.cp-signed-in .sidebar .cp-side-scroll>button[data-section]{min-height:46px;padding:13px 12px!important}
+ body.cp-signed-in .sidebar .cp-account-trigger{min-height:60px}
+ .ci-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ci-head{align-items:flex-start}
+ .ci-actions button{min-height:44px}
+ .ci-filters input,.ci-filters select{min-height:44px}
+ .ci-table-scroller{margin:0 -10px;padding:0 10px}
+ .cp-workspace-tip{flex-wrap:wrap}
+}
+@media(max-width:420px){
+ #dashboard>.row{padding-left:17px!important;padding-right:17px!important}
+ #dashboard .ci-head{gap:12px}
+ .ci-kpis{gap:8px}
+ .ci-kpi{min-height:100px}
+ .ci-kpi .num{font-size:27px}
+ .ci-kpi .cap{font-size:11px;line-height:1.35}
+ .ci-head .ci-actions{width:100%}
+ .ci-head .ci-actions>button{flex:1;white-space:nowrap}
+ .cp-workspace-tip button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.ci-kpi:hover{transform:none}.cp-skip-link{transition:none}}
 </style></head><body>
-<div class="shell">
+<a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell">
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
 <button id="topProfile" class="cp-top-user" style="display:none" onclick="window.section('account')" aria-label="Open your account">
@@ -324,7 +383,7 @@ body.cp-signed-in .cp-sidebar-collapse-open:hover{background:#354468}
 <button id="cpAccountTrigger" class="cp-account-trigger" onclick="window.toggleAccountMenu()" aria-expanded="false" aria-controls="cpAccountMenu" aria-label="Account menu">
 <span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
 </button></div></aside>
-<div id="cpMainContent" class="cp-main-content">
+<main id="cpMainContent" class="cp-main-content" tabindex="-1">
 <div id="calls" class="panel">
   <div class="ci-head">
     <div><h2 style="font-size:24px;margin:0">Call intelligence</h2><p class="muted">Every conversation, the right follow-up. Based on real calls, not estimates.</p></div>
@@ -341,6 +400,7 @@ body.cp-signed-in .cp-sidebar-collapse-open:hover{background:#354468}
     </div>
     <p class="ci-footnote" id="ciSetupNote">Structured analysis applies to future calls. Past calls can still be reviewed and tagged manually.</p>
   </div>
+  <div class="cp-workspace-tip" id="cpStartTip" role="status" style="display:none"><span aria-hidden="true" class="cp-tip-mark">✦</span><div><strong>Your front desk starts here</strong><p>Connect your AI receptionist to collect your first call, then review customer conversations in one place.</p></div><button class="secondary" onclick="window.showVapiSetup()">Connect assistant</button></div>
   <div id="ciNotice" class="muted" role="status" style="min-height:21px;margin-bottom:13px"></div>
   <div class="ci-kpis">
     <div class="ci-kpi"><div class="num" id="ciTotal">—</div><div class="cap">Total calls</div></div>
@@ -362,10 +422,10 @@ body.cp-signed-in .cp-sidebar-collapse-open:hover{background:#354468}
         <option value="90">Last 90 days</option><option value="365">Last year</option>
       </select>
     </div>
-    <div style="overflow-x:auto"><table class="ci-table" aria-label="Business call history"><thead><tr>
+    <div class="ci-table-scroller" style="overflow-x:auto" role="region" tabindex="0" aria-label="Scrollable call table"><table class="ci-table" aria-label="Business call history"><thead><tr>
       <th style="width:23%">Caller</th><th style="width:23%">Lead status</th><th style="width:32%">Conversation</th><th style="width:22%">Time</th>
     </tr></thead><tbody id="ciRows"><tr><td colspan="4" class="ci-empty">Loading calls...</td></tr></tbody></table></div>
-    <div id="ciDetail" style="display:none" class="ci-details" aria-live="polite"></div>
+    <div id="ciDetail" style="display:none" class="ci-details" aria-live="polite" tabindex="-1"></div>
     <div class="ci-footnote">Hot and warm are indicators of expressed intent, not identity or ability-to-pay verification. Review recordings and transcripts before making a sales decision.</div>
   </div>
 </div>
@@ -778,7 +838,8 @@ window.loadCalls=async()=>{
     $("ciWarm").textContent=r.counts?.warm??0;
     $("ciFollow").textContent=r.follow_ups??0;
     $("ciReviewCount").textContent=(r.counts?.needs_review??0)+" need review";
-    $("ciNotice").textContent=ciCalls.length?"Showing "+ciCalls.length+" recorded calls. Sync to refresh.":"No imported calls yet. Connect your Vapi assistant, then sync calls.";
+    $("ciNotice").textContent=ciCalls.length?"Showing "+ciCalls.length+" recorded calls. Sync to refresh.":"No calls imported yet. Connect the business assistant, then sync call history.";
+    $("cpStartTip").style.display=ciCalls.length?"none":"flex";
     window.filterCalls();
   }catch(e){$("ciNotice").textContent=e.message;$("ciRows").innerHTML='<tr><td colspan="4" class="ci-empty">Unable to load calls.</td></tr>'}
 };
@@ -813,7 +874,9 @@ window.filterCalls=()=>{
    '<td>'+ciTag(c.lead_stage)+'<div class="call-secondary">'+esc(c.lead_source==="human_reviewed"?"Human reviewed":c.lead_source==="ai_suggested"?"AI suggested":"Not yet reviewed")+'</div></td>'+
    '<td>'+esc((c.summary||c.product_interest||"Recording / transcript available when provided by Vapi").slice(0,160))+'</td>'+
    '<td>'+esc(ciDate(c.started_at))+'<div class="call-secondary">'+esc(ciDuration(c.duration_seconds))+'</div></td></tr>').join(""):
-   '<tr><td colspan="4"><div class="ci-empty"><strong>No calls match these filters</strong>Try a broader search, or sync calls from Vapi.</div></td></tr>';
+   '<tr><td colspan="4"><div class="ci-empty"><strong>No conversations found</strong>'+(
+     ciCalls.length?'Try a different search or change the lead category.':'When your AI assistant receives a call, its conversation will appear here after syncing.'
+   )+'</div></td></tr>';
   $("ciRows").querySelectorAll("[data-call]").forEach(row=>{
     const open=()=>window.openCall(row.dataset.call);
     row.addEventListener("click",open);
@@ -823,6 +886,8 @@ window.filterCalls=()=>{
 };
 window.openCall=async id=>{
   ciSelected=id;
+  const currentRow=Array.from(document.querySelectorAll("[data-call]")).find(el=>el.dataset.call===id);
+  if(currentRow)window.__callReturnFocus=currentRow;
   $("ciDetail").style.display="block";
   $("ciDetail").innerHTML='<p class="muted">Loading call details...</p>';
   try{
@@ -848,8 +913,9 @@ window.openCall=async id=>{
       '<label>Why this lead category?</label><textarea id="ciReason" maxlength="600" placeholder="Quote the specific evidence in the conversation...">'+esc(c.lead_reason||"")+'</textarea>'+
       '<label>Next action / notes</label><textarea id="ciNote" maxlength="1000" placeholder="E.g. Call back to confirm shipping destination">'+esc(c.follow_up_note||"")+'</textarea>'+
       '<div class="ci-detail-actions"><button id="ciSaveReview">Save review</button><button class="ci-quiet" id="ciRunAI">Run AI analysis</button><span id="ciSaveStatus" class="muted"></span></div>';
-    $("ciClose").addEventListener("click",()=>{$("ciDetail").style.display="none";ciSelected=null});
+    $("ciClose").addEventListener("click",()=>{$("ciDetail").style.display="none";ciSelected=null;if(window.__callReturnFocus?.isConnected)window.__callReturnFocus.focus({preventScroll:true})});
     $("ciSaveReview").addEventListener("click",()=>window.saveCallReview(id));
+    $("ciDetail").focus({preventScroll:true});
     $("ciRunAI").addEventListener("click",()=>window.analyzeCall(id));
     if(c.analysis_requested_at){$("ciRunAI").disabled=true;$("ciRunAI").textContent="AI analysis requested";}
   }catch(e){$("ciDetail").textContent="Unable to load this call: "+e.message}
