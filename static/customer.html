@@ -321,8 +321,41 @@ body.cp-signed-in .cp-main-content{scroll-margin-top:26px}
  .cp-workspace-tip button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.ci-kpi:hover{transform:none}.cp-skip-link{transition:none}}
+</style><style id="cp-quick-ui">
+/* Product navigation: fast page search with keyboard and mobile-friendly modal */
+body.cp-signed-in .sidebar button.cp-quick-open{display:flex;width:calc(100% - 18px);height:42px;align-items:center;text-align:left;margin:13px 9px 0;padding:0 10px;background:#202a40;color:#aebdd2;border:1px solid #303a51;border-radius:9px;gap:9px}
+body.cp-signed-in .sidebar button.cp-quick-open:hover{background:#2a3650;color:#fff;transform:none}
+.cp-quick-open>span:first-child{font-size:21px;line-height:1}
+.cp-quick-open .cp-quick-label{flex:1;font-weight:600;font-size:12px}
+.cp-quick-open kbd{background:#34405a;border-radius:4px;padding:2px 5px;font-size:10px;font-family:inherit;color:#bccce2}
+.cp-quick-dialog[hidden]{display:none!important}
+.cp-quick-dialog{position:fixed;inset:0;z-index:150;display:flex;align-items:flex-start;justify-content:center;padding:clamp(36px,10vh,130px) 18px 18px}
+.cp-quick-backdrop{position:absolute;inset:0;background:rgba(13,19,37,.55);backdrop-filter:blur(3px)}
+.cp-quick-modal{position:relative;width:min(100%,570px);background:#fff;border:1px solid #dfe3ee;border-radius:16px;box-shadow:0 28px 95px rgba(13,20,43,.28);padding:20px;max-height:75dvh;display:flex;flex-direction:column}
+.cp-quick-heading{margin:0 0 12px!important;font-size:17px!important}
+.cp-quick-search-label{font-size:12px;font-weight:700;color:#52617a}
+#cpQuickSearch{width:100%;height:48px;font-size:16px;border-radius:10px;padding:11px 14px;flex:none}
+.cp-quick-results{overflow-y:auto;min-height:0;max-height:410px;margin-top:10px}
+.cp-quick-result{display:flex;flex-direction:column;gap:3px;align-items:stretch;width:100%;border:0;background:#fff;color:#25334b;padding:12px 13px;text-align:left;margin:3px 0;border-radius:10px}
+.cp-quick-result:hover,.cp-quick-result.cp-quick-selected{background:#f0efff;color:#4035a8;transform:none}
+.cp-quick-result span{font-size:13px;font-weight:740}
+.cp-quick-result small{font-size:11px;font-weight:500;color:#77859d}
+.cp-quick-help{font-size:11px;color:#7b889f;padding-top:10px;margin:10px 0 0;border-top:1px solid #e8eaf0}
+.cp-quick-empty{padding:30px 8px;text-align:center;color:#6c7a91}
+body.cp-signed-in.cp-collapsed .cp-quick-open{justify-content:center!important;width:44px!important;margin-left:4px!important;padding:0!important}
+body.cp-signed-in.cp-collapsed .cp-quick-label,body.cp-signed-in.cp-collapsed .cp-quick-open kbd{display:none}
+@media(max-width:850px){body.cp-signed-in .sidebar button.cp-quick-open{min-height:46px}.cp-quick-dialog{padding-top:35px}.cp-quick-modal{max-height:85dvh}}
 </style></head><body>
-<a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell">
+<a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div id="cpQuickDialog" class="cp-quick-dialog" hidden role="presentation">
+<div class="cp-quick-backdrop" onclick="window.closeQuickNav()"></div>
+<div class="cp-quick-modal" role="dialog" aria-modal="true" aria-labelledby="cpQuickHeading">
+<h2 id="cpQuickHeading" class="cp-quick-heading">Go to…</h2>
+<label class="cp-quick-search-label" for="cpQuickSearch">Search pages</label>
+<input id="cpQuickSearch" type="search" autocomplete="off" placeholder="Search CallPilot…" oninput="window.renderQuickNav()">
+<div id="cpQuickResults" class="cp-quick-results" role="listbox" aria-label="Pages"></div>
+<p class="cp-quick-help">Use ↑ ↓ to move · Enter to open · Esc to close</p>
+</div></div>
+<div class="shell">
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
 <button id="topProfile" class="cp-top-user" style="display:none" onclick="window.section('account')" aria-label="Open your account">
@@ -361,6 +394,7 @@ body.cp-signed-in .cp-main-content{scroll-margin-top:26px}
 <button class="cp-sidebar-collapse-open" onclick="window.toggleSidebar()" title="Expand navigation" aria-label="Expand sidebar">☰</button><div class="cols"><aside id="appSidebar" class="card sidebar" aria-label="Main navigation">
 <div class="cp-side-brand"><div class="cp-brand-lockup"><span class="cp-brand-glyph" aria-hidden="true">✦</span><span class="cp-brand-name">Call<span>Pilot</span></span></div><button class="cp-collapse-button" onclick="window.toggleSidebar()" aria-label="Collapse sidebar" title="Collapse sidebar">☰</button></div>
 <div class="cp-side-workspace"><label for="org">WORKSPACE</label><select id="org" aria-label="Current business" onchange="window.loadWorkspace()"></select></div>
+<button id="cpQuickOpen" class="cp-quick-open" onclick="window.openQuickNav()" aria-label="Quick navigation"><span aria-hidden="true">⌕</span><span class="cp-quick-label">Search pages</span><kbd>⌘K</kbd></button>
 <div class="cp-side-scroll">
 <div class="cp-nav-group">WORKSPACE</div>
 <button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
@@ -629,11 +663,68 @@ window.toggleAccountMenu=()=>{
 };
 window.openAccountSettings=()=>{window.closeAccountMenu();window.closeSidebar();window.section("account")};
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){window.closeAccountMenu();window.closeSidebar()}
+ if(e.key==="Escape"){window.closeAccountMenu();window.closeSidebar();window.closeQuickNav()}
 });
 document.addEventListener("click",e=>{
  if(!e.target.closest(".cp-sidebar-bottom"))window.closeAccountMenu();
 });
+let cpQuickReturn=null, cpQuickIndex=0;
+window.openQuickNav=()=>{
+ if(!current)return;
+ cpQuickReturn=document.activeElement;
+ $("cpQuickDialog").hidden=false;
+ $("cpQuickSearch").value="";
+ cpQuickIndex=0;
+ window.renderQuickNav();
+ $("cpQuickSearch").focus();
+};
+window.closeQuickNav=()=>{
+ if($("cpQuickDialog").hidden)return;
+ $("cpQuickDialog").hidden=true;
+ if(cpQuickReturn?.isConnected)cpQuickReturn.focus();
+};
+window.renderQuickNav=()=>{
+ const q=$("cpQuickSearch").value.trim().toLowerCase();
+ const pages=Object.entries(pageMeta).filter(([key,meta])=>
+   (meta[0]+" "+meta[1]+" "+key).toLowerCase().includes(q));
+ cpQuickIndex=Math.max(0,Math.min(cpQuickIndex,pages.length-1));
+ $("cpQuickResults").innerHTML=pages.length?
+   pages.map(([id,meta],i)=>'<button role="option" aria-selected="'+(cpQuickIndex===i)+'" data-quick="'+id+'" class="cp-quick-result '+(cpQuickIndex===i?'cp-quick-selected':'')+'"><span>'+esc(meta[0])+'</span><small>'+esc(meta[1])+'</small></button>').join(""):
+   '<p class="cp-quick-empty">No matching pages. Try another search.</p>';
+ $("cpQuickResults").querySelectorAll("[data-quick]").forEach((b,i)=>{
+   b.onclick=()=>{window.closeQuickNav();window.section(b.dataset.quick)};
+   b.onpointerenter=()=>{cpQuickIndex=i;window.renderQuickNav()};
+ });
+};
+document.addEventListener("keydown",event=>{
+ const editing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+ if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="k"&&current){
+   event.preventDefault();
+   $("cpQuickDialog").hidden?window.openQuickNav():window.closeQuickNav();
+   return;
+ }
+ if(!$("cpQuickDialog").hidden){
+   if(event.key==="Escape"){event.preventDefault();window.closeQuickNav();return}
+   if(["ArrowDown","ArrowUp"].includes(event.key)){
+     event.preventDefault();
+     const n=$("cpQuickResults").querySelectorAll("[data-quick]").length;
+     if(n){cpQuickIndex=(cpQuickIndex+(event.key==="ArrowDown"?1:-1)+n)%n;window.renderQuickNav()}
+     return;
+   }
+   if(event.key==="Enter"){
+     event.preventDefault();
+     $("cpQuickResults").querySelectorAll("[data-quick]")[cpQuickIndex]?.click();
+     return;
+   }
+   if(event.key==="Tab"){
+     const els=[$("cpQuickSearch"),...$("cpQuickResults").querySelectorAll("button")];
+     const cur=els.indexOf(document.activeElement);
+     if(event.shiftKey&&cur<=0){event.preventDefault();els[els.length-1].focus()}
+     if(!event.shiftKey&&cur===els.length-1){event.preventDefault();els[0].focus()}
+   }
+ }
+});
+
 const pageMeta={
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
