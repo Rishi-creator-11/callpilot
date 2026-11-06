@@ -326,3 +326,6 @@ app.include_router(call_intel_router)
 
 from app.calendar import router as calendar_router
 app.include_router(calendar_router)
+
+from app.usage import router as usage_router
+app.include_router(usage_router)
