@@ -70,6 +70,32 @@ def compute_usage(oid):
         "note":"Estimated call counts assume two minutes per call. Actual allowance is measured in minutes."
     }
 
+def record_threshold_alerts(oid:str):
+    """Write each 80/95/100 percent alert once per business billing cycle."""
+    usage=compute_usage(oid)
+    if usage["minutes_included"] is None:
+        return {"created":0}
+    crossed=[level for level in (80,95,100)
+             if usage["usage_percent"] is not None and usage["usage_percent"]>=level]
+    for level in crossed:
+        api("usage_alerts","POST",params={
+            "on_conflict":"organization_id,period_start,threshold"},
+            data={"organization_id":oid,"period_start":usage["period_start"],
+                  "threshold":level},
+            prefer="resolution=ignore-duplicates,return=minimal")
+    return {"created":len(crossed)}
+
+@router.get("/api/account/organizations/{oid}/usage/alerts")
+def get_usage_alerts(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    usage=compute_usage(oid)
+    rows=api("usage_alerts",params={
+        "organization_id":"eq."+oid,
+        "period_start":"eq."+usage["period_start"],
+        "select":"threshold,created_at","order":"threshold.desc","limit":3"})
+    return {"alerts":rows,"period_start":usage["period_start"],
+            "delivery":"dashboard","external_email_enabled":False}
+
 @router.get("/api/account/organizations/{oid}/usage")
 def usage(oid:str,user=Depends(current_user)):
     membership(oid,user)
