@@ -1,4 +1,4 @@
-from app.faq_match import match_approved
+from app.semantic import index_fact, reindex_approved, retrieve, enabled
 """Customer self-service API: verified Supabase identity and tenant membership."""
 import os, uuid, httpx
 from fastapi import APIRouter, Header, Depends, HTTPException
@@ -112,20 +112,21 @@ def approve_fact(oid:str,fid:str,user=Depends(current_user)):
     if not facts:raise HTTPException(404,"Fact not found")
     if MONEY.search(facts[0]["answer"]):raise HTTPException(400,"Monetary answer not allowed")
     from datetime import datetime,timezone
-    api("knowledge_facts","PATCH",params={"organization_id":"eq."+oid,"id":"eq."+fid},
-        data={"approved_at":datetime.now(timezone.utc).isoformat(),"approved_by":user["id"]},prefer="return=minimal")
-    return {"approved":True}
+    fact=api("knowledge_facts",params={"organization_id":"eq."+oid,"id":"eq."+fid,
+        "select":"id,question,answer"})[0]
+    index_fact(oid,fid,fact["question"],approved_by=user["id"])
+    return {"approved":True,"embedded":True}
 
 @router.post("/organizations/{oid}/simulate")
 def simulate(oid:str,body:Question,user=Depends(current_user)):
     membership(oid,user)
     if PRICE.search(body.question):return {"answer":NO_PRICE,"source":"policy"}
-    facts=api("knowledge_facts",params={"organization_id":"eq."+oid,"approved_at":"not.is.null","select":"question,answer"})
-    fact=match_approved(body.question,facts)
+    fact,metadata=retrieve(oid,body.question)
     if fact:
         if MONEY.search(fact["answer"]):return {"answer":NO_PRICE,"source":"policy"}
-        return {"answer":fact["answer"],"source":"approved","matched_question":fact["question"]}
-    return {"answer":UNKNOWN,"source":"unknown"}
+        return {"answer":fact["answer"],"source":"approved_semantic",
+                "matched_question":fact["question"],"similarity":metadata["similarity"]}
+    return {"answer":UNKNOWN,"source":"unknown","reason":metadata["reason"]}
 
 @router.get("/organizations/{oid}/bookings")
 def bookings(oid:str,user=Depends(current_user)):
@@ -162,3 +163,17 @@ def request_custom_voice(oid:str,body:VoiceRequestInput,user=Depends(current_use
         "consent_acknowledged":True,"status":"pending"},prefer="return=representation")
     return {"id":item[0]["id"],"status":"pending",
             "message":"This request does not activate a voice. Verification happens through the voice provider."}
+
+@router.get("/organizations/{oid}/semantic-status")
+def semantic_status(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    facts=api("knowledge_facts",params={"organization_id":"eq."+oid,
+        "approved_at":"not.is.null","select":"id,question,embedded_at","limit":1000})
+    return {"configured":enabled(),"approved_facts":len(facts),
+            "indexed_facts":sum(bool(f["embedded_at"]) for f in facts),
+            "pending_index":sum(not f["embedded_at"] for f in facts)}
+
+@router.post("/organizations/{oid}/knowledge/reindex")
+def semantic_reindex(oid:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    return reindex_approved(oid)
