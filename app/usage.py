@@ -200,7 +200,7 @@ def configure_fallback(oid:str,body:HumanFallback,user=Depends(current_user)):
     membership(oid,user,("owner",))
     import re
     number=(body.number or "").strip() or None
-    if body.enabled and (not number or not re.fullmatch(r"\\+[1-9]\\d{7,14}",number)):
+    if body.enabled and (not number or not re.fullmatch(r"\+[1-9]\d{7,14}",number)):
         raise HTTPException(422,"Enter a valid international-format phone number, such as +12125551234")
     cfg=agent_config(oid)
     pid=cfg.get("provider_phone_id")
