@@ -92,7 +92,7 @@ def get_usage_alerts(oid:str,user=Depends(current_user)):
     rows=api("usage_alerts",params={
         "organization_id":"eq."+oid,
         "period_start":"eq."+usage["period_start"],
-        "select":"threshold,created_at","order":"threshold.desc","limit":3"})
+        "select":"threshold,created_at","order":"threshold.desc","limit":"3"})
     return {"alerts":rows,"period_start":usage["period_start"],
             "delivery":"dashboard","external_email_enabled":False}
 
