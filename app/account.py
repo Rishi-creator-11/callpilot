@@ -1,3 +1,4 @@
+from app.faq_match import match_approved
 """Customer self-service API: verified Supabase identity and tenant membership."""
 import os, uuid, httpx
 from fastapi import APIRouter, Header, Depends, HTTPException
@@ -120,10 +121,10 @@ def simulate(oid:str,body:Question,user=Depends(current_user)):
     membership(oid,user)
     if PRICE.search(body.question):return {"answer":NO_PRICE,"source":"policy"}
     facts=api("knowledge_facts",params={"organization_id":"eq."+oid,"approved_at":"not.is.null","select":"question,answer"})
-    for fact in facts:
-        if fact["question"].strip().casefold()==body.question.strip().casefold():
-            if MONEY.search(fact["answer"]):return {"answer":NO_PRICE,"source":"policy"}
-            return {"answer":fact["answer"],"source":"approved"}
+    fact=match_approved(body.question,facts)
+    if fact:
+        if MONEY.search(fact["answer"]):return {"answer":NO_PRICE,"source":"policy"}
+        return {"answer":fact["answer"],"source":"approved","matched_question":fact["question"]}
     return {"answer":UNKNOWN,"source":"unknown"}
 
 @router.get("/organizations/{oid}/bookings")
