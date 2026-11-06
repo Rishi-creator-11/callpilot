@@ -232,6 +232,13 @@ def check_integrations_on_boot():
                         configured=configure_analysis(org["id"])
                         log.info("callpilot_call_analysis_enabled=%s reused=%s",
                                  configured["enabled"],configured.get("existing",False))
+                        try:
+                            from app.call_intel import disable_knowledge_filler
+                            quiet=disable_knowledge_filler(org["id"])
+                            log.info("callpilot_voice_filler_fix updated=%s reason=%s",
+                                     quiet["updated"],quiet["reason"])
+                        except Exception as voice_error:
+                            log.warning("callpilot_voice_filler_fix failed=%s",type(voice_error).__name__)
                         # Backfill analysis once on existing calls that predate the new feature.
                         from app.call_intel import request_call_analysis
                         old_calls=cloud_api("call_insights",params={
