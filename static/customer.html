@@ -231,7 +231,7 @@ footer{padding:26px 34px;font-size:11px;color:#96a0b2;text-align:center}
     <div><h2 style="font-size:24px;margin:0">Call intelligence</h2><p class="muted">Every conversation, the right follow-up. Based on real calls, not estimates.</p></div>
     <div class="ci-actions">
       <button class="ci-quiet" onclick="window.showVapiSetup()">Connect assistant</button>
-      <button class="ci-primary" id="syncCallsButton" onclick="window.syncCalls()">↻ Sync Vapi calls</button>
+      <button class="ci-quiet" onclick="window.exportCalls()">Export CSV</button><button class="ci-primary" id="syncCallsButton" onclick="window.syncCalls()">↻ Sync Vapi calls</button>
     </div>
   </div>
   <div id="ciConnection" class="ci-connect" style="display:none">
@@ -380,7 +380,7 @@ import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2
 let sb=null,current=null,orgs=[];
 const $=id=>document.getElementById(id),v=id=>$(id).value;
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const msg=(t,fail=false)=>{$("message").textContent=t;$("message").className=fail?"error":"status"};
+let toastTimeout;const msg=(t,fail=false)=>{clearTimeout(toastTimeout);$("message").textContent=t;$("message").className=fail?"error":"status";if(t)toastTimeout=setTimeout(()=>{$("message").textContent=""},8000)};
 function organization(){return v("org")}
 async function request(url,method="GET",data){if(!current)throw Error("Please sign in");const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired");let r=await fetch("/api/account"+url,{method,headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:data?JSON.stringify(data):undefined});let j=await r.json().catch(()=>({}));if(!r.ok){let d=j.detail;let message=Array.isArray(d)?d.map(x=>{const field=Array.isArray(x.loc)?x.loc.filter(t=>t!=="body").join("."):"field";return (field||"Input")+": "+(x.msg||"Invalid value")}).join("; "):typeof d==="string"?d:d&&typeof d==="object"?(d.message||JSON.stringify(d)):"Request failed (HTTP "+r.status+")";throw Error(message)}return j}
 async function safe(fn){try{msg("");const result=await fn();if(typeof result==="string")msg(result)}catch(e){msg(e instanceof Error?e.message:String(e),true)}}
@@ -640,6 +640,24 @@ window.loadCalls=async()=>{
     $("ciNotice").textContent=ciCalls.length?"Showing "+ciCalls.length+" recorded calls. Sync to refresh.":"No imported calls yet. Connect your Vapi assistant, then sync calls.";
     window.filterCalls();
   }catch(e){$("ciNotice").textContent=e.message;$("ciRows").innerHTML='<tr><td colspan="4" class="ci-empty">Unable to load calls.</td></tr>'}
+};
+window.exportCalls=()=>{
+  if(!ciCalls.length){msg("No calls to export yet.",true);return}
+  const fields=[["Call time","started_at"],["Caller","caller_phone"],["Name","caller_name"],
+    ["Lead status","lead_stage"],["Qualification","lead_source"],["Summary","summary"],
+    ["Product","product_interest"],["Duration (seconds)","duration_seconds"],["Follow-up","follow_up_status"]];
+  const quote=x=>{
+    let value=String(x??"").replace(/^[\s]*[=+@\-]/,"'&");
+    return '"'+value.replace(/"/g,'""')+'"';
+  };
+  const lines=[fields.map(x=>quote(x[0])).join(","),
+    ...ciCalls.map(c=>fields.map(x=>quote(c[x[1]])).join(","))];
+  const csv=lines.join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="callpilot-calls-"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+  msg("Call list exported. Transcript and recording links are excluded.");
 };
 window.filterCalls=()=>{
   const q=v("ciSearch").trim().toLowerCase(),stage=v("ciStage");
