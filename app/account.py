@@ -136,3 +136,28 @@ def create_test_assistant(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     from app.cloud import provision_test_agent
     return provision_test_agent(oid)
+
+class VoiceRequestInput(BaseModel):
+    owner_contact:str=Field(min_length=5,max_length=160)
+    provider_voice_id:str=Field(min_length=5,max_length=180)
+    consent_acknowledged:bool
+
+@router.get("/organizations/{oid}/voice-requests")
+def voice_requests(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    return api("voice_requests",params={"organization_id":"eq."+oid,
+        "select":"id,provider,status,owner_contact,created_at","order":"created_at.desc","limit":15})
+
+@router.post("/organizations/{oid}/voice-requests")
+def request_custom_voice(oid:str,body:VoiceRequestInput,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    if not body.consent_acknowledged:
+        raise HTTPException(422,"Voice owner consent must be acknowledged")
+    previous=api("voice_requests",params={"organization_id":"eq."+oid,"status":"eq.pending","select":"id"})
+    if previous:raise HTTPException(409,"A voice request is already awaiting verification")
+    item=api("voice_requests","POST",data={"organization_id":oid,"requested_by":user["id"],
+        "owner_contact":body.owner_contact,
+        "provider_voice_id":body.provider_voice_id,
+        "consent_acknowledged":True,"status":"pending"},prefer="return=representation")
+    return {"id":item[0]["id"],"status":"pending",
+            "message":"This request does not activate a voice. Verification happens through the voice provider."}
