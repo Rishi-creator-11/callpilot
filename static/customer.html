@@ -42,7 +42,7 @@ async function loadSemanticStatus(){const result=await request("/organizations/"
     "Semantic search ready: "+result.indexed_facts+" of "+result.approved_facts+" approved answers indexed.":
     "Semantic search needs a server-side OPENAI_API_KEY. No embeddings can be generated until configured."}
 window.indexKnowledge=()=>safe(async()=>{const result=await request("/organizations/"+organization()+"/knowledge/reindex","POST");await loadSemanticStatus();return "Indexed "+result.indexed+" approved answers."});
-window.ask=()=>safe(async()=>{$("reply").textContent=JSON.stringify(await request("/organizations/"+organization()+"/simulate","POST",{question:v("question")}),null,2)});
+window.ask=()=>safe(async()=>{const question=v("question").trim();if(!question)throw Error("Please enter a question.");const result=await request("/organizations/"+organization()+"/simulate","POST",{question});$("reply").textContent=result.answer+(result.matched_question?"\n\nMatched approved knowledge: "+result.matched_question:"");});
 async function loadCalendar(){let c=await request("/organizations/"+organization()+"/calendar");$("calendarStatus").textContent=c.connected?"Google Calendar connected":c.configured?"Google Calendar available — connect your account":"Google OAuth credentials not yet configured"}
 window.connectCalendar=()=>safe(async()=>{let r=await request("/organizations/"+organization()+"/calendar/connect","POST");location.href=r.url});
 const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Number(v("cduration"))});
