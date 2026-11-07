@@ -539,7 +539,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div class="cp-section-box"><h3>Tell your assistant about your business</h3><p>Describe your business naturally: what you do, products, services, shipping, policies, and anything customers should know. CallPilot indexes approved passages by meaning—no customer questions required.</p>
 <label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
 <label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
-<div class="cp-inline-actions"><button onclick="window.saveDescription()">Save, approve &amp; index</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out prices and private details.</span></div>
+<div class="cp-inline-actions"><button onclick="window.saveDescription()">Save, approve &amp; index</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out monetary amounts and private details.</span></div>
 <h3 style="margin-top:20px">Business descriptions</h3><div id="descriptions" role="region" aria-label="Business descriptions"></div></div>
 <div class="cp-section-box"><h3>Optional: Add a specific Q&amp;A</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
 <label for="faqQ">Customer question</label><input id="faqQ" placeholder="Can I order less than a full container?">
@@ -1054,7 +1054,7 @@ async function loadFacts(){
  const facts=await request("/organizations/"+oid+"/knowledge");
  if(oid!==organization())return;
  knowledgeItems=facts;
- $("knowledgeCount").textContent=facts.filter(f=>f.approved_at).length+" approved facts";
+ $("knowledgeCount").textContent=(facts.filter(f=>f.approved_at).length+descriptionItems.filter(d=>d.approved_at).length)+" approved knowledge entries";
  $("facts").innerHTML=facts.map(f=>
   '<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p>'+
   '<span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+
