@@ -81,10 +81,20 @@ def home():
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing():
-    return marketing_page(pricing_only=True)
+    return marketing_page("pricing", "Pricing")
 
 
-def marketing_page(*, pricing_only=False):
+@app.get("/how-it-works", response_class=HTMLResponse)
+def how_it_works():
+    return marketing_page("how-it-works", "How it works")
+
+
+@app.get("/faq", response_class=HTMLResponse)
+def faq():
+    return marketing_page("faq", "Frequently asked questions")
+
+
+def marketing_page(section_id=None, title=None):
     from app.billing import PLANS, SETUP_FEE_CENTS
 
     plans = [
@@ -94,16 +104,14 @@ def marketing_page(*, pricing_only=False):
         for plan in PLANS.values()
     ]
     html = (ROOT / "static" / "marketing.html").read_text()
-    if pricing_only:
-        header, content = html.split('<main id="main">', 1)
-        _, pricing_content = content.split('<section class="band shaded" id="pricing">', 1)
-        html = (
-            header.replace("<title>CallPilot | An AI front desk for your business</title>",
-                           "<title>CallPilot Pricing</title>")
-            + '<main id="main"><section class="band shaded" id="pricing">'
-            + pricing_content.replace("<h2>Choose your monthly minutes</h2>",
-                                      "<h1>Choose your monthly minutes.</h1>", 1)
-        )
+    if section_id:
+        header, main = html.split('<main id="main">', 1)
+        section = re.search(r'<section [^>]*id="' + re.escape(section_id) + r'".*?</section>', main, re.DOTALL)
+        content = section.group().replace("<h2>", "<h1>", 1).replace("</h2>", "</h1>", 1)
+        _, footer = main.split("</main>", 1)
+        header = header.replace("<title>CallPilot | An AI front desk for your business</title>",
+                                f"<title>{title} | CallPilot</title>")
+        html = header + '<main id="main" class="detail-page">' + content + "</main>" + footer
     return html.replace("{{plan_cards}}", "".join(plans)).replace("{{setup_fee}}", f"${SETUP_FEE_CENTS // 100}")
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])
