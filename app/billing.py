@@ -24,10 +24,10 @@ def billing_ready():
     mode=billing_mode()
     if mode not in ("test","live"):
         return False
-    key=os.getenv("STRIPE_SECRET_KEY","")
+    key=os.getenv("STRIPE_SECRET_KEY","").strip()
     if not key.startswith(("sk_"+mode+"_","rk_"+mode+"_")):
         return False
-    if not os.getenv("STRIPE_WEBHOOK_SECRET","").startswith("whsec_"):
+    if not os.getenv("STRIPE_WEBHOOK_SECRET","").strip().startswith("whsec_"):
         return False
     if mode=="live":
         return (os.getenv("STRIPE_LIVE_APPROVED","").lower()=="true"
@@ -42,7 +42,7 @@ def fixed_price(name):
 
 def stripe_call(path,method="POST",data=None):
     mode=billing_mode()
-    key=os.getenv("STRIPE_SECRET_KEY","")
+    key=os.getenv("STRIPE_SECRET_KEY","").strip()
     if not billing_ready() or not key.startswith(("sk_"+mode+"_","rk_"+mode+"_")):
         raise HTTPException(503,"Stripe checkout is not configured")
     try:
@@ -225,7 +225,7 @@ def check_signature(payload:bytes,header:str,secret:str)->bool:
 
 @router.post("/webhooks/stripe")
 async def stripe_webhook(request:Request):
-    secret=os.getenv("STRIPE_WEBHOOK_SECRET","")
+    secret=os.getenv("STRIPE_WEBHOOK_SECRET","").strip()
     body=await request.body()
     if not check_signature(body,request.headers.get("stripe-signature",""),secret):
         raise HTTPException(400,"Invalid webhook signature")

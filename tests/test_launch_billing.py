@@ -219,3 +219,8 @@ def test_billing_portal_uses_the_callpilot_configuration(db,monkeypatch):
     monkeypatch.setattr(billing,"stripe_call",lambda path,method="POST",data=None:seen.update(path=path,data=data) or {"url":"https://portal.test"})
     assert client.post(f"/api/account/organizations/{OID}/billing-portal").status_code==200
     assert seen["path"]=="billing_portal/sessions" and seen["data"]["configuration"]=="bpc_callpilot_1"
+
+def test_webhook_secret_with_stray_whitespace_still_verifies(db,monkeypatch):
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET",SECRET+"\n ")
+    db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test"})
+    assert hook(completed("evt_50")).json()=={"received":True}
