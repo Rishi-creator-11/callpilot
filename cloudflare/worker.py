@@ -48,6 +48,17 @@ async def spike_sqlite():
     except Exception as e:
         return {"ok":False,"error":type(e).__name__+": "+str(e)[:160]}
 
+
+@app.get("/_spike/sync-http")
+def spike_sync_http():
+    import httpx
+    try:
+        with httpx.Client(timeout=8) as c:
+            r=c.get("https://api.github.com/zen",headers={"User-Agent":"callpilot-spike"})
+        return {"ok":True,"status":r.status_code}
+    except Exception as e:
+        return {"ok":False,"error":type(e).__name__+": "+str(e)[:200]}
+
 @app.get("/api/{path:path}")
 async def api_unavailable(path:str):
     return Response(content='{"detail":"CallPilot production API is not migrated to this staging Worker"}',
