@@ -327,46 +327,6 @@ def check_integrations_on_boot():
 
 
 
-# One-time read-through and recovery of Metro Print's provider call history.
-# Only persist calls owned by this exact assistant. Logs contain metadata only.
-@app.on_event("startup")
-def recover_metroprint_calls_once():
-    import logging
-    log=logging.getLogger("uvicorn.error")
-    oid="0e7de94e-d12f-4a9a-96f9-5d3b91588a5a"
-    aid="7eb2a057-c5ff-4243-bed6-37f175cfb695"
-    try:
-        from app.call_intel import vapi,persist,agent_config
-        conf=agent_config(oid)
-        if conf.get("provider_agent_id")!=aid:
-            log.warning("metroprint_recovery result=blocked_assistant_changed")
-            return
-        result=vapi("GET","/call",params={"assistantId":aid,"limit":100})
-        if not isinstance(result,list):
-            log.warning("metroprint_recovery result=unexpected_list_response")
-            return
-        verified=[c for c in result if isinstance(c,dict) and c.get("assistantId")==aid]
-        log.info("metroprint_recovery fetched=%d matching=%d statuses=%s",
-                 len(result),len(verified),
-                 {state:sum(c.get("status")==state for c in verified)
-                  for state in set(c.get("status") for c in verified)})
-        successful=0
-        failures={}
-        for c in verified:
-            if c.get("status") not in ("ended","completed"):continue
-            try:
-                call=vapi("GET","/call/"+c["id"])
-                if call.get("assistantId")!=aid:continue
-                persist(oid,call)
-                successful+=1
-            except Exception as exc:
-                category=type(exc).__name__+":"+str(getattr(exc,"detail",""))[:70]
-                failures[category]=failures.get(category,0)+1
-        log.info("metroprint_recovery imported=%d failed_counts=%s",successful,failures)
-    except Exception as exc:
-        log.warning("metroprint_recovery result=error kind=%s detail=%s",
-                    type(exc).__name__,str(getattr(exc,"detail",""))[:110])
-
 from app.account import router as account_router
 from app.billing import router as billing_router
 app.include_router(account_router)
