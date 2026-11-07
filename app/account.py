@@ -23,9 +23,17 @@ PLAN_ANSWER=(
 )
 def allowed_plan_fact(oid,question,answer):
     return oid==CALLPILOT_ORG and question.strip()==PLAN_QUESTION and answer.strip()==PLAN_ANSWER
+def tenant_prices_enabled(oid):
+    if oid==CALLPILOT_ORG:return True
+    rows=api("agent_configs",params={"organization_id":"eq."+oid,
+        "select":"allow_price_quotes","limit":1})
+    return bool(rows and rows[0].get("allow_price_quotes"))
+
 def validate_fact(oid,question,answer):
-    if (PRICE.search(question) or MONEY.search(answer)) and not allowed_plan_fact(oid,question,answer):
-        raise HTTPException(400,"Pricing is restricted to CallPilot's verified published plan FAQ.")
+    if (PRICE.search(question) or MONEY.search(answer)) and not (
+        allowed_plan_fact(oid,question,answer)
+        or (oid!=CALLPILOT_ORG and tenant_prices_enabled(oid))):
+        raise HTTPException(400,"Enable verified business pricing in Launch Studio before publishing exact prices.")
 
 SUPA=lambda:os.getenv("SUPABASE_URL","").rstrip("/")
 PUB=lambda:os.getenv("SUPABASE_PUBLISHABLE_KEY","")
@@ -267,7 +275,7 @@ def simulate(oid:str,body:Question,user=Depends(current_user)):
             if re.search(r"\\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\\b",body.question,re.I):
                 return {"answer":"Published prices are fixed. Our team can discuss requirements, but I cannot negotiate or offer deals.","source":"policy"}
             return {"answer":PLAN_ANSWER,"source":"published_pricing"}
-        return {"answer":NO_PRICE,"source":"policy"}
+        if not tenant_prices_enabled(oid):return {"answer":NO_PRICE,"source":"policy"}
     # Lazy backfill for FAQs approved before embeddings were introduced.
     pending=api("knowledge_facts",params={"organization_id":"eq."+oid,
         "approved_at":"not.is.null","question_embedding_384":"is.null","select":"id","limit":1})
@@ -275,11 +283,52 @@ def simulate(oid:str,body:Question,user=Depends(current_user)):
         reindex_approved(oid)
     fact,metadata=retrieve(oid,body.question)
     if fact:
-        if MONEY.search(fact["answer"]) and not allowed_plan_fact(oid,fact["question"],fact["answer"]):
+        if MONEY.search(fact["answer"]) and not (allowed_plan_fact(oid,fact["question"],fact["answer"]) or (oid!=CALLPILOT_ORG and tenant_prices_enabled(oid))):
             return {"answer":NO_PRICE,"source":"policy"}
         return {"answer":fact["answer"],"source":"approved_semantic",
                 "matched_question":fact["question"],"similarity":metadata["similarity"]}
     return {"answer":UNKNOWN,"source":"unknown","reason":metadata["reason"]}
+
+class PricingCapabilities(BaseModel):
+    enabled:bool
+    owner_confirms_prices_are_verified:bool=False
+
+@router.get("/organizations/{oid}/verified-pricing")
+def verified_pricing(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    rows=api("agent_configs",params={"organization_id":"eq."+oid,
+        "select":"allow_price_quotes,price_quote_approved_at","limit":1})
+    cfg=rows[0] if rows else {}
+    return {"enabled":bool(cfg.get("allow_price_quotes")),
+            "approved_at":cfg.get("price_quote_approved_at")}
+
+@router.put("/organizations/{oid}/verified-pricing")
+def set_verified_pricing(oid:str,body:PricingCapabilities,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    if oid==CALLPILOT_ORG:
+        raise HTTPException(409,"CallPilot's own published plan prices are managed centrally")
+    if body.enabled and body.owner_confirms_prices_are_verified is not True:
+        raise HTTPException(422,"Confirm that only current owner-approved prices will be published")
+    from datetime import datetime,timezone
+    original=api("agent_configs",params={"organization_id":"eq."+oid,
+        "select":"allow_price_quotes,price_quote_approved_at,price_quote_approved_by","limit":1})
+    if not original:raise HTTPException(404,"Business assistant configuration missing")
+    updates={"allow_price_quotes":body.enabled,
+       "price_quote_approved_at":datetime.now(timezone.utc).isoformat() if body.enabled else None,
+       "price_quote_approved_by":user["id"] if body.enabled else None}
+    api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+        data=updates,prefer="return=minimal")
+    try:
+        from app.call_intel import refresh_receptionist_prompt
+        result=refresh_receptionist_prompt(oid)
+        if result.get("reason") not in ("already_current","voice_policy_and_one_second_opening_synced","no_assistant"):
+            raise HTTPException(502,"Could not synchronize pricing policy with assistant")
+    except Exception:
+        api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+            data={k:original[0][k] for k in updates},prefer="return=minimal")
+        raise
+    return {"enabled":body.enabled,
+            "note":"Only matching separately approved exact price facts may be spoken."}
 
 class VoiceCapabilities(BaseModel):
     leads_enabled:bool=False
