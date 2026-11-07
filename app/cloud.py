@@ -153,11 +153,16 @@ def provision_test_agent(oid:str):
     if not credential or not os.getenv("VAPI_WEBHOOK_TOKEN"):
         raise HTTPException(503,"Vapi private webhook credential must be configured before voice testing")
     base=public_base()
+    from app.account import CALLPILOT_ORG
+    price_policy=("You may state only the published CallPilot subscription prices returned by "
+                  "lookup_approved_knowledge. Never negotiate, discount, waive fees or close deals. "
+                  if oid==CALLPILOT_ORG else
+                  "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. ")
     prompt=("You are "+a["agent_name"]+", an AI receptionist for "+business["name"]+". "
         "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
         "For EVERY business fact or customer question, call lookup_approved_knowledge with the caller's full question. "
         "Use ONLY the exact answer returned by that tool, without inventing or adding any details. "
-        "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. "
+        + price_policy +
         "If the tool returns unknown information, tell the caller a team member can follow up. "
         "Never claim an appointment has been booked, changed or cancelled: you have NO booking tool. "
         "If the tool fails, offer a human follow-up instead of guessing. "
