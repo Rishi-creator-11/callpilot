@@ -441,6 +441,11 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 .cp-studio-activation .cp-studio-check{font-size:13px;margin:11px 0}
 .cp-studio-activation .cp-studio-actions{align-items:center}.cp-studio-activation .muted{font-size:12px}
 
+.cp-studio-catalog{margin-top:14px;overflow-wrap:anywhere}
+.cp-studio-product{padding:12px 0;border-top:1px solid #e4e7ef;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.cp-studio-product p{margin:3px 0;font-size:12px}.cp-studio-product strong{color:#152238}
+.cp-studio-product-actions{display:flex;gap:7px;flex-wrap:wrap}
+.cp-studio-product-actions button{font-size:12px;padding:7px 10px}
 .cp-studio-warning{margin:15px 0 0;color:#695c3d;background:#fffbec;border:1px solid #f3e5b5;border-radius:10px;padding:12px;font-size:12px}
 @media(max-width:760px){.cp-studio-grid,.cp-studio-connections{grid-template-columns:1fr}.cp-studio-hero{padding:22px}.cp-studio-step{padding:17px}}
 </style></head><body data-app-state="loading">
@@ -562,11 +567,29 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
     <p>These tools perform real operations during calls. They are off until the business owner enables them and the managed assistant is synced.</p>
     <label class="cp-studio-check"><input type="checkbox" id="studioCaptureLeads"> Save customer-approved callback requests to Calls &amp; Leads</label>
     <label class="cp-studio-check"><input type="checkbox" id="studioVoiceBookings"> Check availability and book appointments in my connected Google Calendar</label>
+    <label class="cp-studio-check"><input type="checkbox" id="studioCatalogEnabled"> Look up approved catalog products and recorded stock</label>
+    <label class="cp-studio-check"><input type="checkbox" id="studioOrdersEnabled"> Capture pending order requests for staff review (no payments)</label>
     <div class="cp-studio-actions"><button id="studioEnableVoice" onclick="window.studioSaveActions()">Save &amp; sync voice tools</button><span id="studioActionStatus" class="muted" role="status">Loading voice action settings…</span></div>
     <p class="muted">For bookings, the agent must read the details back and get a clear yes. Confirm your services, calendar access and recording consent before testing on your real number.</p>
    </div>
    <div class="cp-studio-actions"><button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button><button class="secondary" onclick="window.section('usage')">Phone setup</button><button class="secondary" onclick="window.section('calls')">Calls &amp; leads</button><button class="secondary" onclick="window.loadStudio()">Refresh checklist</button></div>
    <p class="cp-studio-warning">Before taking customer calls, verify live voice answers, caller contact capture, appointment booking, call transfers and recording consent. A connected calendar does not mean voice booking is enabled.</p>
+  </article>
+  <article class="cp-studio-step cp-studio-wide">
+   <div class="cp-studio-step-head"><span class="cp-studio-num">06</span><div><h3>Products &amp; order requests</h3><p>Maintain an approved product catalog. Calls can check recorded stock and request an order for staff review, but cannot charge customers.</p></div></div>
+   <div class="cp-form-grid">
+    <div><label for="studioSku">SKU</label><input id="studioSku" maxlength="60" placeholder="BC-1000"></div>
+    <div><label for="studioItemName">Product name</label><input id="studioItemName" maxlength="160" placeholder="Business cards, 1000 pack"></div>
+    <div><label for="studioItemPrice">Verified unit price (USD, optional)</label><input id="studioItemPrice" inputmode="decimal" placeholder="19.99"></div>
+    <div><label for="studioItemStock">Stock on record (optional)</label><input id="studioItemStock" inputmode="numeric" placeholder="250"></div>
+   </div>
+   <label for="studioItemDescription">What should the AI know about this product?</label>
+   <textarea id="studioItemDescription" maxlength="1200" rows="2" placeholder="Size, material, variants, turnaround and important conditions"></textarea>
+   <div class="cp-studio-actions"><button onclick="window.studioAddProduct()">Save draft product</button><button class="secondary" onclick="window.studioLoadCatalog()">Refresh catalog</button></div>
+   <p class="muted">New and edited products are drafts until an authorized business owner approves them. Stock is not synced with an external supplier.</p>
+   <div id="studioCatalogList" aria-live="polite" class="cp-studio-catalog">Loading products…</div>
+   <h3 style="margin-top:22px">Order requests awaiting staff action</h3>
+   <div id="studioOrderList" aria-live="polite" class="cp-studio-catalog">Loading order requests…</div>
   </article>
  </div>
 </div>
@@ -1608,6 +1631,8 @@ window.loadStudio=async()=>{
 
  $("studioCaptureLeads").checked=Boolean(capabilities?.leads_enabled);
  $("studioVoiceBookings").checked=Boolean(capabilities?.booking_enabled);
+ $("studioCatalogEnabled").checked=Boolean(capabilities?.catalog_enabled);
+ $("studioOrdersEnabled").checked=Boolean(capabilities?.order_requests_enabled);
  $("studioVoiceBookings").disabled=!Boolean(capabilities?.calendar_connected);
  $("studioEnableVoice").disabled=!Boolean(capabilities?.assistant_connected);
  $("studioActionStatus").textContent=capabilities?.assistant_connected?
@@ -1632,6 +1657,7 @@ window.loadStudio=async()=>{
   ["Google Calendar",calendar?(hasCalendar?"Connected":"Not connected"):"Could not check"],
   ["Business phone",phone?(hasPhone?"Connected":"Not connected"):"Could not check"]
  ];
+ window.studioLoadCatalog().catch(()=>{});
  $("studioConnections").innerHTML=labels.map(([name,status],i)=>
   '<div class="cp-studio-connection"><strong>'+(checks[i]?"✓ ":"○ ")+esc(name)+'</strong><span>'+esc(status)+'</span></div>'
  ).join("");
@@ -1680,14 +1706,78 @@ window.studioSavePricing=()=>safe(async()=>{
  }catch(e){$("studioPriceStatus").textContent=e.message;throw e}
  finally{btn.disabled=false}
 });
+window.studioLoadCatalog=async()=>{
+ const oid=organization();if(!oid)return;
+ const jobs=await Promise.allSettled([
+   request("/organizations/"+oid+"/catalog"),
+   request("/organizations/"+oid+"/orders/requests")
+ ]);
+ if(oid!==organization())return;
+ const items=jobs[0].status==="fulfilled"?jobs[0].value:null;
+ const orders=jobs[1].status==="fulfilled"?jobs[1].value:null;
+ const cat=$("studioCatalogList"),orderBox=$("studioOrderList");
+ if(!items)cat.textContent="Could not load products. Refresh or check your access.";
+ else{
+  cat.innerHTML=items.length?items.map(p=>{
+   const status=p.active&&p.approved_at?"✓ Approved for AI":"Draft · not shared with callers";
+   const price=p.unit_price_cents==null?"Price not entered":"$"+(p.unit_price_cents/100).toFixed(2);
+   const stock=p.stock_quantity==null?"Stock not tracked":p.stock_quantity+" recorded";
+   return '<div class="cp-studio-product"><div><strong>'+esc(p.name)+'</strong><p>SKU '+esc(p.sku)+' · '+esc(status)+'</p><p>'+esc(price)+' · '+esc(stock)+'</p></div><div class="cp-studio-product-actions">'+
+    (!p.active?'<button class="secondary" data-catalog-approve="'+esc(p.id)+'">Approve</button>':'<button class="secondary" data-catalog-archive="'+esc(p.id)+'">Archive</button>')+
+   '</div></div>'
+  }).join(""):'<p class="muted">No products yet. Add a draft above and approve it.</p>';
+  cat.querySelectorAll("[data-catalog-approve]").forEach(btn=>btn.addEventListener("click",()=>window.studioApproveProduct(btn.dataset.catalogApprove)));
+  cat.querySelectorAll("[data-catalog-archive]").forEach(btn=>btn.addEventListener("click",()=>window.studioArchiveProduct(btn.dataset.catalogArchive)));
+ }
+ if(!orders)orderBox.textContent="Could not load order requests.";
+ else orderBox.innerHTML=orders.length?orders.map(o=>
+  '<div class="cp-studio-product"><div><strong>'+esc(o.quantity)+' × '+esc(o.sku)+'</strong><p>'+esc(o.caller_name)+' · '+esc(o.caller_contact)+'</p><p>'+esc(o.status)+' · '+esc(new Date(o.created_at).toLocaleDateString())+'</p></div><span class="pill">Staff review</span></div>'
+ ).join(""):'<p class="muted">No pending order requests. Approved catalog items can be used by the voice assistant after you enable its tools.</p>';
+};
+window.studioAddProduct=()=>safe(async()=>{
+ const sku=v("studioSku").trim(),name=v("studioItemName").trim();
+ const priceInput=v("studioItemPrice").trim(),stockInput=v("studioItemStock").trim();
+ if(!/^[A-Za-z0-9][A-Za-z0-9._/-]{1,59}$/.test(sku))throw Error("SKU must contain 2–60 letters, numbers or ./_- characters.");
+ if(name.length<2)throw Error("Add the product name.");
+ let price=null,stock=null;
+ if(priceInput!==""){
+  if(!/^(0|[1-9][0-9]{0,6})(\.[0-9]{1,2})?$/.test(priceInput))throw Error("Enter a valid USD price, e.g. 19.99");
+  price=Math.round(Number(priceInput)*100);
+ }
+ if(stockInput!==""){
+  if(!/^(0|[1-9][0-9]{0,8})$/.test(stockInput))throw Error("Enter a valid nonnegative stock quantity.");
+  stock=Number(stockInput);
+ }
+ await request("/organizations/"+organization()+"/catalog","POST",{
+  sku,name,description:v("studioItemDescription").trim(),unit_price_cents:price,stock_quantity:stock
+ });
+ for(const id of ["studioSku","studioItemName","studioItemPrice","studioItemStock","studioItemDescription"])$(id).value="";
+ await window.studioLoadCatalog();
+ return "Draft saved. Approve the product before the AI can use it.";
+});
+window.studioApproveProduct=(id)=>safe(async()=>{
+ if(!confirm("Confirm this product's details are accurate and approve it for AI lookup?"))return;
+ await request("/organizations/"+organization()+"/catalog/"+encodeURIComponent(id)+"/approve","POST");
+ await window.studioLoadCatalog();
+ return "Product approved for your catalog.";
+});
+window.studioArchiveProduct=(id)=>safe(async()=>{
+ if(!confirm("Stop the AI from using this catalog item?"))return;
+ await request("/organizations/"+organization()+"/catalog/"+encodeURIComponent(id)+"/archive","POST");
+ await window.studioLoadCatalog();
+ return "Product archived from AI lookup.";
+});
 window.studioSaveActions=()=>safe(async()=>{
  const leads=$("studioCaptureLeads").checked,booking=$("studioVoiceBookings").checked;
+ const catalog=$("studioCatalogEnabled").checked,orders=$("studioOrdersEnabled").checked;
+ if(orders&&!catalog)throw Error("Turn on catalog lookup before enabling pending order requests.");
+ if(orders&&!confirm("Allow callers to SUBMIT pending order requests for staff review? The AI will not charge customers or place a supplier order."))return;
  if(booking&&!confirm("Enable REAL Google Calendar bookings on this assistant? The AI must obtain explicit caller confirmation before creating any event."))return;
  const btn=$("studioEnableVoice");btn.disabled=true;
  $("studioActionStatus").textContent="Synchronizing approved voice actions with Vapi…";
  try{
   const result=await request("/organizations/"+organization()+"/voice-capabilities","PUT",{
-   leads_enabled:leads,booking_enabled:booking
+   leads_enabled:leads,booking_enabled:booking,catalog_enabled:catalog,order_requests_enabled:orders
   });
   $("studioActionStatus").textContent=result.provider_synced?
    "Saved and verified with Vapi. Run controlled phone tests before customer launch.":
