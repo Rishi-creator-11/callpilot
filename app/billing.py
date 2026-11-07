@@ -77,6 +77,8 @@ def billing_status(oid:str,user=Depends(current_user)):
         "has_customer":bool(a and a.get("stripe_customer_id")),"plans":PLANS,
         "setup_fee_cents":SETUP_FEE_CENTS,"setup_paid":bool(a and a.get("setup_paid_at")),
         "selected_plan":(a or {}).get("selected_plan"),
+        "pending_confirmation":bool(a and a.get("pending_checkout_session_id") and not (a.get("status") in ("active","trialing"))),
+        "cancel_at_period_end":bool(a and a.get("cancel_at_period_end")),
         "mode":("sandbox" if billing_mode()=="test" else "live") if billing_ready() else "not_enabled",
         "live_ready":billing_ready() and billing_mode()=="live"}
 
@@ -146,6 +148,47 @@ def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
     api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},
         data={"pending_checkout_session_id":session.get("id")},prefer="return=minimal")
     return {"url":session["url"],"mode":"sandbox" if billing_mode()=="test" else "live","plan":selection.plan}
+
+@router.post("/api/account/organizations/{oid}/billing/confirm-checkout")
+def confirm_checkout(oid:str,user=Depends(current_user)):
+    """Reconcile the server-recorded pending checkout after redirect.
+
+    Never trusts a browser-provided session or a successful URL. Stripe must
+    verify payment, customer, tenant and the existing checkout session.
+    Signed webhooks remain the authoritative asynchronous update path.
+    """
+    membership(oid,user,("owner",))
+    a=account(oid)
+    if not a or not a.get("pending_checkout_session_id"):
+        return {"confirmed":bool(a and a.get("status") in ("active","trialing")),
+                "status":(a or {}).get("status","unconfigured")}
+    if not billing_ready() or a.get("stripe_mode","test")!=billing_mode():
+        raise HTTPException(503,"Stripe reconciliation unavailable")
+    checkout_id=a["pending_checkout_session_id"]
+    session=stripe_call("checkout/sessions/"+checkout_id,method="GET")
+    if (session.get("id")!=checkout_id or
+        session.get("client_reference_id")!=oid or
+        (session.get("metadata") or {}).get("organization_id")!=oid or
+        session.get("customer")!=a.get("stripe_customer_id") or
+        session.get("mode")!="subscription" or
+        session.get("livemode")!=(billing_mode()=="live")):
+        raise HTTPException(409,"Stripe checkout does not match this workspace")
+    if session.get("status")!="complete" or session.get("payment_status")!="paid":
+        return {"confirmed":False,"status":"payment_pending"}
+    subscription_id=session.get("subscription")
+    if not isinstance(subscription_id,str) or not subscription_id.startswith("sub_"):
+        return {"confirmed":False,"status":"subscription_pending"}
+    sub=stripe_call("subscriptions/"+subscription_id,method="GET")
+    if (sub.get("id")!=subscription_id or
+        sub.get("customer")!=a.get("stripe_customer_id") or
+        sub.get("livemode")!=(billing_mode()=="live")):
+        raise HTTPException(409,"Stripe subscription does not match this workspace")
+    if sub.get("status") not in ("active","trialing"):
+        return {"confirmed":False,"status":sub.get("status","pending")}
+    handle_stripe_event("checkout.session.completed",session)
+    handle_stripe_event("customer.subscription.updated",sub)
+    return {"confirmed":True,"status":sub["status"],
+            "selected_plan":(account(oid) or {}).get("selected_plan")}
 
 @router.post("/api/account/organizations/{oid}/billing-portal")
 def billing_portal(oid:str,user=Depends(current_user)):
