@@ -150,6 +150,11 @@ def update_api(oid: UUID, api_id: UUID, body: ApiDefinition, user=Depends(curren
     existing = next((row for row in rows_for(workspace) if row["id"] == str(api_id)), None)
     if not existing:
         raise HTTPException(404, "Custom API not found.")
+    if existing.get("auth_ciphertext") and not body.bearer_token:
+        old_host = urllib.parse.urlsplit(existing["url_template"]).hostname
+        if urllib.parse.urlsplit(body.url_template).hostname != old_host:
+            # A saved token must never follow a URL to a different host without the owner re-entering it.
+            raise HTTPException(422, "You changed the host. Enter the bearer token again so it is only sent where you intend.")
     data = prepare(workspace, body, existing)
     api("custom_apis", "PATCH", params={"organization_id": "eq." + workspace, "id": "eq." + str(api_id)},
         data=data, prefer="return=minimal")
@@ -208,7 +213,8 @@ def run(workspace: str, row: dict, values: dict, call_id: str) -> str:
     if parts.scheme != "https" or not parts.hostname or not host_is_public(parts.hostname):
         audit(workspace, row, call_id, "blocked_host")
         raise ValueError("This tool is not available right now.")
-    headers = {"User-Agent": "CallPilot/1.0", "Accept": "application/json, text/plain;q=0.8"}
+    # Ask for an uncompressed body and read it raw, so the size cap bounds memory (no decompression bombs).
+    headers = {"User-Agent": "CallPilot/1.0", "Accept": "application/json, text/plain;q=0.8", "Accept-Encoding": "identity"}
     if row.get("auth_ciphertext"):
         try:
             headers["Authorization"] = "Bearer " + cipher().decrypt(row["auth_ciphertext"].encode()).decode()
@@ -222,7 +228,7 @@ def run(workspace: str, row: dict, values: dict, call_id: str) -> str:
             response = client.send(request, stream=True)
             try:
                 chunks, size = [], 0
-                for chunk in response.iter_bytes():
+                for chunk in response.iter_raw():
                     chunks.append(chunk)
                     size += len(chunk)
                     if size >= MAX_RESPONSE_BYTES:

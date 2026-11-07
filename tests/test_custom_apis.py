@@ -161,3 +161,25 @@ def test_managed_name_helper_covers_custom_tools():
     from app.voice_actions import is_managed_tool_name
     assert is_managed_tool_name("api_order_status") and is_managed_tool_name("book_appointment")
     assert not is_managed_tool_name("transferCall") and not is_managed_tool_name(None) and not is_managed_tool_name("api_")
+
+
+def test_changing_the_host_requires_reentering_the_saved_token(store):
+    created = client.post(URL, json={**BODY, "bearer_token": "tok"}).json()
+    moved = {**BODY, "url_template": "https://evil.example.net/orders/{order_number}"}
+    assert client.put(URL + "/" + created["id"], json=moved).status_code == 422
+    assert store.rows[0]["url_template"].startswith("https://api.example.com")
+    same_host = {**BODY, "description": "Look up the status of an order by its number.",
+                 "url_template": "https://api.example.com/v2/orders/{order_number}"}
+    assert client.put(URL + "/" + created["id"], json=same_host).status_code == 200
+    assert client.put(URL + "/" + created["id"], json={**moved, "bearer_token": "new"}).status_code == 200
+
+
+def test_requests_ask_for_identity_encoding(store, monkeypatch):
+    client.post(URL, json=BODY)
+    seen = {}
+    def handler(request):
+        seen["encoding"] = request.headers.get("accept-encoding")
+        return httpx.Response(200, text="ok")
+    mock_http(monkeypatch, handler)
+    mod.run_by_tool_name(W, "api_order_status", "c", {"order_number": "1"})
+    assert seen["encoding"] == "identity"
