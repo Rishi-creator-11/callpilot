@@ -10,9 +10,17 @@ router=APIRouter(prefix="/api/account",tags=["customer"])
 # Never allow other tenants to bypass price protections.
 CALLPILOT_ORG="b550c0af-7d9c-4231-8eec-cb9f6ba9e724"
 PLAN_QUESTION="What are CallPilot's plans?"
-PLAN_ANSWER=("Starter is $49 per month, Growth is $99 per month, and Business is "
-             "$179 per month. Each plan has a $25 one-time setup fee. "
-             "Applicable taxes are additional. We do not negotiate or offer special deals.")
+PLAN_ANSWER=(
+    "Starter includes 100 AI calling minutes per month for $49 per month. "
+    "Growth includes 300 AI calling minutes per month for $99 per month. "
+    "Business includes 600 AI calling minutes per month for $179 per month. "
+    "Every plan includes an AI receptionist, approved business knowledge management, "
+    "call history, available recordings and transcripts, AI call summaries, lead insights, "
+    "and the business dashboard. Each plan has a $25 one-time setup fee covering initial "
+    "business setup, knowledge configuration, phone connection assistance, and launch testing. "
+    "Calls are capped at four minutes each. There are no automatic overage charges. "
+    "Applicable taxes are additional. Published prices are fixed; no discounts or custom deals."
+)
 def allowed_plan_fact(oid,question,answer):
     return oid==CALLPILOT_ORG and question.strip()==PLAN_QUESTION and answer.strip()==PLAN_ANSWER
 def validate_fact(oid,question,answer):
