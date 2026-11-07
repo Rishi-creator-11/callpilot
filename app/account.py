@@ -160,7 +160,7 @@ def delete_knowledge(oid:str,fid:str,user=Depends(current_user)):
 @router.post("/organizations/{oid}/simulate")
 def simulate(oid:str,body:Question,user=Depends(current_user)):
     membership(oid,user)
-    if PRICE.search(body.question):
+    if PRICE.search(body.question) or (oid==CALLPILOT_ORG and "plan" in body.question.casefold()):
         if oid==CALLPILOT_ORG:
             import re
             if re.search(r"\\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\\b",body.question,re.I):
@@ -174,7 +174,8 @@ def simulate(oid:str,body:Question,user=Depends(current_user)):
         reindex_approved(oid)
     fact,metadata=retrieve(oid,body.question)
     if fact:
-        if MONEY.search(fact["answer"]):return {"answer":NO_PRICE,"source":"policy"}
+        if MONEY.search(fact["answer"]) and not allowed_plan_fact(oid,fact["question"],fact["answer"]):
+            return {"answer":NO_PRICE,"source":"policy"}
         return {"answer":fact["answer"],"source":"approved_semantic",
                 "matched_question":fact["question"],"similarity":metadata["similarity"]}
     return {"answer":UNKNOWN,"source":"unknown","reason":metadata["reason"]}
