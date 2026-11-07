@@ -474,14 +474,16 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     from app.voice_actions import MANAGED_TOOLS,voice_tool_definitions
     flags=cfg[0]
     credential=os.getenv("VAPI_CREDENTIAL_ID","")
-    if (any(flags.get(k) for k in ("voice_leads_enabled","voice_booking_enabled","voice_catalog_enabled","voice_order_requests_enabled")) or (flags.get("call_menu") or {}).get("enabled")) and not credential:
+    voice_tools=voice_tool_definitions(oid,credential,flags)
+    if (any(flags.get(k) for k in ("voice_leads_enabled","voice_booking_enabled","voice_catalog_enabled","voice_order_requests_enabled")) or (flags.get("call_menu") or {}).get("enabled") or voice_tools) and not credential:
         raise HTTPException(503,"Vapi private tool credential is not configured")
+    from app.voice_actions import is_managed_tool_name
     base_tools=[t for t in existing_tools if not (isinstance(t,dict) and
-                (t.get("function") or {}).get("name") in MANAGED_TOOLS) and not is_managed_transfer(t)]
+                is_managed_tool_name((t.get("function") or {}).get("name"))) and not is_managed_transfer(t)]
     end_tool=next((t for t in base_tools if isinstance(t,dict) and t.get("type")=="endCall"),
                   {"type":"endCall"})
     next_tools=[t for t in base_tools if not (isinstance(t,dict) and t.get("type")=="endCall")]
-    next_tools.extend(voice_tool_definitions(oid,credential,flags))
+    next_tools.extend(voice_tools)
     transfer=native_transfer_tool(oid,flags.get("transfer_directory") or [])
     if transfer:
         if any(isinstance(t,dict) and t.get("type")=="transferCall" for t in base_tools):
@@ -552,7 +554,7 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
         or (transfer is not None and (len(saved_transfers)!=1 or transfer_routes(saved_transfers[0])!=transfer_routes(transfer)))
         or any((t.get("function") or {}).get("name") not in [
             (z.get("function") or {}).get("name") for z in saved_tools if isinstance(z,dict)]
-            for t in next_tools if isinstance(t,dict) and (t.get("function") or {}).get("name") in MANAGED_TOOLS)
+            for t in next_tools if isinstance(t,dict) and is_managed_tool_name((t.get("function") or {}).get("name")))
         or not any(isinstance(h,dict) and h.get("name")==OPENING_HOOK_NAME
                    and h.get("options",{}).get("seconds")==1
                    and any(a.get("exact")==greeting for a in h.get("do",[]) if isinstance(a,dict))

@@ -111,7 +111,7 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
             try:args=__import__("json").loads(args)
             except ValueError:args={}
         name=func.get("name")
-        if name in ("capture_customer_lead","check_appointment_availability","book_appointment","lookup_catalog_item","submit_order_request","resolve_call_menu"):
+        if name in ("capture_customer_lead","check_appointment_availability","book_appointment","lookup_catalog_item","submit_order_request","resolve_call_menu") or (isinstance(name,str) and name.startswith("api_")):
             from app.voice_actions import execute_voice_action
             try:
                 answer=execute_voice_action(organization_id,msg,name,args)

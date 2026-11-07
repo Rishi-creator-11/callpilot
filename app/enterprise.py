@@ -59,7 +59,9 @@ def allow(client: str) -> bool:
 def submit(body: Inquiry, request: Request):
     if body.website:  # Bots fill hidden fields. Pretend success and store nothing.
         return {"received": True}
-    client = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "unknown")
+    # Only the rightmost entry was added by our own proxy; earlier entries can be forged by the sender.
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
+    client = forwarded[-1] if forwarded else (request.client.host if request.client else "unknown")
     if not allow(client):
         raise HTTPException(429, "Too many requests. Please try again later.")
     api("enterprise_inquiries", "POST", data={

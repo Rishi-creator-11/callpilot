@@ -22,6 +22,10 @@ MANAGED_TOOLS = frozenset({
 })
 
 
+def is_managed_tool_name(name) -> bool:
+    return isinstance(name, str) and (name in MANAGED_TOOLS or re.fullmatch(r"api_[a-z0-9_]{2,40}", name) is not None)
+
+
 def feature_flags(oid: str) -> dict:
     rows = api("agent_configs", params={
         "organization_id": "eq." + oid,
@@ -130,6 +134,8 @@ def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
             ["sku","quantity","caller_name","caller_contact","confirmed"],
             oid, credential,
         ))
+    from app.custom_apis import tool_definitions
+    tools.extend(tool_definitions(oid, credential, _definition))
     return tools
 
 
@@ -473,5 +479,9 @@ def execute_voice_action(oid: str, message: dict, name: str, args: dict) -> str:
         "submit_order_request": submit_order_request,
     }
     if name not in handlers:
+        if isinstance(name, str) and name.startswith("api_"):
+            from app.custom_apis import run_by_tool_name
+            call_id, _ = _call_context(oid, message)
+            return run_by_tool_name(oid, name, call_id, args)
         raise ValueError("Unknown voice action")
     return handlers[name](oid, message, args)

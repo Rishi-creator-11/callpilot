@@ -38,6 +38,12 @@ def test_rate_limit_per_client(store):
     assert codes == [201, 201, 201, 429] and len(store) == 3
 
 
+def test_forged_leftmost_forwarded_address_does_not_reset_the_limit(store):
+    codes = [client.post("/api/enterprise-inquiry", json=GOOD,
+                         headers={"x-forwarded-for": "1.1.1.%d, 8.8.8.8" % i}).status_code for i in range(4)]
+    assert codes == [201, 201, 201, 429]
+
+
 def test_page_renders_form():
     page = client.get("/enterprise")
     assert page.status_code == 200 and "enterprise-form" in page.text

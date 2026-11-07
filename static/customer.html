@@ -865,8 +865,25 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  </div>
  </div>
  <div id="cnCustom" hidden>
-  <div class="cn-empty"><strong>No custom APIs yet</strong><span>Custom REST APIs need a secret vault, reviewed request schemas, a destination allowlist and audit logging before they can run during calls. This is not available yet.</span></div>
- </div>
+   <p class="muted">Let the agent call your own web services during a call, for example to look up an order. Only public https addresses are allowed. Tokens are stored encrypted and never shown again.</p>
+   <div class="cp-inline-actions"><button type="button" id="capiAdd">Add API</button><button type="button" id="capiSync" class="secondary">Sync live assistant</button></div>
+   <form id="capiForm" class="cp-section-box" hidden>
+    <h3 id="capiFormTitle">Add API</h3>
+    <label for="capiName">Name</label><input id="capiName" required minlength="2" maxlength="60" placeholder="Order status">
+    <label for="capiDescription">When should the agent use it?</label><textarea id="capiDescription" required minlength="10" maxlength="400" rows="2" placeholder="Look up the status of a customer order by number."></textarea>
+    <div class="cp-form-grid"><div><label for="capiMethod">Method</label><select id="capiMethod"><option>GET</option><option>POST</option></select></div>
+    <div><label for="capiUrl">URL</label><input id="capiUrl" required maxlength="500" placeholder="https://api.example.com/orders/{order_number}"></div></div>
+    <p class="muted">Use {name} in the URL for values the agent collects. POST sends the values as JSON.</p>
+    <div id="capiParams"></div>
+    <button type="button" id="capiAddParam" class="secondary">Add value</button>
+    <label for="capiToken">Bearer token <span class="muted">(optional, leave blank to keep the saved token)</span></label>
+    <input id="capiToken" type="password" autocomplete="new-password" maxlength="1024">
+    <label class="cp-studio-check"><input id="capiEnabled" type="checkbox" checked> Enabled</label>
+    <div class="cp-inline-actions"><button type="submit">Save API</button><button type="button" id="capiCancel" class="secondary">Cancel</button></div>
+   </form>
+   <p id="capiStatus" role="status" class="muted"></p>
+   <div id="capiList" aria-live="polite"></div>
+  </div>
 </section>
 
 <section id="builder" class="panel card" style="display:none" aria-label="Assistant workspace">
@@ -3173,6 +3190,91 @@ $("sheetsDisconnect").addEventListener("click",async event=>{
  catch(e){if(oid===organization())$("sheetsResult").textContent=e.message}
  finally{button.disabled=false}
 });
+const capiPath=oid=>"/organizations/"+oid+"/custom-apis";
+let capiEditing=null,capiItems=[];
+function capiParamRow(param={name:"",description:""}){
+ const row=document.createElement("div"),name=document.createElement("input"),desc=document.createElement("input"),remove=document.createElement("button");
+ row.className="cp-inline-actions";
+ name.placeholder="name, e.g. order_number";name.maxLength=30;name.pattern="[a-z][a-z0-9_]{0,29}";name.value=param.name;name.setAttribute("aria-label","Value name");
+ desc.placeholder="What the agent should ask for";desc.maxLength=200;desc.minLength=3;desc.value=param.description;desc.setAttribute("aria-label","Value description");
+ remove.type="button";remove.className="secondary";remove.textContent="Remove";remove.addEventListener("click",()=>{row.remove();$("capiAddParam").disabled=$("capiParams").children.length>=5});
+ row.append(name,desc,remove);$("capiParams").append(row);
+ $("capiAddParam").disabled=$("capiParams").children.length>=5;
+}
+function capiOpen(item){
+ capiEditing=item?.id||null;
+ $("capiForm").reset();$("capiParams").replaceChildren();
+ $("capiFormTitle").textContent=item?"Edit "+item.name:"Add API";
+ if(item){
+  $("capiName").value=item.name;$("capiDescription").value=item.description;$("capiMethod").value=item.method;
+  $("capiUrl").value=item.url_template;$("capiEnabled").checked=item.enabled;item.params.forEach(capiParamRow);
+ }
+ $("capiForm").hidden=false;$("capiName").focus();
+}
+function capiRender(){
+ const list=$("capiList");list.replaceChildren();
+ document.querySelector('[data-cn-tab="custom"] .wk-badge').textContent=String(capiItems.length);
+ if(!capiItems.length){list.innerHTML='<div class="cn-empty"><strong>No custom APIs yet</strong><span>Add an API to let your agent look things up in your own systems.</span></div>';return}
+ for(const item of capiItems){
+  const card=document.createElement("article"),title=document.createElement("h3"),text=document.createElement("p"),meta=document.createElement("p"),actions=document.createElement("div");
+  card.className="cp-studio-connection";
+  title.textContent=item.name+(item.enabled?"":" (off)");text.textContent=item.description;
+  meta.className="muted";meta.textContent=item.method+" "+item.url_template+(item.has_token?" · token saved":"");
+  actions.className="cp-inline-actions";
+  const mk=(label,fn)=>{const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent=label;b.addEventListener("click",fn);actions.append(b)};
+  mk("Edit",()=>capiOpen(item));
+  mk("Test",async()=>{
+   const values={};
+   for(const p of item.params){const v=window.prompt("Test value for "+p.name+" ("+p.description+")","");if(v===null)return;values[p.name]=v}
+   $("capiStatus").textContent="Running a test call…";
+   try{const r=await request(capiPath(organization())+"/"+item.id+"/test","POST",{values});$("capiStatus").textContent=r.result}
+   catch(e){$("capiStatus").textContent=e.message}
+  });
+  mk("Delete",async()=>{
+   if(!window.confirm("Delete "+item.name+"? Sync your live assistant afterwards to remove it from calls."))return;
+   try{await request(capiPath(organization())+"/"+item.id,"DELETE");await loadCustomApis()}catch(e){$("capiStatus").textContent=e.message}
+  });
+  card.append(title,text,meta,actions);list.append(card);
+ }
+}
+async function loadCustomApis(){
+ const oid=organization();
+ $("capiForm").hidden=true;$("capiStatus").textContent="";
+ try{
+  const result=await request(capiPath(oid));
+  if(oid!==organization())return;
+  capiItems=result.apis;
+  for(const id of ["capiAdd","capiSync"])$(id).hidden=!result.can_manage;
+  capiRender();
+  if(!result.can_manage)$("capiList").innerHTML='<div class="cn-empty"><strong>Only owners and admins can manage custom APIs</strong></div>';
+ }catch(e){if(oid===organization())$("capiStatus").textContent=e.message}
+}
+$("capiAdd").addEventListener("click",()=>capiOpen(null));
+$("capiCancel").addEventListener("click",()=>{$("capiForm").hidden=true});
+$("capiAddParam").addEventListener("click",()=>capiParamRow());
+$("capiForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter;
+ button.disabled=true;
+ const params=[...$("capiParams").children].map(row=>{const [name,desc]=row.querySelectorAll("input");return {name:name.value.trim(),description:desc.value.trim()}});
+ const body={name:v("capiName").trim(),description:v("capiDescription").trim(),method:v("capiMethod"),url_template:v("capiUrl").trim(),params,enabled:$("capiEnabled").checked};
+ if(v("capiToken"))body.bearer_token=v("capiToken");
+ try{
+  await request(capiPath(oid)+(capiEditing?"/"+capiEditing:""),capiEditing?"PUT":"POST",body);
+  $("capiForm").hidden=true;
+  $("capiStatus").textContent="Saved. Sync your live assistant so the agent can use it on calls.";
+  await loadCustomApis();$("capiStatus").textContent="Saved. Sync your live assistant so the agent can use it on calls.";
+ }catch(e){$("capiStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("capiSync").addEventListener("click",async event=>{
+ const button=event.currentTarget;
+ if(button.disabled||!window.confirm("Apply your saved settings and custom APIs to the live assistant?"))return;
+ button.disabled=true;$("capiStatus").textContent="Syncing live assistant…";
+ try{await request("/organizations/"+organization()+"/agent/sync","POST");$("capiStatus").textContent="The live assistant now has your custom APIs."}
+ catch(e){$("capiStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
 async function loadConnections(){
  const oid=organization();
  const services=[
@@ -3186,7 +3288,7 @@ async function loadConnections(){
   try{status=describe(await request("/organizations/"+oid+path))}
   catch{status="Could not check this connection"}
   if(oid===organization())$(id).textContent=status;
- }),loadHighLevel(),loadShopify(),loadSheets()]);
+ }),loadHighLevel(),loadShopify(),loadSheets(),loadCustomApis()]);
 }
 for(const tab of document.querySelectorAll("[data-cn-tab]")){
  tab.addEventListener("click",()=>{
