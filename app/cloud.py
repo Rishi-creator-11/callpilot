@@ -158,6 +158,10 @@ def provision_test_agent(oid:str):
                   "lookup_approved_knowledge. Never negotiate, discount, waive fees or close deals. "
                   if oid==CALLPILOT_ORG else
                   "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. ")
+    lead_policy=("Before ending a normal call, ask for the caller's name and ask whether the number "
+                 "they called from is the best callback number. If not, ask for a preferred number. "
+                 "Respect refusals; never invent contact details or prevent a caller hanging up. "
+                 if oid==CALLPILOT_ORG else "")
     prompt=("You are "+a["agent_name"]+", an AI receptionist for "+business["name"]+". "
         "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
         "For EVERY business fact or customer question, call lookup_approved_knowledge with the caller's full question. "
@@ -166,7 +170,7 @@ def provision_test_agent(oid:str):
         "If the tool returns unknown information, tell the caller a team member can follow up. "
         "Never claim an appointment has been booked, changed or cancelled: you have NO booking tool. "
         "If the tool fails, offer a human follow-up instead of guessing. "
-        "Speak briefly, clearly and professionally.")
+        "Speak briefly, clearly and professionally. " + lead_policy)
     voice=({"provider":"11labs","model":"eleven_flash_v2_5","voiceId":a["voice_id"]}
         if a["voice_provider"]=="elevenlabs" else {"provider":"vapi","voiceId":"Elliot","version":2})
     tool={"type":"function","async":False,
