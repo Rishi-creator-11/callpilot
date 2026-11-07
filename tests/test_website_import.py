@@ -124,3 +124,47 @@ def test_import_requires_editor_and_saves_only_a_tenant_draft(monkeypatch):
         assert options["data"] == {"organization_id": "owned", **page}
         assert options["params"]["on_conflict"] == "organization_id,source_url"
         assert options["prefer"].startswith("resolution=ignore-duplicates")
+
+
+def test_menu_and_button_leftovers_are_removed_but_headings_and_prices_stay():
+    page = website_import.PageText()
+    page.feed(
+        "<html><head><title>Metro Print</title></head><body><a href='/about'>About</a><nav>Home Shop</nav>"
+        "<div>Skip to content</div><div>Search products…</div><button>Request a quote</button>"
+        "<h2>Signs &amp; Banners</h2><p>Business cards start at $24.99 for 100.</p><div>Sign in</div>"
+        "<footer>Copyright all rights reserved today</footer></body></html>")
+    page.close()
+    title, content = page.result("example.com")
+    assert content.splitlines() == ["Signs & Banners", "Business cards start at $24.99 for 100."]
+    assert ("/about", "About") in page.links
+
+
+def test_site_links_stay_on_the_same_site_and_pick_only_useful_pages():
+    links = [("/services", "Our services"), ("https://evil.example.net/pricing", "Pricing"), ("/blog/post", "A post"),
+             ("/pricing/", "Pricing"), ("/files/menu.pdf", "Menu"), ("mailto:a@b.co", "Email"), ("/contact-us", "Contact"),
+             ("/about", "About"), ("//www.example.com/faq", "FAQ")]
+    chosen = website_import.same_site_links("https://example.com/", links, 3)
+    assert chosen == ["https://example.com/services", "https://example.com/pricing/", "https://example.com/contact-us"]
+
+
+def test_fetch_page_combines_a_few_pages_without_duplicates(monkeypatch):
+    pages = {
+        "https://example.com/": {"title": "Home", "content": "We print business cards.\nOpen Monday to Friday.",
+                                  "source_url": "https://example.com/", "links": [("/pricing", "Pricing"), ("/about", "About")]},
+        "https://example.com/pricing": {"title": "Pricing", "content": "Open Monday to Friday.\nCards start at $20.", "source_url": "https://example.com/pricing"},
+        "https://example.com/about": {"title": "About", "content": "Family owned since 1999.", "source_url": "https://example.com/about"},
+    }
+    monkeypatch.setattr(website_import, "_fetch_page", lambda raw, with_links=False: dict(pages[raw]))
+    result = website_import.fetch_page("https://example.com/")
+    assert set(result) == {"title", "content", "source_url"} and result["title"] == "Home"
+    lines = result["content"].splitlines()
+    assert lines.count("Open Monday to Friday.") == 1 and "Cards start at $20." in lines and "Family owned since 1999." in lines
+
+
+def test_a_failing_extra_page_does_not_break_the_import(monkeypatch):
+    def fake(raw, with_links=False):
+        if raw != "https://example.com/":
+            raise OSError("down")
+        return {"title": "Home", "content": "We print business cards.", "source_url": raw, "links": [("/pricing", "Pricing")]}
+    monkeypatch.setattr(website_import, "_fetch_page", fake)
+    assert website_import.fetch_page("https://example.com/")["content"] == "We print business cards."

@@ -129,3 +129,111 @@ def test_viewers_cannot_build(make, monkeypatch):
         raise HTTPException(404, "Workspace not found")
     monkeypatch.setattr(mod, "membership", deny)
     assert client.post(URL, json={"goals": ["info"]}).status_code == 404 and env.saved == []
+
+
+# ---- phone numbers, understanding the business, and saving confirmed knowledge ----
+@pytest.mark.parametrize("raw,expected", [
+    ("9144460465", "+19144460465"), ("(914) 446-0465", "+19144460465"), ("1 914 446 0465", "+19144460465"),
+    ("+1 914 446 0465", "+19144460465"), ("+44 20 7946 0958", "+442079460958")])
+def test_phone_numbers_are_forgiving(raw, expected):
+    assert mod.normalize_phone(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["555", "0144460465", "+0123", "abcdefghij", "1144460465"])
+def test_bad_phone_numbers_are_rejected(raw):
+    with pytest.raises(ValueError):
+        mod.normalize_phone(raw)
+
+
+def test_a_plain_us_number_is_accepted_by_the_build_endpoint(make, monkeypatch):
+    env = make()
+    saved = []
+    monkeypatch.setattr("app.transfer_directory.reject_loops", lambda w, d: None)
+    monkeypatch.setattr("app.transfer_directory.rpc", lambda name, payload: saved.append(payload) or True)
+    response = client.post(URL, json={"goals": ["transfer"], "transfer_number": "9144460465"})
+    assert response.status_code == 200 and saved[0]["p_directory"][0]["number"] == "+19144460465"
+
+
+def test_invented_prices_are_dropped_and_real_ones_kept():
+    source = "Business cards start at $24.99 for 100. Flyers are $45 per 500."
+    kept = mod.verified_prices([
+        {"item": "Business cards", "price_text": "$24.99"}, {"item": "Flyers", "price_text": "$45"},
+        {"item": "Banners", "price_text": "$99"}, {"item": "Posters", "price_text": "cheap"},
+        {"item": "Business cards", "price_text": "$24.99"}], source)
+    assert [(p["item"], p["price_text"]) for p in kept] == [("Business cards", "$24.99"), ("Flyers", "$45")]
+
+
+def test_overview_never_contains_money_amounts():
+    text = mod.overview_text({"summary": "We print cards.", "offerings": [
+        {"name": "Cards", "description": "From $24.99"}, {"name": "Signs", "description": "Indoor and outdoor"}],
+        "hours": "Mon-Fri 9-5", "phone": "", "email": "", "address": ""})
+    assert "$" not in text and "Signs: Indoor and outdoor" in text and "Hours: Mon-Fri 9-5" in text
+
+
+def test_deterministic_fallback_finds_prices_and_a_summary():
+    data = mod.deterministic_understanding("Metro Print makes cards.\nBusiness cards from $24.99\nOpen daily")
+    assert data["prices"][0]["price_text"] == "$24.99" and data["summary"].startswith("Metro Print")
+
+
+def test_analyze_needs_exactly_one_source_and_enough_text(make, monkeypatch):
+    make()
+    monkeypatch.setattr(mod, "llm_understanding", lambda text: None)
+    assert client.post(URL + "/analyze", json={}).status_code == 422
+    assert client.post(URL + "/analyze", json={"text": "short"}).status_code == 422
+    assert client.post(URL + "/analyze", json={"text": "x" * 30, "document_id": "00000000-0000-0000-0000-000000000001"}).status_code == 422
+
+
+def test_analyze_uses_the_model_but_filters_what_it_invents(make, monkeypatch):
+    make()
+    model = {"summary": "Print shop", "offerings": [{"name": "Cards", "description": ""}], "hours": "", "phone": "", "email": "",
+             "address": "", "prices": [{"item": "Cards", "price_text": "$24.99"}, {"item": "Ghost", "price_text": "$5"}]}
+    monkeypatch.setattr(mod, "llm_understanding", lambda text: dict(model))
+    monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
+    result = client.post(URL + "/analyze", json={"text": "We print cards. Business cards cost $24.99 each."}).json()
+    assert [p["item"] for p in result["understanding"]["prices"]] == ["Cards"] and "Ghost" not in str(result)
+
+
+def test_analyze_falls_back_when_the_model_is_unavailable(make, monkeypatch):
+    make()
+    monkeypatch.setattr(mod, "llm_understanding", lambda text: None)
+    monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
+    result = client.post(URL + "/analyze", json={"text": "We print cards.\nCards from $24.99 each\nOpen daily"}).json()
+    assert result["understanding"]["prices"][0]["price_text"] == "$24.99"
+
+
+class Knowledge:
+    def __init__(self):
+        self.calls = []
+
+    def install(self, monkeypatch):
+        monkeypatch.setattr("app.account.create_description", lambda w, b, u: self.calls.append(("doc", b.content)) or {"id": "d1"})
+        monkeypatch.setattr("app.account.approve_description", lambda w, d, u: self.calls.append(("approve_doc", d)))
+        monkeypatch.setattr("app.account.set_verified_pricing", lambda w, b, u: self.calls.append(("pricing", b.enabled)))
+        monkeypatch.setattr("app.account.create_fact", lambda w, b, u: self.calls.append(("fact", b.question, b.answer)) or {"id": "f%d" % len(self.calls)})
+        monkeypatch.setattr("app.account.approve_fact", lambda w, f, u: self.calls.append(("approve_fact", f)))
+
+
+def test_confirmed_prices_enable_pricing_and_become_approved_facts(make, monkeypatch):
+    make()
+    k = Knowledge(); k.install(monkeypatch)
+    body = {"overview": "We print business cards and signs for local shops.", "prices_confirmed": True,
+            "prices": [{"item": "Business cards", "price_text": "$24.99"}]}
+    result = client.post(URL + "/knowledge", json=body).json()
+    assert result == {"overview_saved": True, "prices_saved": 1, "prices_enabled": True}
+    assert ("pricing", True) in k.calls and ("fact", "How much is Business cards?", "Business cards: $24.99") in k.calls
+
+
+def test_unconfirmed_prices_are_not_published(make, monkeypatch):
+    make()
+    k = Knowledge(); k.install(monkeypatch)
+    body = {"overview": "We print business cards and signs for local shops.", "prices_confirmed": False,
+            "prices": [{"item": "Business cards", "price_text": "$24.99"}]}
+    result = client.post(URL + "/knowledge", json=body).json()
+    assert result["prices_saved"] == 0 and not any(c[0] in ("pricing", "fact") for c in k.calls)
+
+
+def test_overview_with_money_is_refused(make, monkeypatch):
+    make()
+    k = Knowledge(); k.install(monkeypatch)
+    response = client.post(URL + "/knowledge", json={"overview": "Business cards cost $24.99 and we are open daily."})
+    assert response.status_code == 422 and k.calls == []

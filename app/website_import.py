@@ -13,6 +13,13 @@ from fastapi import HTTPException
 
 MAX_BYTES = 1_000_000
 MAX_TEXT = 12_000
+MAX_COMBINED = 11_900
+EXTRA_PAGES = 4
+SITE_BUDGET_SECONDS = 28
+USEFUL_LINK = re.compile(r"about|service|product|pricing|price|rates|contact|faq|hours|shipping|turnaround|quote|location|menu|team|order|how-it-works", re.I)
+UI_ONLY = re.compile(
+    r"^(skip to content|search.*|sign in|log in|login|menu|cart|close|subscribe|request a quote|get a quote|shop .*|view all|"
+    r"learn more|read more|home|next|previous|accept|decline|cookies?.*|privacy policy|terms.*)$", re.I)
 REDIRECTS = {301, 302, 303, 307, 308}
 FETCH_SLOTS = BoundedSemaphore(4)
 TLS_CONTEXT = ssl.create_default_context()
@@ -60,7 +67,8 @@ def public_addresses(host, port):
 
 
 class PageText(HTMLParser):
-    SKIP = {"script", "style", "noscript", "svg", "template", "head", "nav", "iframe"}
+    SKIP = {"script", "style", "noscript", "svg", "template", "head", "nav", "iframe", "footer", "aside",
+            "form", "button", "select", "option", "dialog"}
     BLOCK = {"p", "div", "br", "li", "section", "article", "h1", "h2", "h3", "h4", "tr"}
 
     def __init__(self):
@@ -69,8 +77,13 @@ class PageText(HTMLParser):
         self.body = []
         self.skipped = []
         self.in_title = False
+        self.links = []
+        self._link = None
 
     def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            href = dict(attrs).get("href")
+            self._link = [href, []] if href else None
         if tag == "title":
             self.in_title = True
         if tag in self.SKIP:
@@ -79,6 +92,9 @@ class PageText(HTMLParser):
             self.body.append("\n")
 
     def handle_endtag(self, tag):
+        if tag == "a" and self._link:
+            self.links.append((self._link[0], " ".join("".join(self._link[1]).split())))
+            self._link = None
         if tag == "title":
             self.in_title = False
         if self.skipped and tag == self.skipped[-1]:
@@ -87,6 +103,8 @@ class PageText(HTMLParser):
             self.body.append("\n")
 
     def handle_data(self, data):
+        if self._link is not None:
+            self._link[1].append(data)
         if self.in_title:
             self.title.append(data)
         elif not self.skipped:
@@ -96,7 +114,10 @@ class PageText(HTMLParser):
         for parts in (self.title, self.body):
             parts[:] = [re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", part) for part in parts]
         lines = (" ".join(line.split()) for line in "".join(self.body).splitlines())
-        content = "\n".join(dict.fromkeys(line for line in lines if line))[:MAX_TEXT].strip()
+        # Drop menu and button leftovers: keep real sentences, headings, numbers and times.
+        useful = (line for line in lines if line and not UI_ONLY.match(line)
+                  and (len(line.split()) >= 3 or any(ch.isdigit() for ch in line) or len(line) >= 14))
+        content = "\n".join(dict.fromkeys(useful))[:MAX_TEXT].strip()
         if len(content) < 20:
             raise HTTPException(422, "This page has too little readable text. Try a Services or About page.")
         title = " ".join("".join(self.title).split())
@@ -105,18 +126,56 @@ class PageText(HTMLParser):
         return title[:120], content
 
 
-def fetch_page(raw):
+def same_site_links(base_url, links, limit):
+    base = urlsplit(base_url)
+    host = base.hostname.removeprefix("www.")
+    chosen, seen = [], {base.path.rstrip("/") or "/"}
+    for href, text in links:
+        try:
+            target = urlsplit(urljoin(base_url, href))
+        except ValueError:
+            continue
+        if target.scheme not in ("http", "https") or (target.hostname or "").removeprefix("www.") != host:
+            continue
+        path = target.path.rstrip("/") or "/"
+        if path in seen or re.search(r"\.(pdf|jpe?g|png|gif|webp|zip|mp4|svg)$", path, re.I):
+            continue
+        if USEFUL_LINK.search(path) or USEFUL_LINK.search(text or ""):
+            seen.add(path)
+            chosen.append(urlunsplit((target.scheme, target.netloc, target.path, target.query, "")))
+        if len(chosen) >= limit:
+            break
+    return chosen
+
+
+def fetch_page(raw, extra_pages=EXTRA_PAGES):
+    """Read the page and a few clearly useful pages on the same site (about, services, pricing, contact)."""
     if not FETCH_SLOTS.acquire(blocking=False):
         raise HTTPException(429, "Website imports are busy. Try again shortly.")
     try:
-        return _fetch_page(raw)
+        started = time.monotonic()
+        page = _fetch_page(raw, with_links=True)
+        links = page.pop("links")
+        parts = [page["content"]]
+        for extra in same_site_links(page["source_url"], links, extra_pages):
+            if time.monotonic() - started > SITE_BUDGET_SECONDS:
+                break
+            try:
+                more = _fetch_page(extra)
+            except (OSError, http.client.HTTPException, HTTPException):
+                continue
+            parts.append("— " + more["title"] + " —\n" + more["content"])
+        if len(parts) > 1:
+            lines = list(dict.fromkeys(line for part in parts for line in part.splitlines() if line.strip()))
+            page["content"] = "\n".join(lines)[:MAX_COMBINED].strip()
+        return page
     except (OSError, http.client.HTTPException) as exc:
         raise HTTPException(422, "Could not read this website. Check the address or paste your business details.") from exc
     finally:
         FETCH_SLOTS.release()
 
 
-def _fetch_page(raw):
+def _fetch_page(raw, with_links=False):
     current = normalize_url(raw)
     deadline = time.monotonic() + 12
 
@@ -197,5 +256,8 @@ def _fetch_page(raw):
             page.feed(body)
             page.close()
         title, content = page.result(host)
-        return {"title": title, "content": content, "source_url": current}
+        result = {"title": title, "content": content, "source_url": current}
+        if with_links:
+            result["links"] = page.links
+        return result
     raise HTTPException(422, "The website redirected too many times. Enter the final page address.")

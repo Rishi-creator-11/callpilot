@@ -778,23 +778,47 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 
 
 <section id="quicksetup" class="panel card" style="display:none">
- <div class="cp-panel-heading"><div><h2>Quick setup</h2><p>Share your website, tick what you want your agent to do, and we build it for you. Then talk to it.</p></div></div>
- <ol class="qs-steps" aria-label="Setup steps"><li id="qsDot1" aria-current="step">1. Website</li><li id="qsDot2">2. What it should do</li><li id="qsDot3">3. Your agent</li><li id="qsDot4">4. Test it</li></ol>
+ <div class="cp-panel-heading"><div><h2>Set up your agent</h2><p>Tell us about your business, pick what the agent should do, and we build it. Then you talk to it.</p></div></div>
+ <ol class="qs-steps" aria-label="Setup steps"><li id="qsDot1" aria-current="step">1. Your business</li><li id="qsDotR">2. Check it</li><li id="qsDot2">3. What it does</li><li id="qsDot3">4. Your agent</li><li id="qsDot4">5. Talk to it</li></ol>
  <div id="qsStep1" class="cp-section-box">
-  <h3>Teach your agent about your business</h3>
-  <p>We read one page of your website and use it to answer callers. You review it before it is used.</p>
-  <form id="qsWebsiteForm">
-   <label for="qsUrl">Website address</label><input id="qsUrl" type="text" inputmode="url" maxlength="2048" placeholder="example.com">
-   <div class="cp-inline-actions"><button type="submit" id="qsImport">Import my website</button><button type="button" id="qsSkip" class="secondary">I don’t have a website</button></div>
-  </form>
-  <div id="qsPreview" hidden>
-   <h4>What we found</h4>
-   <pre id="qsPreviewText" class="qs-preview"></pre>
-   <label class="cp-studio-check"><input id="qsApprove" type="checkbox" checked> This looks right. Use it to answer callers.</label>
-   <p class="muted">Prices are never read out unless you approve exact prices separately. You can edit this later in Knowledge.</p>
-   <div class="cp-inline-actions"><button type="button" id="qsToGoals">Continue</button></div>
+  <h3>Tell us about your business</h3>
+  <p>Choose the easiest way. We read it, show you what we understood, and nothing is used until you say it looks right.</p>
+  <div class="cn-tabs" role="group" aria-label="Ways to share your business">
+   <button type="button" data-qs-tab="website" aria-pressed="true">My website</button>
+   <button type="button" data-qs-tab="pdf" aria-pressed="false">A PDF</button>
+   <button type="button" data-qs-tab="text" aria-pressed="false">Type or speak</button>
   </div>
+  <form id="qsWebsiteForm" data-qs-pane="website">
+   <label for="qsUrl">Website address</label><input id="qsUrl" type="text" inputmode="url" maxlength="2048" placeholder="example.com">
+   <p class="muted">We read your main page and your about, services, pricing and contact pages.</p>
+   <div class="cp-inline-actions"><button type="submit" id="qsImport">Read my website</button></div>
+  </form>
+  <div data-qs-pane="pdf" hidden>
+   <label for="qsPdf">A brochure, price list or menu (PDF, up to 5 MB)</label><input id="qsPdf" type="file" accept="application/pdf">
+   <div class="cp-inline-actions"><button type="button" id="qsPdfGo">Read my PDF</button></div>
+  </div>
+  <div data-qs-pane="text" hidden>
+   <label for="qsAbout">Tell us about your business</label>
+   <textarea id="qsAbout" maxlength="6000" rows="6" placeholder="What you do, who you serve, your hours, how to reach you, and what you charge."></textarea>
+   <div class="cp-inline-actions"><button type="button" id="qsMic" class="secondary" hidden>🎤 Speak</button><button type="button" id="qsAboutGo">Continue</button></div>
+  </div>
+  <div class="cp-inline-actions" style="margin-top:14px"><button type="button" id="qsSkip" class="secondary">Skip for now</button></div>
   <p id="qsStatus1" role="status" class="muted"></p>
+ </div>
+ <div id="qsStepR" class="cp-section-box" hidden>
+  <h3>Here is what we understood</h3>
+  <p>Please check it and fix anything that is wrong. Your agent only knows what you approve here.</p>
+  <label for="qsOverview">About your business</label>
+  <textarea id="qsOverview" rows="9" maxlength="4000"></textarea>
+  <div id="qsPricesBox" hidden>
+   <h4>Prices we found</h4>
+   <p class="muted">Tick the prices your agent may tell callers. Leave the rest out and it will take details for a quote instead.</p>
+   <div id="qsPrices" class="qs-goals"></div>
+   <label class="cp-studio-check"><input id="qsPricesOk" type="checkbox"> These prices are current and correct. My agent may quote them.</label>
+  </div>
+  <p id="qsNoPrices" class="muted" hidden>We did not find prices, so your agent will collect the details for a quote.</p>
+  <div class="cp-inline-actions"><button type="button" id="qsBackR" class="secondary">Back</button><button type="button" id="qsLooksGood">This looks right</button></div>
+  <p id="qsStatusR" role="status" class="muted"></p>
  </div>
  <div id="qsStep2" class="cp-section-box" hidden>
   <h3>What should your agent do?</h3>
@@ -804,28 +828,29 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <input id="qsOther" maxlength="200" placeholder="For example: always ask about the deadline first">
   <div id="qsTransferBox" hidden>
    <label for="qsTransferNumber">Phone number to connect callers to</label>
-   <input id="qsTransferNumber" inputmode="tel" maxlength="16" placeholder="+12125550100">
-   <p class="muted">Use international format with the plus sign.</p>
+   <input id="qsTransferNumber" inputmode="tel" maxlength="20" placeholder="(914) 446-0465">
+   <p class="muted">A U.S. number is fine. For other countries start with +.</p>
   </div>
   <div class="cp-inline-actions"><button type="button" id="qsBack2" class="secondary">Back</button><button type="button" id="qsBuild">Build my agent</button></div>
   <p id="qsStatus2" role="status" class="muted"></p>
  </div>
  <div id="qsStep3" class="cp-section-box" hidden>
   <h3 id="qsDoneTitle">Your agent is ready</h3>
-  <p class="muted">The opening line your callers will hear:</p>
+  <p class="muted">The opening line callers will hear:</p>
   <blockquote id="qsGreeting" class="qs-quote"></blockquote>
   <h4>What it can do now</h4><ul id="qsEnabled" class="qs-list"></ul>
   <div id="qsNeedsBox" hidden><h4>Still needed</h4><ul id="qsNeeds" class="qs-list"></ul></div>
-  <div class="cp-inline-actions"><button type="button" id="qsToTest">Test your agent</button><button type="button" id="qsRedo" class="secondary">Change my choices</button></div>
+  <div class="cp-inline-actions"><button type="button" id="qsToTest">Talk to your agent</button><button type="button" id="qsRedo" class="secondary">Change my choices</button></div>
  </div>
  <div id="qsStep4" class="cp-section-box" hidden>
-  <h3>Test your agent</h3>
-  <p>Ask what a real caller would ask. The agent answers from the information you approved.</p>
+  <h3>Talk to your agent</h3>
+  <p>Ask what a real caller would ask. Type below, or speak with your voice.</p>
   <div id="qsChat" class="qs-chat" aria-live="polite"></div>
   <form id="qsChatForm" class="qs-chatform"><label for="qsQuestion" class="cp-visually-hidden">Your question</label>
    <input id="qsQuestion" required maxlength="500" placeholder="What are your hours?" autocomplete="off"><button type="submit">Ask</button></form>
-  <div class="cp-inline-actions"><button type="button" id="qsVoice" class="secondary">Talk to it by voice</button><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button></div>
-  <p class="muted">Voice practice needs the microphone and is limited per day. Text testing is always available.</p>
+  <div class="cp-inline-actions"><button type="button" id="qsVoice">Talk by voice</button><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button></div>
+  <p class="muted">Voice uses your microphone and is limited per day. Typing always works.</p>
+  <div class="cp-inline-actions" style="margin-top:14px"><button type="button" id="qsFinish">I’m done. Open my dashboard</button></div>
  </div>
 </section>
 
@@ -2181,6 +2206,18 @@ async function loadOrganizations({select,destination}={}){
   '<option value="">Create a business</option>';
  if(old&&orgs.some(x=>x.id===old))$("org").value=old;
  if(orgs.length){
+   // First visit after signing in: guide new owners straight into setting up their agent.
+   if(!destination&&!pendingInvite&&!location.hash.replace("#","")){
+    const mine=orgs.find(x=>x.id===organization());
+    if(mine&&["owner","admin"].includes(mine.role)){
+     try{
+      if(!localStorage.getItem("callpilot.qs."+mine.id)){
+       const status=await request("/organizations/"+encodeURIComponent(mine.id)+"/quick-setup");
+       if(!status.setup_done)destination="quicksetup";
+      }
+     }catch{}
+    }
+   }
    if(!destination&&!pendingInvite&&location.hash==="#onboarding"){
     const setupId=readWorkspacePreference("websiteSetup");
     const workspace=orgs.find(x=>x.id===setupId&&x.id===organization());
@@ -3370,13 +3407,20 @@ $("capiSync").addEventListener("click",async event=>{
 const QS_ICONS={info:"💬",messages:"📝",quotes:"🧾",orders:"📦",booking:"📅",transfer:"📞"};
 const QS_HELP={info:"Answer questions about your business",messages:"Take messages and capture leads",quotes:"Collect the details for a quote",
  orders:"Take order requests for your team to review",booking:"Book appointments on your calendar",transfer:"Connect callers to a person"};
-let qsGoals=new Set(["info","messages"]),qsDoc=null;
+let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null;
+const qsKey=oid=>"callpilot.qs."+oid;
 function qsShow(step){
- for(let n=1;n<=4;n++){
+ for(const n of [1,"R",2,3,4]){
   $("qsStep"+n).hidden=n!==step;
   if(n===step)$("qsDot"+n).setAttribute("aria-current","step");else $("qsDot"+n).removeAttribute("aria-current");
  }
+ $("qsStep"+step).scrollIntoView({block:"nearest"});
 }
+function qsTab(name){
+ for(const tab of document.querySelectorAll("[data-qs-tab]"))tab.setAttribute("aria-pressed",String(tab.dataset.qsTab===name));
+ for(const pane of document.querySelectorAll("[data-qs-pane]"))pane.hidden=pane.dataset.qsPane!==name;
+}
+for(const tab of document.querySelectorAll("[data-qs-tab]"))tab.addEventListener("click",()=>qsTab(tab.dataset.qsTab));
 function qsRenderGoals(){
  const box=$("qsGoals");box.replaceChildren();
  for(const key of Object.keys(QS_HELP)){
@@ -3395,52 +3439,116 @@ function qsRenderGoals(){
 }
 async function loadQuickSetup(){
  const oid=organization();
- qsShow(1);qsRenderGoals();
- $("qsPreview").hidden=true;$("qsStatus1").textContent="";
+ qsShow(1);qsTab("website");qsRenderGoals();
+ $("qsStatus1").textContent="";
  try{
   const status=await request("/organizations/"+oid+"/quick-setup");
   if(oid!==organization())return;
-  if(status.knowledge_approved)$("qsStatus1").textContent="You already have "+status.knowledge_approved+" approved source"+(status.knowledge_approved===1?"":"s")+". You can add another website or continue.";
-  if(status.enabled.messages||status.enabled.booking||status.enabled.orders)for(const [k,on] of Object.entries(status.enabled))if(on)qsGoals.add(k);
+  if(status.knowledge_approved)$("qsStatus1").textContent="Your agent already knows "+status.knowledge_approved+" approved source"+(status.knowledge_approved===1?"":"s")+". You can add more or skip ahead.";
+  for(const [k,on] of Object.entries(status.enabled))if(on)qsGoals.add(k);
   qsRenderGoals();
  }catch(e){$("qsStatus1").textContent=e.message}
 }
-$("qsSkip").addEventListener("click",()=>{qsDoc=null;qsShow(2)});
+async function qsAnalyze(payload,status){
+ const oid=organization();
+ status.textContent="Reading it and working out what matters…";
+ const r=await request("/organizations/"+oid+"/quick-setup/analyze","POST",payload);
+ if(oid!==organization())return;
+ $("qsOverview").value=r.overview;
+ const prices=r.understanding.prices||[],list=$("qsPrices");list.replaceChildren();
+ for(const price of prices){
+  const label=document.createElement("label"),input=document.createElement("input"),text=document.createElement("span");
+  label.className="qs-goal on";input.type="checkbox";input.checked=true;input.dataset.item=price.item;input.dataset.price=price.price_text;
+  input.addEventListener("change",()=>label.classList.toggle("on",input.checked));
+  text.textContent=price.item+" — "+price.price_text;label.append(input,text);list.append(label);
+ }
+ $("qsPricesBox").hidden=!prices.length;$("qsNoPrices").hidden=prices.length>0;$("qsPricesOk").checked=false;
+ $("qsStatusR").textContent="";status.textContent="";qsShow("R");
+}
+$("qsSkip").addEventListener("click",()=>{
+ try{localStorage.setItem(qsKey(organization()),"skipped")}catch{}
+ window.section("builder",{push:true});
+});
 $("qsWebsiteForm").addEventListener("submit",async event=>{
  event.preventDefault();
- const oid=organization(),button=$("qsImport"),url=v("qsUrl").trim();
+ const oid=organization(),button=$("qsImport"),url=v("qsUrl").trim(),status=$("qsStatus1");
  if(button.disabled)return;
- if(!url){$("qsStatus1").textContent="Enter your website address, or choose I don’t have a website.";return}
- button.disabled=true;$("qsStatus1").textContent="Reading your website…";$("qsPreview").hidden=true;
+ if(!url){status.textContent="Enter your website address.";return}
+ button.disabled=true;status.textContent="Reading your website. This can take up to half a minute…";
  try{
   const result=await request("/organizations/"+oid+"/descriptions/import-website","POST",{url});
   const docs=await request("/organizations/"+oid+"/descriptions");
   if(oid!==organization())return;
-  qsDoc=docs.find(d=>d.source_url===result.source_url)||null;
-  if(!qsDoc)throw Error("We could not read that page. Check the address, or choose I don’t have a website.");
-  const text=(qsDoc.content||"").trim();
-  $("qsPreviewText").textContent=text.length>700?text.slice(0,700)+"…":text;
-  $("qsApprove").checked=!qsDoc.approved_at;$("qsApprove").disabled=Boolean(qsDoc.approved_at);
-  $("qsPreview").hidden=false;
-  $("qsStatus1").textContent=result.created?"Imported. Please check what we found.":"This page was already imported.";
- }catch(e){$("qsStatus1").textContent=e.message}
+  const doc=docs.find(d=>d.source_url===result.source_url);
+  if(!doc)throw Error("We could not read that page. Check the address, or try a PDF or type about your business.");
+  qsSource={document_id:doc.id};
+  await qsAnalyze(qsSource,status);
+ }catch(e){status.textContent=e.message}
  finally{button.disabled=false}
 });
-$("qsToGoals").addEventListener("click",async event=>{
- const button=event.currentTarget,oid=organization();
+$("qsPdfGo").addEventListener("click",async event=>{
+ const button=event.currentTarget,oid=organization(),status=$("qsStatus1"),file=$("qsPdf").files[0];
  if(button.disabled)return;
- if(qsDoc&&$("qsApprove").checked&&!qsDoc.approved_at){
-  button.disabled=true;$("qsStatus1").textContent="Saving what your agent will know…";
-  try{await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(qsDoc.id)+"/approve","POST");qsDoc.approved_at="now"}
-  catch(e){
-   $("qsStatus1").textContent=e.message+" You can fix this in Knowledge, or continue without it.";
-   $("qsApprove").checked=false;button.disabled=false;return;
-  }
-  button.disabled=false;
- }
- $("qsStatus1").textContent="";qsShow(2);
+ if(!file){status.textContent="Choose a PDF first.";return}
+ button.disabled=true;status.textContent="Reading your PDF…";
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)throw Error("Session expired. Sign in again.");
+  const response=await fetch("/api/account/organizations/"+encodeURIComponent(oid)+"/descriptions/import-pdf?"+new URLSearchParams({filename:file.name}),
+   {method:"POST",headers:{"Content-Type":"application/pdf","Authorization":"Bearer "+session.access_token},body:file});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(typeof data.detail==="string"?data.detail:"We could not read that PDF.");
+  const docs=await request("/organizations/"+oid+"/descriptions");
+  if(oid!==organization())return;
+  const doc=docs.find(d=>d.source_filename===file.name);
+  if(!doc)throw Error("We could not find that PDF after reading it. Please try again.");
+  qsSource={document_id:doc.id};
+  await qsAnalyze(qsSource,status);
+ }catch(e){status.textContent=e.message}
+ finally{button.disabled=false}
 });
-$("qsBack2").addEventListener("click",()=>qsShow(1));
+$("qsAboutGo").addEventListener("click",async event=>{
+ const button=event.currentTarget,status=$("qsStatus1"),text=v("qsAbout").trim();
+ if(button.disabled)return;
+ if(text.length<20){status.textContent="Tell us a little more about your business first.";return}
+ button.disabled=true;qsSource={text};
+ try{await qsAnalyze(qsSource,status)}catch(e){status.textContent=e.message}
+ finally{button.disabled=false}
+});
+{
+ const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(Recognition)$("qsMic").hidden=false;
+ $("qsMic").addEventListener("click",()=>{
+  if(qsRecognition){qsRecognition.stop();return}
+  qsRecognition=new Recognition();
+  qsRecognition.lang=navigator.language||"en-US";qsRecognition.continuous=true;qsRecognition.interimResults=false;
+  qsRecognition.onresult=event=>{
+   const heard=[...event.results].slice(event.resultIndex).map(r=>r[0].transcript).join(" ").trim();
+   if(heard)$("qsAbout").value=($("qsAbout").value+" "+heard).trim().slice(0,6000);
+  };
+  qsRecognition.onerror=()=>{$("qsStatus1").textContent="We could not use the microphone. You can type instead."};
+  qsRecognition.onend=()=>{qsRecognition=null;$("qsMic").textContent="🎤 Speak"};
+  $("qsMic").textContent="■ Stop";qsRecognition.start();
+ });
+}
+$("qsBackR").addEventListener("click",()=>qsShow(1));
+$("qsLooksGood").addEventListener("click",async event=>{
+ const button=event.currentTarget,oid=organization(),status=$("qsStatusR");
+ if(button.disabled)return;
+ const overview=v("qsOverview").trim();
+ if(overview.length<20){status.textContent="Add a few lines about your business first.";return}
+ const prices=[...$("qsPrices").querySelectorAll("input:checked")].map(i=>({item:i.dataset.item,price_text:i.dataset.price}));
+ if(prices.length&&!$("qsPricesOk").checked){status.textContent="Confirm the prices are correct, or untick them.";return}
+ button.disabled=true;status.textContent="Saving what your agent will know…";
+ try{
+  const r=await request("/organizations/"+oid+"/quick-setup/knowledge","POST",{overview,prices,prices_confirmed:prices.length>0&&$("qsPricesOk").checked});
+  if(oid!==organization())return;
+  status.textContent="";qsShow(2);
+  $("qsStatus2").textContent=r.prices_saved?"Saved. Your agent can now quote "+r.prices_saved+" price"+(r.prices_saved===1?"":"s")+".":"Saved.";
+ }catch(e){status.textContent=e.message}
+ finally{button.disabled=false}
+});
+$("qsBack2").addEventListener("click",()=>qsShow("R"));
 $("qsBuild").addEventListener("click",async event=>{
  const button=event.currentTarget,oid=organization();
  if(button.disabled)return;
@@ -3469,6 +3577,10 @@ $("qsToTest").addEventListener("click",()=>{qsShow(4);$("qsQuestion").focus()});
 $("qsBack4").addEventListener("click",()=>qsShow(3));
 $("qsVoice").addEventListener("click",()=>{window.section("simulator",{push:true});setTimeout(()=>$("startVoicePractice")?.scrollIntoView({block:"center"}),400)});
 $("qsLive").addEventListener("click",()=>window.section("channels",{push:true}));
+$("qsFinish").addEventListener("click",()=>{
+ try{localStorage.setItem(qsKey(organization()),"done")}catch{}
+ window.section("analytics",{push:true});
+});
 $("qsChatForm").addEventListener("submit",async event=>{
  event.preventDefault();
  const oid=organization(),input=$("qsQuestion"),question=input.value.trim(),button=event.submitter;
