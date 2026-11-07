@@ -189,7 +189,7 @@ def test_call_records_are_idempotent_on_provider_call_id(monkeypatch):
 # ---------- admission and human forwarding ----------
 def admission(monkeypatch,remaining=10,used=0,active=0,included=100,status="active",
               fallback=None,enforced=True,phone="ph_1"):
-    monkeypatch.setattr(usage,"agent_config",lambda oid:{"provider_phone_id":"ph_1","provider_agent_id":"asst_A"})
+    monkeypatch.setattr(usage,"agent_config",lambda oid,**kw:{"provider_phone_id":"ph_1","provider_agent_id":"asst_A"})
     def api(table,method="GET",params=None,**kw):
         if table=="phone_assignments":
             return [fallback or {"id":1}] if "fallback_enabled" in (params or {}).get("select","") else [{"id":1}]
@@ -241,7 +241,7 @@ def test_admission_fails_closed_when_billing_data_is_unavailable(monkeypatch):
 def test_forwarding_requires_explicit_valid_number_and_owner_role(monkeypatch):
     app.dependency_overrides[current_user]=lambda:{"id":"u"}
     monkeypatch.setattr(usage,"membership",lambda *a,**k:"owner")
-    monkeypatch.setattr(usage,"agent_config",lambda oid:{"provider_phone_id":"ph_1"})
+    monkeypatch.setattr(usage,"agent_config",lambda oid,**kw:{"provider_phone_id":"ph_1"})
     saved=[]
     monkeypatch.setattr(usage,"api",lambda table,method="GET",params=None,data=None,prefer=None:
         saved.append(data) if method=="PATCH" else [{"id":1}])

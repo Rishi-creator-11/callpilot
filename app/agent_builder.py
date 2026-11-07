@@ -111,16 +111,135 @@ def suggest(oid: UUID, body: DraftInput, user=Depends(current_user)):
     return proposal
 
 
-@router.post("/sync")
-def sync(oid: UUID, user=Depends(current_user)):
-    workspace = str(oid)
-    membership(workspace, user, ("owner", "admin"))
+SNAPSHOT_FIELDS = (
+    "stock_voice_id,speech_language,speech_keyterms,speech_pronunciations,"
+    "voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled,"
+    "transfer_directory,call_menu"
+)
+IDENTITY_KEYS = ("agent_name", "greeting", "call_instructions")
+
+
+class PublishInput(BaseModel):
+    note: str | None = Field(default=None, max_length=200)
+
+
+def sync_assistant(workspace: str) -> None:
     result = refresh_receptionist_prompt(workspace, use_saved_greeting=True)
     if result["reason"] == "no_assistant":
         raise HTTPException(409, "Connect a CallPilot-managed assistant before syncing.")
     if result["reason"] not in ("already_current", "voice_policy_and_one_second_opening_synced"):
         raise HTTPException(409, "The connected assistant cannot be updated here.")
+
+
+def saved_configuration(workspace: str) -> dict:
+    rows = api("agent_configs", params={
+        "organization_id": "eq." + workspace, "limit": 1,
+        "select": "agent_name,greeting,call_instructions," + SNAPSHOT_FIELDS,
+    })
+    if not rows:
+        raise HTTPException(404, "No receptionist is configured for this workspace")
+    return rows[0]
+
+
+def split_snapshot(row: dict) -> tuple[dict, dict]:
+    identity = {key: row.get(key) or "" for key in IDENTITY_KEYS}
+    settings = {key: row.get(key) for key in SNAPSHOT_FIELDS.split(",")}
+    return identity, settings
+
+
+def latest_publication(workspace: str) -> dict | None:
+    rows = api("agent_publications", params={
+        "organization_id": "eq." + workspace, "order": "version.desc", "limit": 1,
+        "select": "id,version,agent_name,greeting,call_instructions,settings,source,note,created_at",
+    })
+    return rows[0] if rows else None
+
+
+def has_unpublished_changes(current: dict, published: dict | None) -> bool:
+    if not published:
+        return True
+    identity, settings = split_snapshot(current)
+    return (any(published.get(key) != identity[key] for key in IDENTITY_KEYS)
+            or (published.get("settings") or {}) != settings)
+
+
+def record_publication(workspace: str, user_id: str, current: dict, *, note=None,
+                       source="publish", rolled_back_from=None) -> int:
+    identity, settings = split_snapshot(current)
+    version = rpc("record_agent_publication", {
+        "p_organization_id": workspace, "p_user": user_id, "p_note": note,
+        "p_source": source, "p_rolled_back_from": rolled_back_from,
+        "p_settings": settings, **{"p_" + key: value for key, value in identity.items()},
+    })
+    if not isinstance(version, int):
+        raise HTTPException(409, "The configuration changed while publishing. Review it and publish again.")
+    return version
+
+
+@router.post("/sync")
+def sync(oid: UUID, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    sync_assistant(workspace)
     return {"synced": True}
+
+
+@router.get("/publication")
+def publication_status(oid: UUID, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    published = latest_publication(workspace)
+    versions = api("agent_publications", params={
+        "organization_id": "eq." + workspace, "order": "version.desc", "limit": 20,
+        "select": "id,version,agent_name,greeting,call_instructions,source,note,created_at",
+    })
+    return {
+        "unpublished_changes": has_unpublished_changes(saved_configuration(workspace), published),
+        "current_version": published["version"] if published else None,
+        "versions": versions,
+    }
+
+
+@router.post("/publish")
+def publish(oid: UUID, body: PublishInput | None = None, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    current = saved_configuration(workspace)
+    sync_assistant(workspace)
+    published = latest_publication(workspace)
+    if not has_unpublished_changes(current, published):
+        return {"version": published["version"], "unchanged": True}
+    note = ((body.note or "").strip() or None) if body else None
+    version = record_publication(workspace, user["id"], current, note=note)
+    return {"version": version, "unchanged": False}
+
+
+@router.post("/publication/{publication_id}/rollback")
+def rollback(oid: UUID, publication_id: UUID, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    rows = api("agent_publications", params={
+        "organization_id": "eq." + workspace, "id": "eq." + str(publication_id),
+        "select": "id,version,agent_name,greeting,call_instructions", "limit": 1,
+    })
+    if not rows:
+        raise HTTPException(404, "Published version not found.")
+    target = rows[0]
+    # Recorded values may predate current form validation; restore them as published.
+    save_agent_configuration(workspace, AgentEdit.model_construct(
+        **{key: target[key] for key in IDENTITY_KEYS}))
+    try:
+        sync_assistant(workspace)
+    except HTTPException as exc:
+        raise HTTPException(exc.status_code,
+            "Version %d was restored as the draft but could not be applied to the live assistant. %s"
+            % (target["version"], exc.detail)) from exc
+    version = record_publication(
+        workspace, user["id"], saved_configuration(workspace),
+        note="Rolled back to version %d" % target["version"],
+        source="rollback", rolled_back_from=target["id"])
+    return {"version": version, "restored_version": target["version"],
+            **{key: target[key] for key in IDENTITY_KEYS}}
 
 
 @router.get("/history")

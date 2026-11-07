@@ -775,7 +775,8 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
     <label for="builderGreeting">Opening greeting</label><textarea id="builderGreeting" required minlength="10" maxlength="500"></textarea>
     <label for="builderInstructions">Conversation instructions</label><textarea id="builderInstructions" maxlength="2400" rows="5"></textarea>
     <p class="muted">Save your edits to the workspace. Sync when you want to apply saved settings to the managed assistant.</p>
-    <div class="cp-inline-actions"><button type="submit">Save configuration</button><button id="builderSync" type="button" class="secondary" disabled>Sync live assistant</button></div>
+    <div class="cp-inline-actions"><button type="submit">Save configuration</button><button id="builderSync" type="button" class="secondary" disabled>Sync live assistant</button><button id="builderPublish" type="button" disabled>Publish</button></div>
+    <p id="builderPublishState" class="muted" role="status"></p>
    </form>
    <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Manage approved knowledge →</button>
   </aside>
@@ -793,6 +794,9 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <summary>Configuration history</summary>
   <p class="muted">Review earlier saved settings. Restoring changes the saved configuration. Sync to update the live assistant.</p>
   <div id="builderRevisions" aria-live="polite"></div>
+  <h3>Published versions</h3>
+  <p class="muted">Each publish applies the saved configuration to the live assistant and records a snapshot. Rolling back restores that version's name, greeting and instructions and applies them to the live assistant.</p>
+  <div id="builderPublications" aria-live="polite"></div>
  </details>
 </section>
 
@@ -3253,6 +3257,9 @@ function resetBuilder(){
  $("builderHistory").open=false;
  $("builderHistory").hidden=true;
  $("builderRevisions").replaceChildren();
+ $("builderPublications").replaceChildren();
+ $("builderPublish").disabled=true;
+ $("builderPublishState").textContent="";
  $("builderStatus").textContent="Loading receptionist configuration…";
 }
 function setBuilderFields(agent){
@@ -3289,6 +3296,7 @@ async function loadBuilder(){
   $("builderReset").hidden=!builderCanEdit;
   $("builderHistory").hidden=!builderCanEdit;
   if(builderCanEdit&&$("builderHistory").open)void loadBuilderHistory();
+  if(builderCanEdit)void loadPublication(oid);
   for(const field of $("builderSettings").elements)field.disabled=!builderCanEdit;
   $("assistantAgentName").textContent=(agent.value.agent_name||"Your")+" assistant";
   $("assistantAgentState").textContent=orgs.find(workspace=>workspace.id===oid)?.name||"Workspace";
@@ -3408,6 +3416,7 @@ $("builderSettings").addEventListener("submit",async event=>{
   $("assistantAgentName").textContent=fields.agent_name+" assistant";
   $("builderStatus").textContent=builderDirty?"Saved the previous version. Save again to include your latest edits.":"Configuration saved. Sync when you are ready to update the live assistant.";
   if($("builderHistory").open)await loadBuilderHistory();
+  void loadPublication(oid);
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
  finally{button.disabled=false}
 });
@@ -3418,9 +3427,65 @@ $("builderSync").addEventListener("click",async event=>{
  $("builderStatus").textContent="Syncing live assistant…";
  try{
   await request(builderPath(oid)+"/sync","POST");
-  if(oid===organization())$("builderStatus").textContent="The managed assistant is synced.";
+  if(oid===organization())$("builderStatus").textContent="The managed assistant is synced. Publish to record this as a version.";
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
  finally{if(oid===organization())button.disabled=builderDirty}
+});
+async function loadPublication(oid){
+ const list=$("builderPublications"),state=$("builderPublishState"),publish=$("builderPublish");
+ if(!builderCanEdit)return;
+ try{
+  const info=await request(builderPath(oid)+"/publication");
+  if(oid!==organization())return;
+  publish.disabled=!builderCanEdit||!info.unpublished_changes;
+  state.textContent=info.current_version===null?"Not published yet. Publish to apply this configuration to your live assistant.":
+   info.unpublished_changes?"Live version "+info.current_version+" has unpublished changes.":"Live version "+info.current_version+" is up to date.";
+  list.replaceChildren();
+  if(!info.versions.length){list.textContent="Published versions appear here after your first publish.";return}
+  for(const row of info.versions){
+   const entry=document.createElement("details"),summary=document.createElement("summary"),greeting=document.createElement("p");
+   const notes=document.createElement("p"),button=document.createElement("button");
+   entry.className="item";
+   summary.textContent="Version "+row.version+(row.source==="rollback"?" (rollback)":"")+" · "+row.agent_name+" · "+new Date(row.created_at).toLocaleString()+(row.version===info.current_version?" · live":"");
+   greeting.textContent=row.greeting;
+   notes.textContent=(row.note?row.note+"\n\n":"")+(row.call_instructions||"No additional conversation instructions.");
+   notes.style.whiteSpace="pre-wrap";
+   button.type="button";button.className="secondary";button.textContent="Roll back to this version";
+   button.disabled=row.version===info.current_version&&!info.unpublished_changes;
+   button.addEventListener("click",async()=>{
+    if(oid!==organization()||button.disabled||!window.confirm("Replace the draft with version "+row.version+" and apply it to the live assistant now?"))return;
+    button.disabled=true;
+    state.textContent="Rolling back…";
+    try{
+     const restored=await request(builderPath(oid)+"/publication/"+encodeURIComponent(row.id)+"/rollback","POST");
+     if(oid!==organization())return;
+     setBuilderFields(restored);
+     $("studioAgentName").value=restored.agent_name;
+     $("studioGreeting").value=restored.greeting;
+     builderDirty=false;
+     $("builderStatus").textContent="Rolled back to version "+restored.restored_version+" and applied to the live assistant.";
+     if($("builderHistory").open)await loadBuilderHistory();
+    }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+    finally{if(oid===organization())await loadPublication(oid)}
+   });
+   entry.append(summary,greeting,notes,button);
+   list.append(entry);
+  }
+ }catch(e){if(oid===organization())state.textContent=e.message}
+}
+$("builderPublish").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled||!builderCanEdit)return;
+ if(builderDirty){$("builderStatus").textContent="Save your latest edits before publishing.";return}
+ const note=window.prompt("Add an optional note for this version (max 200 characters).","");
+ if(note===null)return;
+ button.disabled=true;
+ $("builderStatus").textContent="Publishing to the live assistant…";
+ try{
+  const result=await request(builderPath(oid)+"/publish","POST",{note:note.trim().slice(0,200)||null});
+  if(oid===organization())$("builderStatus").textContent=result.unchanged?"Live version "+result.version+" already matches your saved configuration.":"Published version "+result.version+" to the live assistant.";
+ }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+ finally{if(oid===organization())await loadPublication(oid)}
 });
 $("builderHistory").addEventListener("toggle",()=>{
  if($("builderHistory").open)void loadBuilderHistory();
@@ -3456,6 +3521,7 @@ async function loadBuilderHistory(){
      $("builderSync").disabled=false;
      $("builderStatus").textContent="Saved configuration restored. Sync to apply it to the live assistant.";
      await loadBuilderHistory();
+     void loadPublication(oid);
     }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
     finally{button.disabled=false}
    });
