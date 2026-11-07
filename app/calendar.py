@@ -1,6 +1,6 @@
 """Google Calendar OAuth and appointment validation (requires client credentials)."""
 from __future__ import annotations
-import os,re,secrets,urllib.parse,httpx
+import hashlib,os,re,secrets,urllib.parse,httpx
 from datetime import datetime,timedelta,timezone
 from uuid import UUID
 from fastapi import APIRouter,Depends,HTTPException,Query
@@ -84,8 +84,8 @@ def oauth_callback(code:str|None=None,state:str|None=None,error:str|None=None):
     except (httpx.HTTPError,KeyError,ValueError,InvalidToken):
         return RedirectResponse("/app?calendar=error#appointments")
 
-def google_token(oid):
-    c=connection(oid)
+def google_token(oid, saved_connection=None):
+    c=saved_connection or connection(oid)
     if not c:raise HTTPException(409,"Connect Google Calendar first")
     try:refresh=cipher().decrypt(c["refresh_token_ciphertext"].encode()).decode()
     except InvalidToken:raise HTTPException(503,"Calendar token could not be decrypted")
@@ -181,10 +181,12 @@ def reschedule_appointment(oid: UUID, aid: UUID, body: AppointmentMove, user=Dep
     start, end = check_slot(body)
     key = {"p_workspace": workspace, "p_appointment": appointment, "p_operation": operation}
     filter_ = {"organization_id": "eq." + workspace, "id": "eq." + appointment}
-    rows = api("appointment_requests", params={**filter_, "select": "status,calendar_event_id,requested_time,duration_minutes,move_id,move_start"})
+    rows = api("appointment_requests", params={**filter_, "select": "status,calendar_event_id,requested_time,duration_minutes,move_id,move_start,cancel_pending_ref"})
     if not rows or rows[0]["status"] != "confirmed" or not rows[0].get("calendar_event_id"):
         raise HTTPException(404, "Confirmed appointment not found.")
     row = rows[0]
+    if row.get("cancel_pending_ref"):
+        raise HTTPException(409, "Finish the pending cancellation before changing this appointment.")
     headers = {"Authorization": "Bearer " + google_token(workspace)}
     event_id = row["calendar_event_id"]
     url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + urllib.parse.quote(event_id, safe="")
@@ -267,47 +269,71 @@ def book_from_dashboard(oid:UUID,body:StaffBooking,user=Depends(current_user)):
 
 
 @router.post("/api/account/organizations/{oid}/calendar/appointments/{aid}/cancel")
-def cancel_appointment(oid:UUID,aid:UUID,user=Depends(current_user)):
-    workspace=str(oid)
-    membership(workspace,user,("owner","admin"))
-    filter_={"organization_id":"eq."+workspace,"id":"eq."+str(aid)}
-    rows=api("appointment_requests",params={**filter_,"select":"status,calendar_event_id,move_start"})
+def cancel_appointment(oid: UUID, aid: UUID, user=Depends(current_user)):
+    workspace, appointment = str(oid), str(aid)
+    membership(workspace, user, ("owner", "admin"))
+    key = {"organization_id": "eq." + workspace, "id": "eq." + appointment}
+    columns = "status,calendar_event_id,move_start,cancel_pending_ref"
+    rows = api("appointment_requests", params={**key, "select": columns})
     if not rows:
-        raise HTTPException(404,"Appointment not found.")
-    row=rows[0]
-    if row["status"]=="cancelled":
-        return {"status":"cancelled"}
-    if row.get("move_start"):
-        raise HTTPException(409,"Retry the pending reschedule before cancelling this appointment.")
-    event_id=row.get("calendar_event_id")
-    if row["status"]!="confirmed" or not event_id:
-        raise HTTPException(409,"Only confirmed Google Calendar appointments can be cancelled here.")
-    headers={"Authorization":"Bearer "+google_token(workspace)}
-    url="https://www.googleapis.com/calendar/v3/calendars/primary/events/"+urllib.parse.quote(event_id,safe="")
+        raise HTTPException(404, "Appointment not found.")
+    row = rows[0]
+    if row["status"] == "cancelled":
+        return {"status": "cancelled"}
+    if row["move_start"]:
+        raise HTTPException(409, "Retry the pending reschedule before cancelling this appointment.")
+    event_id = row["calendar_event_id"]
+    if row["status"] != "confirmed" or not event_id:
+        raise HTTPException(409, "Only confirmed Google Calendar appointments can be cancelled here.")
+    saved_connection = connection(workspace)
+    if not saved_connection:
+        raise HTTPException(409, "Connect the original Google Calendar first.")
+    connection_ref = hashlib.sha256(saved_connection["refresh_token_ciphertext"].encode()).hexdigest()
+    prior_ref = row["cancel_pending_ref"]
+    headers = {"Authorization": "Bearer " + google_token(workspace, saved_connection)}
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + urllib.parse.quote(event_id, safe="")
     try:
         with httpx.Client(timeout=12) as client:
-            response=client.get(url,headers=headers)
-            if response.status_code in (404,410):
-                raise HTTPException(409,"The event could not be verified in the connected calendar.")
-            response.raise_for_status()
-            event=response.json()
-            marker=(event.get("extendedProperties") or {}).get("private") or {}
-            if marker.get("callpilot_org")!=workspace or marker.get("callpilot_reservation_id")!=str(aid):
-                raise HTTPException(409,"Manage this older appointment directly in Google Calendar.")
-            if event.get("status")!="cancelled":
-                etag=event.get("etag")
-                if not etag:
-                    raise HTTPException(502,"Google Calendar did not provide an event version.")
-                deleted=client.delete(url,headers={**headers,"If-Match":etag},params={"sendUpdates":"all"})
-                if deleted.status_code==412:
-                    raise HTTPException(409,"The calendar event changed. Try again.")
-                if deleted.status_code!=204:
-                    raise HTTPException(502,"Google Calendar did not confirm cancellation.")
-    except (httpx.HTTPError,ValueError) as exc:
-        raise HTTPException(502,"Google Calendar did not confirm cancellation.") from exc
-    api("appointment_requests","PATCH",params={**filter_,"status":"eq.confirmed"},
-        data={"status":"cancelled"},prefer="return=minimal")
-    return {"status":"cancelled"}
+            response = client.get(url, headers=headers)
+            if response.status_code in (404, 410):
+                if prior_ref != connection_ref:
+                    raise HTTPException(409, "The event could not be verified in the connected calendar.")
+            else:
+                response.raise_for_status()
+                event = response.json()
+                marker = (event.get("extendedProperties") or {}).get("private") or {}
+                already_deleted = (event.get("status") == "cancelled" and prior_ref == connection_ref
+                                   and event.get("id") == event_id)
+                if not already_deleted:
+                    if marker.get("callpilot_org") != workspace or marker.get("callpilot_reservation_id") != appointment:
+                        raise HTTPException(409, "Manage this appointment directly in Google Calendar.")
+                    etag = event.get("etag")
+                    if event.get("status") != "cancelled" and not etag:
+                        raise HTTPException(502, "Google Calendar did not provide an event version.")
+                    if prior_ref != connection_ref:
+                        claimed = api("appointment_requests", "PATCH", params={**key,
+                            "status": "eq.confirmed", "move_start": "is.null",
+                            "cancel_pending_ref": "eq." + prior_ref if prior_ref else "is.null",
+                            "select": "id"}, data={"cancel_pending_ref": connection_ref},
+                            prefer="return=representation")
+                        if not claimed:
+                            raise HTTPException(409, "This appointment changed. Refresh and review it again.")
+                    if event.get("status") != "cancelled":
+                        deleted = client.delete(url, headers={**headers, "If-Match": etag}, params={"sendUpdates": "all"})
+                        if deleted.status_code == 412:
+                            raise HTTPException(409, "The calendar event changed. Retry the cancellation.")
+                        if deleted.status_code not in (204, 404, 410):
+                            raise HTTPException(502, "Google Calendar did not confirm cancellation. Retry to check its status.")
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(502, "Google Calendar did not confirm cancellation. Retry to check its status.") from exc
+    updated = api("appointment_requests", "PATCH", params={**key, "status": "eq.confirmed",
+        "cancel_pending_ref": "eq." + connection_ref, "select": "id"},
+        data={"status": "cancelled", "cancel_pending_ref": None}, prefer="return=representation")
+    if not updated:
+        current = api("appointment_requests", params={**key, "select": "status"})
+        if not current or current[0]["status"] != "cancelled":
+            raise HTTPException(409, "Cancellation could not be confirmed in CallPilot. Retry to check its status.")
+    return {"status": "cancelled"}
 
 
 @router.post("/api/account/organizations/{oid}/calendar/book-test")

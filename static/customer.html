@@ -3555,9 +3555,10 @@ function renderBookings(){
    actions.className="cp-inline-actions";
    move.type="button";move.className="secondary";move.textContent=row.move_start?"Retry reschedule":"Reschedule";
    move.addEventListener("click",()=>openReschedule(row));
-   actions.append(move);
+   if(!row.cancel_pending)actions.append(move);
    const button=document.createElement("button");
-   button.type="button";button.className="secondary";button.textContent="Cancel appointment";
+   button.type="button";button.className="secondary";
+   button.textContent=row.cancel_pending?"Retry cancellation":"Cancel appointment";
    button.addEventListener("click",async()=>{
     if(button.disabled||!window.confirm("Cancel this appointment in Google Calendar?"))return;
     const oid=organization();
@@ -3567,7 +3568,10 @@ function renderBookings(){
      if(oid!==organization())return;
      $("calendarResult").textContent="Appointment cancelled.";
      await loadBookings();
-    }catch(e){if(oid===organization())$("calendarResult").textContent=e.message}
+    }catch(e){if(oid===organization()){
+     $("calendarResult").textContent=e.message;
+     await loadBookings();
+    }}
     finally{button.disabled=false}
    });
    button.disabled=Boolean(row.move_start);
