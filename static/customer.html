@@ -539,7 +539,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div class="cp-section-box"><h3>Tell your assistant about your business</h3><p>Describe your business naturally: what you do, products, services, shipping, policies, and anything customers should know. CallPilot indexes approved passages by meaning—no customer questions required.</p>
 <label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
 <label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
-<div class="cp-inline-actions"><button onclick="window.saveDescription()">Save description</button><span class="muted">Review and approve it below before callers can use the information. Leave out prices and private details.</span></div>
+<div class="cp-inline-actions"><button onclick="window.saveDescription()">Save, approve &amp; index</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out prices and private details.</span></div>
 <h3 style="margin-top:20px">Business descriptions</h3><div id="descriptions" role="region" aria-label="Business descriptions"></div></div>
 <div class="cp-section-box"><h3>Optional: Add a specific Q&amp;A</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
 <label for="faqQ">Customer question</label><input id="faqQ" placeholder="Can I order less than a full container?">
@@ -1015,9 +1015,11 @@ async function loadDescriptions(){
 window.saveDescription=()=>safe(async()=>{
  const title=v("descriptionTitle").trim(),content=v("descriptionBody").trim();
  if(title.length<3||content.length<20)throw Error("Enter a title and at least 20 characters describing your business.");
- await request("/organizations/"+organization()+"/descriptions","POST",{title,content});
+ const created=await request("/organizations/"+organization()+"/descriptions","POST",{title,content});
+ const result=await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(created.id)+"/approve","POST");
  $("descriptionTitle").value="";$("descriptionBody").value="";
- await loadDescriptions();return "Description saved as a draft. Approve and index it below.";
+ await loadDescriptions();await loadSemanticStatus();
+ return "Business description approved and indexed into "+result.indexed_passages+" searchable passages.";
 });
 window.approveDescription=id=>safe(async()=>{
  const r=await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
