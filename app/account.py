@@ -116,7 +116,7 @@ def update_agent(oid:str,body:AgentEdit,user=Depends(current_user)):
 def list_knowledge(oid:str,user=Depends(current_user)):
     membership(oid,user)
     return api("knowledge_facts",params={"organization_id":"eq."+oid,
-        "select":"id,question,answer,approved_at,created_at","order":"created_at.desc"})
+        "source_document_id":"is.null","select":"id,question,answer,approved_at,created_at","order":"created_at.desc"})
 
 @router.post("/organizations/{oid}/knowledge")
 def create_fact(oid:str,body:FactCreate,user=Depends(current_user)):
@@ -164,6 +164,97 @@ def delete_knowledge(oid:str,fid:str,user=Depends(current_user)):
     api("knowledge_facts","DELETE",params={"organization_id":"eq."+oid,"id":"eq."+fid},
         prefer="return=minimal")
     return {"deleted":True}
+
+
+class BusinessDescription(BaseModel):
+    title:str=Field(min_length=3,max_length=120)
+    content:str=Field(min_length=20,max_length=12000)
+
+def _description_policy(oid,content):
+    # Match the same existing financial restrictions as the public agent FAQ tool.
+    if MONEY.search(content) or PRICE.search(content):
+        raise HTTPException(400,"Remove prices, fees and quotes from the description; those require separate approved pricing rules.")
+
+@router.get("/organizations/{oid}/descriptions")
+def list_descriptions(oid:str,user=Depends(current_user)):
+    membership(oid,user)
+    return api("knowledge_documents",params={"organization_id":"eq."+oid,
+        "select":"id,title,content,approved_at,created_at","order":"created_at.desc","limit":100})
+
+@router.post("/organizations/{oid}/descriptions")
+def create_description(oid:str,body:BusinessDescription,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    title,content=body.title.strip(),body.content.strip()
+    _description_policy(oid,content)
+    rows=api("knowledge_documents","POST",data={"organization_id":oid,"title":title,
+        "content":content},prefer="return=representation")
+    return {"id":rows[0]["id"],"approved":False}
+
+@router.put("/organizations/{oid}/descriptions/{did}")
+def edit_description(oid:str,did:str,body:BusinessDescription,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    rows=api("knowledge_documents",params={"organization_id":"eq."+oid,"id":"eq."+did,"select":"id"})
+    if not rows:raise HTTPException(404,"Description not found")
+    title,content=body.title.strip(),body.content.strip()
+    _description_policy(oid,content)
+    # Unpublish stale searchable passages before changing source text.
+    api("knowledge_documents","PATCH",params={"organization_id":"eq."+oid,"id":"eq."+did},
+        data={"approved_at":None,"approved_by":None},prefer="return=minimal")
+    api("knowledge_facts","DELETE",params={"organization_id":"eq."+oid,"source_document_id":"eq."+did},
+        prefer="return=minimal")
+    api("knowledge_documents","PATCH",params={"organization_id":"eq."+oid,"id":"eq."+did},
+        data={"title":title,"content":content,
+              "updated_at":__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()},
+        prefer="return=minimal")
+    return {"saved":True,"approved":False,"requires_reapproval":True}
+
+@router.delete("/organizations/{oid}/descriptions/{did}")
+def delete_description(oid:str,did:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    rows=api("knowledge_documents",params={"organization_id":"eq."+oid,"id":"eq."+did,"select":"id"})
+    if not rows:raise HTTPException(404,"Description not found")
+    # Children disappear with FK ON DELETE CASCADE.
+    api("knowledge_documents","DELETE",params={"organization_id":"eq."+oid,"id":"eq."+did},
+        prefer="return=minimal")
+    return {"deleted":True}
+
+@router.post("/organizations/{oid}/descriptions/{did}/approve")
+def approve_description(oid:str,did:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    doc=api("knowledge_documents",params={"organization_id":"eq."+oid,
+        "id":"eq."+did,"select":"id,title,content,approved_at"})
+    if not doc:raise HTTPException(404,"Description not found")
+    doc=doc[0]
+    _description_policy(oid,doc["content"])
+    from app.semantic import embeddings,to_pgvector,MODEL,split_description
+    from datetime import datetime,timezone
+    sections=split_description(doc["content"])
+    if not sections:raise HTTPException(422,"No searchable business information found")
+    # Embedding must succeed for all passages before any approval is published.
+    vectors=embeddings([doc["title"]+": "+part for part in sections])
+    api("knowledge_facts","DELETE",params={"organization_id":"eq."+oid,
+        "source_document_id":"eq."+did},prefer="return=minimal")
+    now=datetime.now(timezone.utc).isoformat()
+    rows=[{"organization_id":oid,"source_document_id":did,
+           "question":doc["title"]+": "+part,"answer":part,
+           "question_embedding_384":to_pgvector(vector),
+           "embedding_model":MODEL,"embedded_at":now}
+          for part,vector in zip(sections,vectors)]
+    try:
+        api("knowledge_facts","POST",data=rows,prefer="return=minimal")
+        # Publish all passages only after every insert succeeded.
+        api("knowledge_facts","PATCH",params={"organization_id":"eq."+oid,
+            "source_document_id":"eq."+did},data={"approved_at":now,
+            "approved_by":user["id"]},prefer="return=minimal")
+        api("knowledge_documents","PATCH",params={"organization_id":"eq."+oid,
+            "id":"eq."+did},data={"approved_at":now,"approved_by":user["id"]},
+            prefer="return=minimal")
+    except Exception:
+        # Failed publication cannot leave partially approved knowledge visible.
+        api("knowledge_facts","DELETE",params={"organization_id":"eq."+oid,
+            "source_document_id":"eq."+did},prefer="return=minimal")
+        raise
+    return {"approved":True,"indexed_passages":len(rows)}
 
 @router.post("/organizations/{oid}/simulate")
 def simulate(oid:str,body:Question,user=Depends(current_user)):
