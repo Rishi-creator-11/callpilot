@@ -133,7 +133,7 @@ def _normalize_spoken_name(oid:str,question:str)->tuple[str,set[str]]:
     org=api("organizations",params={"id":"eq."+oid,"select":"name","limit":1})
     name=(org[0].get("name") if org else "") or ""
     brand=re.sub(r"[^a-z0-9]","",name.casefold())
-    brands=_terms(name)
+    brands=_terms(name)|_terms(brand)
     # Resolve close single-token ASR distortions only when the name in the
     # current workspace is an unambiguous candidate, e.g. Copilot -> CallPilot.
     if 6<=len(brand)<=20:
@@ -141,7 +141,7 @@ def _normalize_spoken_name(oid:str,question:str)->tuple[str,set[str]]:
         for token in tokens:
             if token.casefold()!=brand and difflib.SequenceMatcher(
                 None,token.casefold(),brand).ratio()>=0.84:
-                question=re.sub(r"\b"+re.escape(token)+r"\b",name,question,flags=re.I)
+                question=re.sub(r"\b"+re.escape(token)+r"\b",brand,question,flags=re.I)
     return question,brands
 
 def retrieve(organization_id:str,question:str):
