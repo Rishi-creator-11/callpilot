@@ -673,6 +673,18 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
   </div>
  </form>
 </details>
+<details class="item">
+ <summary><strong>Import a PDF</strong></summary>
+ <form id="pdfImportForm">
+  <p class="muted">Upload an unlocked PDF with selectable text, up to 5 MB and 50 pages. The extracted text starts as a draft.</p>
+  <label for="pdfImportFile">PDF document</label>
+  <input id="pdfImportFile" type="file" accept="application/pdf,.pdf" required>
+  <div class="cp-inline-actions">
+   <button id="pdfImportButton" type="submit">Import PDF draft</button>
+   <span id="pdfImportStatus" class="muted" role="status"></span>
+  </div>
+ </form>
+</details>
 <label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
 <label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
 <div class="cp-inline-actions"><button id="descriptionSaveBtn" onclick="window.saveDescription()">Save, approve &amp; index</button><button id="descriptionDraftBtn" class="secondary" onclick="window.saveDescription(false)">Save draft</button><button id="descriptionCancelEdit" class="secondary" style="display:none" onclick="window.cancelDescriptionEdit()">Cancel edit</button><span class="muted">Approve only information that is accurate for callers. Leave out monetary amounts and private details.</span></div>
@@ -712,7 +724,27 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div class="cp-section-box"><h3>Ask your assistant</h3>
 <label for="question">Customer's question</label><textarea id="question" placeholder="Can I buy just one item?"></textarea>
 <button onclick="window.ask()">Test safe answer</button>
-<h3 style="margin-top:19px">Assistant response</h3><pre id="reply" role="status" style="font-family:inherit;font-size:14px;line-height:1.65">Ask a question to preview the answer.</pre></div></div>
+<h3 style="margin-top:19px">Assistant response</h3><pre id="reply" role="status" style="font-family:inherit;font-size:14px;line-height:1.65">Ask a question to preview the answer.</pre></div>
+<div class="cp-section-box">
+ <h3>Saved knowledge checks</h3>
+ <p>Save the questions you want to test again after changing your knowledge. Each check runs the text-answer simulator and reports what matched.</p>
+ <form id="knowledgeCheckForm">
+  <label for="checkQuestion">Question to test</label>
+  <input id="checkQuestion" minlength="3" maxlength="500" required>
+  <label for="checkExpectation">Expected result</label>
+  <select id="checkExpectation">
+   <option value="contains">Approved answer contains a phrase</option>
+   <option value="unknown">No verified answer</option>
+   <option value="policy">Policy response</option>
+  </select>
+  <div id="checkPhrase"><label for="checkExpectedText">Expected phrase</label>
+   <input id="checkExpectedText" maxlength="300" required>
+  </div>
+  <button type="submit">Save check</button>
+ </form>
+ <p id="knowledgeCheckStatus" role="status" class="muted"></p>
+ <div id="knowledgeChecks"></div>
+</div></div>
 <div id="appointments" class="panel card">
 <div class="cp-panel-heading"><div><h2>Appointments</h2><p class="muted">Connect your calendar and test scheduling before relying on live appointment bookings.</p></div></div>
 <div class="cp-section-box"><h3>Calendar connection</h3><p id="calendarStatus" class="muted">Checking Google Calendar configuration...</p>
@@ -963,7 +995,7 @@ function loadActivePage(id){
  if(!current||!organization())return;
  const load={
    studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
-   simulator:()=>loadSemanticStatus(),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
+   simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),workspace:()=>window.fillWorkspace()
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
@@ -1082,6 +1114,14 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("websiteImportStatus").textContent="";
    $("websiteImportButton").disabled=false;
    window.cancelDescriptionEdit();
+   pdfImportRun++;
+   $("pdfImportFile").value="";
+   $("pdfImportStatus").textContent="";
+   $("pdfImportButton").disabled=false;
+   $("knowledgeCheckForm").reset();
+   $("checkExpectation").dispatchEvent(new Event("change"));
+   $("knowledgeChecks").replaceChildren();
+   $("knowledgeCheckStatus").textContent="";
    clearCallWorkspace();
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
    const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"studio";
@@ -1160,6 +1200,7 @@ function updateKnowledgeCount(){
 }
 let descriptionEditingId=null;
 let websiteImportRun=0;
+let pdfImportRun=0;
 $("websiteImportForm").addEventListener("submit",async event=>{
  event.preventDefault();
  const button=$("websiteImportButton"),status=$("websiteImportStatus");
@@ -1182,6 +1223,33 @@ $("websiteImportForm").addEventListener("submit",async event=>{
  finally{if(isCurrent())button.disabled=false}
 });
 
+$("pdfImportForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),input=$("pdfImportFile"),button=$("pdfImportButton"),status=$("pdfImportStatus");
+ const file=input.files[0];
+ if(!oid||!file||button.disabled)return;
+ if(file.size>5*1024*1024){status.textContent="PDF files must be 5 MB or smaller.";return}
+ const isCurrent=()=>oid===organization()&&run===pdfImportRun;
+ const run=++pdfImportRun;
+ button.disabled=true;
+ status.textContent="Reading PDF…";
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)throw Error("Session expired. Sign in again.");
+  const response=await fetch("/api/account/organizations/"+encodeURIComponent(oid)+
+   "/descriptions/import-pdf?"+new URLSearchParams({filename:file.name}),{
+   method:"POST",headers:{"Content-Type":"application/pdf","Authorization":"Bearer "+session.access_token},body:file
+  });
+  const data=await response.json();
+  if(!response.ok)throw Error(typeof data.detail==="string"?data.detail:"PDF import failed.");
+  if(!isCurrent())return;
+  status.textContent=data.created?"PDF draft saved. Review it below before approving.":"This PDF is already in this workspace’s knowledge base.";
+  input.value="";
+  await loadFacts();
+ }catch(e){if(isCurrent())status.textContent=e.message}
+ finally{if(isCurrent())button.disabled=false}
+});
+
 async function loadDescriptions(){
  const oid=organization();if(!oid)return;
  const docs=await request("/organizations/"+encodeURIComponent(oid)+"/descriptions");
@@ -1190,7 +1258,7 @@ async function loadDescriptions(){
  updateKnowledgeCount();
  $("descriptions").innerHTML=docs.map(d=>
   '<div class="item"><strong>'+esc(d.title)+'</strong>'+
-  (d.source_url?'<p class="muted" style="overflow-wrap:anywhere">Source · '+esc(d.source_url)+'</p>':'')+
+  (d.source_url||d.source_filename?'<p class="muted" style="overflow-wrap:anywhere">Source · '+esc(d.source_url||d.source_filename)+'</p>':'')+
   '<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(d.content)+'</p>'+
   '<span class="muted">'+(d.approved_at?'Approved and searchable':'Draft — not shared with callers')+'</span> '+
   (!d.approved_at?'<button class="secondary" data-approve-desc="'+esc(d.id)+'">Approve &amp; index</button>':'')+
@@ -1246,7 +1314,7 @@ window.saveDescription=(approve=true)=>safe(async()=>{
 });
 window.approveDescription=id=>safe(async()=>{
  const doc=descriptionItems.find(d=>d.id===id);
- if(doc?.source_url&&!confirm("Publish this imported text for callers? Confirm that you reviewed it for accuracy and removed private details and instructions."))return;
+ if((doc?.source_url||doc?.source_filename)&&!confirm("Publish this imported text for callers? Confirm that you reviewed it for accuracy and removed private details and instructions."))return;
  const r=await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
  await loadDescriptions();await loadSemanticStatus();
  return "Approved and indexed "+r.indexed_passages+" searchable passages.";
@@ -1318,6 +1386,66 @@ async function loadSemanticStatus(){const result=await request("/organizations/"
     "Semantic search ready: "+result.indexed_facts+" of "+result.approved_facts+" approved answers indexed.":
     "Semantic search is not connected. Check your Supabase embedding service configuration."}
 window.indexKnowledge=()=>safe(async()=>{const result=await request("/organizations/"+organization()+"/knowledge/reindex","POST");await loadSemanticStatus();return "Indexed "+result.indexed+" approved answers."});
+const knowledgeCheckPath=oid=>"/organizations/"+encodeURIComponent(oid)+"/knowledge-checks";
+$("checkExpectation").addEventListener("change",()=>{
+ const contains=v("checkExpectation")==="contains";
+ $("checkPhrase").hidden=!contains;
+ $("checkExpectedText").required=contains;
+});
+async function loadKnowledgeChecks(){
+ const oid=organization(),list=$("knowledgeChecks");
+ const canEdit=["owner","admin"].includes(orgs.find(org=>org.id===oid)?.role);
+ $("knowledgeCheckForm").hidden=!canEdit;
+ const checks=await request(knowledgeCheckPath(oid));
+ if(oid!==organization())return;
+ list.replaceChildren();
+ if(!checks.length){list.textContent="No saved checks yet.";return}
+ for(const check of checks){
+  const row=document.createElement("div"),title=document.createElement("strong"),description=document.createElement("p");
+  const run=document.createElement("button"),result=document.createElement("p");
+  row.className="item";title.textContent=check.question;
+  description.textContent=check.expectation==="contains"?"Expected phrase: "+check.expected_text:
+   check.expectation==="unknown"?"Expected: no verified answer":"Expected: policy response";
+  run.type="button";run.className="secondary";run.textContent="Run check";
+  result.setAttribute("role","status");
+  run.addEventListener("click",async()=>{
+   run.disabled=true;result.textContent="Checking…";
+   try{
+    const data=await request(knowledgeCheckPath(oid)+"/"+encodeURIComponent(check.id)+"/run","POST");
+    result.textContent=(data.passed?"Passed. ":"Did not match. ")+data.answer;
+   }catch(e){result.textContent=e.message}
+   finally{run.disabled=false}
+  });
+  row.append(title,description,run);
+  if(canEdit){
+   const remove=document.createElement("button");
+   remove.type="button";remove.className="secondary";remove.textContent="Remove";
+   remove.addEventListener("click",()=>safe(async()=>{
+    if(!confirm("Remove this saved knowledge check?"))return;
+    await request(knowledgeCheckPath(oid)+"/"+encodeURIComponent(check.id),"DELETE");
+    if(oid===organization())await loadKnowledgeChecks();
+   }));
+   row.append(remove);
+  }
+  row.append(result);list.append(row);
+ }
+}
+$("knowledgeCheckForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const form=event.currentTarget,button=form.querySelector("button"),oid=organization();
+ if(!oid||button.disabled)return;
+ button.disabled=true;
+ try{
+  await request(knowledgeCheckPath(oid),"POST",{
+   question:v("checkQuestion"),expectation:v("checkExpectation"),expected_text:v("checkExpectedText")
+  });
+  if(oid!==organization())return;
+  form.reset();$("checkExpectation").dispatchEvent(new Event("change"));
+  $("knowledgeCheckStatus").textContent="Check saved.";
+  await loadKnowledgeChecks();
+ }catch(e){if(oid===organization())$("knowledgeCheckStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
 window.ask=()=>safe(async()=>{const question=v("question").trim();if(!question)throw Error("Please enter a question.");const result=await request("/organizations/"+organization()+"/simulate","POST",{question});$("reply").textContent=result.answer+(result.matched_question?"\n\nMatched approved knowledge: "+result.matched_question:"");});
 async function loadCalendar(){
  let c=await request("/organizations/"+organization()+"/calendar");

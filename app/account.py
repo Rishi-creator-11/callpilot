@@ -1,10 +1,13 @@
 from app.semantic import index_fact, reindex_approved, retrieve, enabled
 """Customer self-service API: verified Supabase identity and tenant membership."""
-import os, uuid, httpx
-from fastapi import APIRouter, Header, Depends, HTTPException
-from pydantic import BaseModel, Field
+import hashlib, os, uuid, httpx
+from fastapi import APIRouter, Header, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 from app.cloud import api, PRICE, MONEY, NO_PRICE, UNKNOWN
 from app.website_import import fetch_page
+from app.pdf_import import extract_pdf, MAX_PDF_BYTES
+from starlette.concurrency import run_in_threadpool
 
 router=APIRouter(prefix="/api/account",tags=["customer"])
 # Only the owner's Call Pilot marketing workspace may publish its fixed plans.
@@ -194,7 +197,7 @@ def _description_policy(oid,content):
 def list_descriptions(oid:str,user=Depends(current_user)):
     membership(oid,user)
     return api("knowledge_documents",params={"organization_id":"eq."+oid,
-        "select":"id,title,content,source_url,approved_at,created_at","order":"created_at.desc","limit":100})
+        "select":"id,title,content,source_url,source_filename,approved_at,created_at","order":"created_at.desc","limit":100})
 
 @router.post("/organizations/{oid}/descriptions")
 def create_description(oid:str,body:BusinessDescription,user=Depends(current_user)):
@@ -216,6 +219,32 @@ def import_website(oid: str, body: WebsiteImport, user=Depends(current_user)):
         prefer="resolution=ignore-duplicates,return=representation",
     )
     return {"created": bool(rows), "source_url": page["source_url"]}
+
+
+@router.post("/organizations/{oid}/descriptions/import-pdf")
+async def import_pdf(oid: str, request: Request,
+                     filename: str = Query(min_length=5, max_length=200),
+                     user=Depends(current_user)):
+    await run_in_threadpool(membership, oid, user, ("owner", "admin"))
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    if not name.lower().endswith(".pdf") or not name[:-4].strip() or not name.isprintable():
+        raise HTTPException(422, "Choose a PDF file with a valid filename.")
+    if request.headers.get("content-type") != "application/pdf":
+        raise HTTPException(415, "Upload a PDF document.")
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_PDF_BYTES:
+            raise HTTPException(413, "PDF files must be 5 MB or smaller.")
+        body.extend(chunk)
+    content = await run_in_threadpool(extract_pdf, bytes(body))
+    rows = await run_in_threadpool(
+        api, "knowledge_documents", "POST",
+        params={"on_conflict": "organization_id,source_sha256"},
+        data={"organization_id": oid, "title": name[:120], "content": content,
+              "source_filename": name, "source_sha256": hashlib.sha256(body).hexdigest()},
+        prefer="resolution=ignore-duplicates,return=representation",
+    )
+    return {"created": bool(rows)}
 
 
 @router.put("/organizations/{oid}/descriptions/{did}")
@@ -287,10 +316,14 @@ def approve_description(oid:str,did:str,user=Depends(current_user)):
 @router.post("/organizations/{oid}/simulate")
 def simulate(oid:str,body:Question,user=Depends(current_user)):
     membership(oid,user)
-    if PRICE.search(body.question) or (oid==CALLPILOT_ORG and "plan" in body.question.casefold()):
+    return answer_question(oid, body.question)
+
+
+def answer_question(oid: str, question: str):
+    if PRICE.search(question) or (oid==CALLPILOT_ORG and "plan" in question.casefold()):
         if oid==CALLPILOT_ORG:
             import re
-            if re.search(r"\\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\\b",body.question,re.I):
+            if re.search(r"\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\b",question,re.I):
                 return {"answer":"Published prices are fixed. Our team can discuss requirements, but I cannot negotiate or offer deals.","source":"policy"}
             return {"answer":PLAN_ANSWER,"source":"published_pricing"}
         if not tenant_prices_enabled(oid):return {"answer":NO_PRICE,"source":"policy"}
@@ -299,13 +332,66 @@ def simulate(oid:str,body:Question,user=Depends(current_user)):
         "approved_at":"not.is.null","question_embedding_384":"is.null","select":"id","limit":1})
     if pending:
         reindex_approved(oid)
-    fact,metadata=retrieve(oid,body.question)
+    fact,metadata=retrieve(oid,question)
     if fact:
         if MONEY.search(fact["answer"]) and not (allowed_plan_fact(oid,fact["question"],fact["answer"]) or (oid!=CALLPILOT_ORG and tenant_prices_enabled(oid))):
             return {"answer":NO_PRICE,"source":"policy"}
         return {"answer":fact["answer"],"source":"approved_semantic",
                 "matched_question":fact["question"],"similarity":metadata["similarity"]}
     return {"answer":UNKNOWN,"source":"unknown","reason":metadata["reason"]}
+
+class KnowledgeCheck(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    question: str = Field(min_length=3, max_length=500)
+    expectation: Literal["contains", "unknown", "policy"]
+    expected_text: str = Field(default="", max_length=300)
+
+
+CHECK_FIELDS = "id,question,expectation,expected_text"
+
+
+@router.get("/organizations/{oid}/knowledge-checks")
+def list_knowledge_checks(oid: uuid.UUID, user=Depends(current_user)):
+    membership(str(oid), user)
+    return api("knowledge_checks", params={"organization_id": f"eq.{oid}",
+                                           "select": CHECK_FIELDS, "order": "created_at.asc,id.asc"})
+
+
+@router.post("/organizations/{oid}/knowledge-checks", status_code=201)
+def create_knowledge_check(oid: uuid.UUID, body: KnowledgeCheck, user=Depends(current_user)):
+    membership(str(oid), user, ("owner", "admin"))
+    if body.expectation == "contains" and not body.expected_text:
+        raise HTTPException(422, "Enter the phrase you expect in the answer.")
+    return api("knowledge_checks", "POST", params={"select": CHECK_FIELDS},
+               data={"organization_id": str(oid), "question": body.question,
+                     "expectation": body.expectation,
+                     "expected_text": body.expected_text if body.expectation == "contains" else ""},
+               prefer="return=representation")[0]
+
+
+@router.delete("/organizations/{oid}/knowledge-checks/{check_id}", status_code=204)
+def delete_knowledge_check(oid: uuid.UUID, check_id: uuid.UUID, user=Depends(current_user)):
+    membership(str(oid), user, ("owner", "admin"))
+    api("knowledge_checks", "DELETE", params={"organization_id": f"eq.{oid}", "id": f"eq.{check_id}"})
+
+
+@router.post("/organizations/{oid}/knowledge-checks/{check_id}/run")
+def run_knowledge_check(oid: uuid.UUID, check_id: uuid.UUID, user=Depends(current_user)):
+    membership(str(oid), user)
+    rows = api("knowledge_checks", params={"organization_id": f"eq.{oid}",
+                                          "id": f"eq.{check_id}", "select": CHECK_FIELDS})
+    if not rows:
+        raise HTTPException(404, "Knowledge check not found.")
+    check = rows[0]
+    result = answer_question(str(oid), check["question"])
+    if check["expectation"] == "contains":
+        expected = " ".join(check["expected_text"].casefold().split())
+        answer = " ".join(result["answer"].casefold().split())
+        passed = result["source"] in {"approved_semantic", "published_pricing"} and expected in answer
+    else:
+        passed = result["source"] == check["expectation"]
+    return {**result, "passed": passed}
+
 
 class PricingCapabilities(BaseModel):
     enabled:bool

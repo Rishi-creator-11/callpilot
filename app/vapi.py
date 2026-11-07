@@ -129,7 +129,7 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
         from app.account import CALLPILOT_ORG,PLAN_ANSWER,tenant_prices_enabled
         if organization_id==CALLPILOT_ORG and (PRICE.search(question) or "plan" in question.casefold()):
             import re
-            if re.search(r"\\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\\b",question,re.I):
+            if re.search(r"\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\b",question,re.I):
                 answer="Published prices are fixed. Our team can discuss requirements, but I cannot negotiate or offer deals."
             else:
                 answer=PLAN_ANSWER
