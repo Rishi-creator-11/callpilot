@@ -94,25 +94,95 @@ def faq():
     return marketing_page("faq", "Frequently asked questions")
 
 
-def marketing_page(section_id=None, title=None):
+PRODUCT_PAGES = {
+    "lead-capture": (
+        "Capture leads while you work", "Give callers a way to leave a clear callback request.",
+        "CallPilot can ask what the caller needs, confirm their contact details, and record an approved callback request for your team.",
+        ("Review your business information and greeting.", "Enable callback capture in Launch Studio.",
+         "Review captured requests from Calls &amp; leads."),
+        "A caller requests a quote", "The receptionist confirms the caller’s name, number, and what they need before saving the request.",
+        "/app#studio", "Open Launch Studio",
+    ),
+    "appointment-scheduling": (
+        "Make room for your next customer", "Book visits around your real calendar and business hours.",
+        "Connect Google Calendar, set when you take appointments, and enable booking after reviewing your configuration.",
+        ("Connect Google Calendar from Appointments.", "Set weekly booking hours and date exceptions.",
+         "Check availability and enable voice booking when you are ready."),
+        "A caller requests a Friday visit", "The receptionist checks the slot and confirms the booking after a calendar event is created.",
+        "/app#appointments", "Open appointments",
+    ),
+    "product-orders": (
+        "Help callers find the right product", "Answer catalog questions and collect order requests for your team.",
+        "Teach CallPilot which products are available and which prices can be shared. Your team reviews any pending order requests.",
+        ("Add products and stock to your catalog.", "Approve the items and prices callers can hear.",
+         "Enable catalog lookup and review pending orders in Launch Studio."),
+        "A caller asks for a product", "The receptionist checks the approved catalog and can save a pending request for your team to review.",
+        "/app#studio", "Open catalog setup",
+    ),
+    "call-history": (
+        "See what happened after the ring", "Find the conversations that need a follow-up.",
+        "Review call details, available transcripts and recordings, and the context your team needs for the next conversation.",
+        ("Open Calls &amp; leads.", "Search or filter calls by date and review individual conversations.",
+         "Record the follow-up status and notes for your team."),
+        "A missed opportunity becomes a next step", "A teammate reviews the summary, checks the caller’s request, and records the follow-up.",
+        "/app#calls", "Open Calls &amp; leads",
+    ),
+    "phone-setup": (
+        "Bring CallPilot onto your phone line", "Set up a managed number and check where calls go.",
+        "Keep your public business number and use your carrier’s forwarding options with a connected CallPilot number.",
+        ("Open Usage &amp; phone to review your number.", "Link your managed number and configure a fallback when available.",
+         "Confirm the forwarding behavior with your carrier before sending customer calls."),
+        "Your existing line stays familiar", "Customers dial the number they know, and your carrier forwards calls according to the settings you choose.",
+        "/app#usage", "Open phone setup",
+    ),
+}
+
+
+def render_product_page(product_page: str):
+    heading, lead, introduction, steps, sample_title, sample, destination, action = PRODUCT_PAGES[product_page]
+    sequence = "".join(f"<li>{step}</li>" for step in steps)
+    content = f"""
+<section class="band"><div class="wrap">
+<div class="section-head"><p class="eyebrow">CallPilot capabilities</p><h1>{heading}.</h1>
+<p class="lead">{lead}</p><a class="button dark" href="{destination}">{action} →</a></div>
+<div class="detail-layout"><div><h2>How it works</h2><p>{introduction}</p><ol>{sequence}</ol></div>
+<article class="card"><p class="eyebrow">Example workflow</p><h3>{sample_title}</h3><p>{sample}</p></article></div>
+</div></section>"""
+    return marketing_page(title=heading, content=content)
+
+
+def marketing_page(section_id=None, title=None, content=None):
     from app.billing import PLANS, SETUP_FEE_CENTS
 
     plans = [
-        '<article class="card">'
+        '<article class="card plan">'
         f'<h3>{plan["name"]}</h3><p class="price">${plan["monthly_cents"] // 100}<span> / month</span></p>'
-        f'<p>{plan["included_minutes"]:,} included calling minutes per month.</p></article>'
+        f'<p>{plan["included_minutes"]:,} included calling minutes per month.</p>'
+        '<a class="button dark" href="/app#billing">View billing options →</a></article>'
         for plan in PLANS.values()
     ]
     html = (ROOT / "static" / "marketing.html").read_text()
-    if section_id:
+    if section_id or content:
         header, main = html.split('<main id="main">', 1)
-        section = re.search(r'<section [^>]*id="' + re.escape(section_id) + r'".*?</section>', main, re.DOTALL)
-        content = section.group().replace("<h2>", "<h1>", 1).replace("</h2>", "</h1>", 1)
+        if section_id:
+            section = re.search(r'<section [^>]*id="' + re.escape(section_id) + r'".*?</section>', main, re.DOTALL)
+            content = section.group().replace("<h2>", "<h1>", 1).replace("</h2>", "</h1>", 1)
         _, footer = main.split("</main>", 1)
         header = header.replace("<title>CallPilot | An AI front desk for your business</title>",
                                 f"<title>{title} | CallPilot</title>")
         html = header + '<main id="main" class="detail-page">' + content + "</main>" + footer
     return html.replace("{{plan_cards}}", "".join(plans)).replace("{{setup_fee}}", f"${SETUP_FEE_CENTS // 100}")
+
+def product_endpoint(slug):
+    def endpoint():
+        return render_product_page(slug)
+    return endpoint
+
+
+for slug in PRODUCT_PAGES:
+    app.add_api_route("/" + slug, product_endpoint(slug), response_class=HTMLResponse,
+                      name=slug, include_in_schema=False)
+
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])
 def businesses():

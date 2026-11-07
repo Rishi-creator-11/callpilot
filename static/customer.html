@@ -448,6 +448,31 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 .cp-studio-product-actions button{font-size:12px;padding:7px 10px}
 .cp-studio-warning{margin:15px 0 0;color:#695c3d;background:#fffbec;border:1px solid #f3e5b5;border-radius:10px;padding:12px;font-size:12px}
 @media(max-width:760px){.cp-studio-grid,.cp-studio-connections{grid-template-columns:1fr}.cp-studio-hero{padding:22px}.cp-studio-step{padding:17px}}
+
+</style><style id="callpilot-public-theme">
+:root{--cp-primary:#147665;--cp-hover:#0c5a4d;--cp-border:#dce6e1}
+body[data-app-state="guest"]{background:#0b1831}
+body[data-app-state="guest"] nav{background:#0b1831;border-color:#293952}
+body[data-app-state="guest"] nav .brand{color:#fff}
+body[data-app-state="guest"] nav .brand span{color:#9ee9d6}
+body[data-app-state="guest"] nav .pill{background:#20334d;border-color:#3d536c;color:#dce9f7}
+#auth .hero h1{color:white;font-weight:800;letter-spacing:-.055em}
+#auth .hero h1 span{color:#9ee9d6}
+#auth .hero p,#auth .cp-auth-benefits>div{color:#d5e2ef}
+#auth .hero .pill,#auth .cp-auth-benefits i{background:#153e43;color:#a9f0dc;border-color:#346368}
+#authBox .cp-overline{color:#146452}
+body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:#c6e0e5!important}
+.cp-studio-hero,.cp-onboarding-intro{background:#0b1831;color:white}
+.cp-studio-hero p,.cp-onboarding-intro p{color:#d1dce9}
+.cp-studio-eyebrow{color:#a7e9d8}
+.cp-onboarding-wrap{max-width:650px;margin-inline:auto}
+.cp-onboarding-intro{padding:24px;border-radius:13px;margin-bottom:23px}
+.cp-onboarding-intro h2{color:white;margin:6px 0}
+.cp-onboarding-intro p{margin-bottom:0}
+.cp-onboarding-steps{display:flex;gap:8px;flex-wrap:wrap;padding:0;list-style:none;margin:0 0 18px}
+.cp-onboarding-steps li{padding:5px 10px;border:1px solid #dbe7e0;border-radius:999px;color:#405768;font-size:12px;font-weight:700}
+.cp-onboarding-steps li[aria-current="step"]{background:#ddf5ea;color:#155d4d;border-color:#a5d9ca}
+#onboarding [hidden]{display:none!important}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
@@ -458,8 +483,8 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 </div></nav>
 <section id="auth"><div class="cp-auth-wrap">
 <div class="hero"><span class="pill">The AI front desk built for growing businesses</span>
-<h1>Every call.<br><span>A real opportunity.</span></h1>
-<p>Turn your business phone into a better customer experience. Answer questions, capture qualified leads, review every conversation, and manage follow-ups—all in one workspace.</p>
+<h1>Your front desk.<br><span>Always ready.</span></h1>
+<p>Build a receptionist that answers from your business knowledge, takes messages, and helps callers book appointments.</p>
 <div class="cp-auth-benefits"><div><i>✓</i> An AI receptionist that knows your business</div>
 <div><i>✓</i> Call intelligence, recordings and lead follow-ups</div>
 <div><i>✓</i> Private, secure business workspaces</div></div>
@@ -516,6 +541,28 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small><span id="sideAccountPlan" class="cp-account-plan" role="status">Checking plan…</span></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
 </button></div></aside>
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
+
+<section id="onboarding" class="panel card" style="display:none">
+ <div class="cp-onboarding-wrap">
+  <div class="cp-onboarding-intro"><span class="cp-studio-eyebrow">CALLPILOT / GET STARTED</span><h2>Build your front desk.</h2><p>Start with your business. You can review what the receptionist learns before it answers callers.</p></div>
+  <ol class="cp-onboarding-steps" aria-label="Setup steps"><li id="setupStepOne" aria-current="step">1. Business details</li><li id="setupStepTwo">2. Website knowledge</li><li>3. Launch Studio</li></ol>
+  <form id="businessSetupForm">
+   <label for="setupBusinessName">Business name</label>
+   <input id="setupBusinessName" autocomplete="organization" minlength="2" maxlength="120" required placeholder="Northline Heating">
+   <label for="setupIndustry">Industry <span class="muted">(optional)</span></label>
+   <input id="setupIndustry" maxlength="80" placeholder="Home services">
+   <div class="cp-inline-actions"><button type="submit">Continue</button></div>
+  </form>
+  <form id="setupWebsiteForm" hidden>
+   <h3>Teach CallPilot about <span id="setupWorkspaceName"></span></h3>
+   <p>Import a public page as a draft. Review the imported text in your knowledge base before callers can hear it.</p>
+   <label for="setupWebsiteUrl">Public website address</label>
+   <input id="setupWebsiteUrl" type="text" inputmode="url" maxlength="2048" required placeholder="example.com/services">
+   <div class="cp-inline-actions"><button type="submit">Import and review</button><button id="skipSetupWebsite" type="button" class="secondary">Skip to Launch Studio</button></div>
+  </form>
+  <p id="businessSetupStatus" role="status" class="muted"></p>
+ </div>
+</section>
 
 <div id="studio" class="panel card" style="display:none">
  <div class="cp-studio-hero">
@@ -1032,6 +1079,7 @@ document.addEventListener("click",e=>{
  if(!e.target.closest(".cp-sidebar-bottom"))window.closeAccountMenu();
 });
 const pageMeta={
+ onboarding:["Business setup","Create a workspace and get your receptionist ready to learn."],
  studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
@@ -1169,30 +1217,83 @@ async function render(){
    }
  }finally{renderInFlight=false}
 }
-async function loadOrganizations(){
+async function loadOrganizations({select,destination}={}){
  const result=await request("/me");
  orgs=result.organizations;
- const old=organization();
+ const old=select||organization();
  $("org").innerHTML=orgs.length?orgs.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):
   '<option value="">Create a business</option>';
  if(old&&orgs.some(x=>x.id===old))$("org").value=old;
  if(orgs.length){
-   await window.loadWorkspace({preserve:!!old});
+   await window.loadWorkspace({destination});
  }else{
    $("orgInfo").textContent="Create your first business to begin";
    $("wsSaveButton").textContent="Create business";
     $("wsSaveButton").disabled=false;
     $("wsName").disabled=false;
     $("wsIndustry").disabled=false;
-    window.section("workspace");
+    window.section(pendingInvite?"workspace":"onboarding");
  }
 }
-window.createBusiness=()=>safe(async()=>{
- const o=await request("/organizations","POST",{name:v("bname").trim(),industry:v("industry").trim()||"General"});
- await loadOrganizations();$("org").value=o.id;await window.loadWorkspace();
- return "Business workspace created."
+let setupOrganization=null;
+function setupStage(workspace=null){
+ setupOrganization=workspace;
+ $("businessSetupForm").hidden=Boolean(workspace);
+ $("setupWebsiteForm").hidden=!workspace;
+ $("setupWorkspaceName").textContent=workspace?.name||"";
+ $("setupStepOne").removeAttribute("aria-current");
+ $("setupStepTwo").removeAttribute("aria-current");
+ $(workspace?"setupStepTwo":"setupStepOne").setAttribute("aria-current","step");
+ $("businessSetupStatus").textContent="";
+}
+window.createBusiness=()=>{
+ setupStage();
+ $("businessSetupForm").reset();
+ $("setupWebsiteForm").reset();
+ $("setupBusinessName").value=v("bname").trim();
+ $("setupIndustry").value=v("industry").trim();
+ window.section("onboarding");
+ $("setupBusinessName").focus();
+};
+$("businessSetupForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const button=event.submitter,status=$("businessSetupStatus");
+ if(button.disabled)return;
+ button.disabled=true;
+ try{
+  const name=v("setupBusinessName").trim(),industry=v("setupIndustry").trim()||"General";
+  if(name.length<2)throw Error("Enter your business name.");
+  const workspace=setupOrganization||await request("/organizations","POST",{name,industry});
+  setupOrganization=workspace;
+  await loadOrganizations({select:workspace.id,destination:"onboarding"});
+  setupStage(workspace);
+  $("setupWebsiteUrl").focus();
+ }catch(e){status.textContent=e.message}
+ finally{button.disabled=false}
 });
-window.loadWorkspace=async({preserve=false}={})=>{
+function completeBusinessSetup(destination){
+ setupStage();
+ $("businessSetupForm").reset();
+ $("setupWebsiteForm").reset();
+ window.section(destination);
+}
+$("skipSetupWebsite").addEventListener("click",()=>completeBusinessSetup("studio"));
+$("setupWebsiteForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const button=event.submitter,skip=$("skipSetupWebsite"),status=$("businessSetupStatus"),workspace=setupOrganization;
+ if(button.disabled||!workspace)return;
+ button.disabled=skip.disabled=true;
+ status.textContent="Reading your website…";
+ try{
+  await request("/organizations/"+encodeURIComponent(workspace.id)+"/descriptions/import-website","POST",{url:v("setupWebsiteUrl").trim()});
+  if(workspace!==setupOrganization||workspace.id!==organization()||activePage!=="onboarding")return;
+  completeBusinessSetup("knowledge");
+  msg("Website draft saved. Review the imported text before approving it.");
+ }catch(e){
+  if(workspace===setupOrganization&&activePage==="onboarding")status.textContent=e.message;
+ }finally{button.disabled=skip.disabled=false}
+});
+window.loadWorkspace=async({destination}={})=>{
  if(!organization())return;
  await safe(async()=>{
    const o=orgs.find(x=>x.id===organization());
@@ -1224,8 +1325,9 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("knowledgeCheckStatus").textContent="";
    clearCallWorkspace();
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
-   const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"studio";
-   window.section(destination);
+   const hash=location.hash.slice(1);
+   const page=destination||(pageMeta[hash]&&hash!=="onboarding"?hash:"studio");
+   window.section(page);
    window.refreshAccountPlan();
  });
 };
