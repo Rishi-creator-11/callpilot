@@ -36,14 +36,19 @@ def billing_ready():
     return True
 
 def fixed_price(name):
-    """Use fixed production Price IDs ONLY in live mode.
+    """Keep Stripe live and sandbox Price IDs in separate configuration namespaces.
 
-    A live Price ID is invalid in Stripe's test environment. Test Checkout
-    uses inline test-mode prices and must never reference live products.
+    STRIPE_PRICE_* values are live-only. Optional STRIPE_TEST_PRICE_* values are
+    only used in sandbox. If no test-mode Price ID is configured, test Checkout
+    uses inline recurring and one-time price_data.
     """
-    if billing_mode()!="live":
+    if billing_mode()=="live":
+        key="STRIPE_PRICE_"+name.upper()
+    elif billing_mode()=="test":
+        key="STRIPE_TEST_PRICE_"+name.upper()
+    else:
         return None
-    value=os.getenv("STRIPE_PRICE_"+name.upper(),"")
+    value=os.getenv(key,"")
     return value if value.startswith("price_") else None
 
 def stripe_call(path,method="POST",data=None):
