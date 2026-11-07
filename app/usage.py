@@ -164,7 +164,8 @@ def business_phone(oid:str,user=Depends(current_user)):
         "phone_number":rows[0].get("provider_number") if rows else None,
         "fallback_enabled":bool(config.get("fallback_enabled")),
         "fallback_number":config.get("fallback_number"),
-        "provisioning":"provisioned" if rows and rows[0]["status"]=="pending" else "linked"}
+        "provisioning":{ "pending":"provisioned","linked":"linked" }.get(rows[0]["status"],"unverified")
+            if rows else "unverified"}
 
 @router.get("/api/account/organizations/{oid}/phone/options")
 def available_business_numbers(oid:str,user=Depends(current_user)):

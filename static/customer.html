@@ -45,6 +45,15 @@
 .ci-footnote{font-size:12px;color:#98a9c7;margin:12px 0}
 @media(max-width:950px){.ci-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ci-table th:nth-child(4),.ci-table td:nth-child(4){display:none}}
 @media(max-width:560px){.ci-table th:nth-child(3),.ci-table td:nth-child(3){display:none}.ci-detail-grid{grid-template-columns:1fr}}
+.cp-worker-kicker{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;color:#216854;margin-bottom:5px}
+.cp-worker-nav{display:flex;flex-wrap:wrap;gap:6px;padding:6px;margin:0 0 20px;border:1px solid #dce5de;border-radius:12px;background:#f2f6f2}
+.cp-worker-nav button{min-height:42px;border:1px solid transparent;border-radius:8px;background:transparent;color:#325347;box-shadow:none}
+.cp-worker-nav button[aria-pressed="true"]{background:#fff;border-color:#c9d9d0;color:#153f31;box-shadow:0 2px 5px #22483414}
+.cp-worker-nav button:hover:not(:disabled){background:#e5efe9;color:#193e32}
+#workerIntake #intakeWorker{max-width:420px}
+#workerIntake fieldset,#workerMenu fieldset{border:1px solid #dce5de;border-radius:12px;padding:14px;margin:16px 0}
+#workerIntake legend,#workerMenu legend{padding:0 6px;font-weight:750}
+@media(max-width:540px){.cp-worker-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cp-worker-nav button{width:100%;padding-inline:8px}}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -788,7 +797,16 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 </section>
 
 <section id="workers" class="panel card" style="display:none">
- <div class="cp-panel-heading"><div><h2>Workers</h2><p>Give your receptionist a playbook for each kind of call.</p></div></div>
+ <div class="cp-panel-heading"><div><p class="cp-worker-kicker">Receptionist configuration</p>
+  <h2>Workers</h2><p>Give each type of call a specialist, a set of questions, or a path to the right team.</p></div>
+  <button class="secondary" type="button" onclick="window.section('channels')">Manage call routing</button></div>
+ <div class="cp-worker-nav" role="group" aria-label="Workers workspace">
+  <button type="button" data-worker-view="playbooks" aria-controls="workerPlaybooks" aria-pressed="true">Playbooks</button>
+  <button type="button" data-worker-view="intake" aria-controls="workerIntake" aria-pressed="false">Intake forms</button>
+  <button type="button" data-worker-view="menu" aria-controls="workerMenu" aria-pressed="false">Call menu</button>
+  <button type="button" onclick="window.section('knowledge')">Knowledge ↗</button>
+ </div>
+ <div id="workerPlaybooks">
  <div class="cp-section-box"><h3>Default receptionist</h3>
  <p>When no playbook matches, the receptionist follows its general instructions and approved tools.</p>
  <div class="cp-inline-actions"><button class="secondary" onclick="window.section('builder')">Edit general instructions</button>
@@ -804,8 +822,9 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </div>
  </form>
  <p id="workerStatus" role="status" class="muted"></p>
- <details class="cp-section-box" id="workerIntake" hidden>
-  <summary>Structured intake forms</summary>
+ </div>
+ <div class="cp-section-box" id="workerIntake" hidden>
+  <h3>Structured intake forms</h3>
   <p>Choose what a specialist asks and which answers are required. Completed forms stay with the call.</p>
   <label for="intakeWorker">Worker</label><select id="intakeWorker"><option value="">Select a saved worker</option></select>
   <form id="intakeForm" hidden>
@@ -819,9 +838,9 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </form>
   <p id="intakeStatus" role="status" class="muted"></p>
   <div id="intakeSubmissions" aria-live="polite"></div>
- </details>
- <details class="cp-section-box">
-  <summary>Spoken call menu</summary>
+ </div>
+ <div class="cp-section-box" id="workerMenu" hidden>
+  <h3>Spoken call menu</h3>
   <p>Offer callers numbered choices. Each phrase opens a specific workflow. Callers can ask for the receptionist at any time.</p>
   <form id="callMenuForm" hidden>
    <label class="cp-studio-check"><input id="callMenuEnabled" type="checkbox"> Offer this menu at the start of a call</label>
@@ -832,7 +851,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
     <button id="reloadCallMenu" type="button" class="secondary">Refresh</button></div>
   </form>
   <p id="callMenuStatus" role="status" class="muted"></p>
- </details>
+ </div>
 </section>
 
 <div id="studio" class="panel card" style="display:none">
@@ -1313,6 +1332,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <p>Each business has its own AI assistant and number. You can use an imported provider number, or forward your existing business number.</p>
 <div class="cp-help" id="usagePhoneStatus" role="status">Checking your business number…</div>
 <form id="usageActivateForm" hidden>
+ <p class="muted">Activation requires a paid calling plan. It enables CallPilot’s usage limits, screening and routing for new calls.</p>
  <label class="cp-fallback-check"><input id="usageActivateConfirm" type="checkbox" required> Route new calls through this workspace's receptionist and plan limits</label>
  <button type="submit">Activate incoming calls</button>
  <p id="usageActivateStatus" role="status"></p>
@@ -1909,6 +1929,7 @@ window.loadWorkspace=async({destination}={})=>{
     resetRouting();
     resetCallMenu();
     resetIntakeForms();
+    showWorkerView("playbooks");
     $("phoneReserveForm").reset();$("phoneReserveForm").hidden=true;
     $("phoneReserveCheck").hidden=true;$("phoneReserveStatus").textContent="";
     $("usageActivateForm").reset();$("usageActivateForm").hidden=true;
@@ -2841,6 +2862,19 @@ $("shopifyLookup").addEventListener("submit",async event=>{
 });
 const workersPath=oid=>"/organizations/"+oid+"/workers";
 let workersWorkspace="",workersSaved=[],workersDraft=[],workersEditable=false,workersDirty=false;
+function showWorkerView(view){
+ for(const [key,id] of [["playbooks","workerPlaybooks"],["intake","workerIntake"],["menu","workerMenu"]]){
+  $(id).hidden=key!==view;
+  document.querySelector("[data-worker-view='"+key+"']").setAttribute("aria-pressed",String(key===view));
+ }
+ if(view==="intake"&&workersWorkspace&&!workersEditable){
+  $("intakeStatus").textContent="Only workspace owners and admins can manage intake forms.";
+ }
+}
+for(const control of document.querySelectorAll("[data-worker-view]")){
+ control.addEventListener("click",()=>showWorkerView(control.dataset.workerView));
+}
+
 function resetWorkers(){
  workersWorkspace="";
  workersSaved=[];workersDraft=[];
@@ -2947,13 +2981,12 @@ const intakeKinds={name:"Name",phone:"Phone",email:"Email",postal:"Postal code",
 let intakeForms=[],intakeDraft=null,intakeDirty=false;
 function resetIntakeForms(){
  intakeForms=[];intakeDraft=null;intakeDirty=false;
- $("workerIntake").hidden=true;$("intakeForm").hidden=true;
+ $("intakeForm").hidden=true;
  $("intakeWorker").replaceChildren(new Option("Select a saved worker",""));
  $("intakeFields").replaceChildren();$("intakeSubmissions").replaceChildren();$("intakeStatus").textContent="";
 }
 async function loadIntakeForms(oid){
  if(!workersEditable)return;
- $("workerIntake").hidden=false;
  const worker=$("intakeWorker"),selected=worker.value;
  worker.replaceChildren(new Option("Select a saved worker",""));
  worker.disabled=true;$("intakeForm").hidden=true;$("intakeSubmissions").replaceChildren();
@@ -3125,6 +3158,20 @@ function renderWorkers(){
      markWorkersDirty();renderWorkers();
     });
     controls.append(button);
+   }
+   if(workersSaved.some(saved=>saved.name===worker.name)){
+    const intake=document.createElement("button");
+    intake.type="button";intake.className="secondary";intake.textContent="Configure intake";
+    intake.addEventListener("click",()=>{
+     if(intakeDirty&&intakeDraft?.worker_name!==worker.name&&!window.confirm("Discard unsaved intake questions?"))return;
+     showWorkerView("intake");
+     const selector=$("intakeWorker");
+     if([...selector.options].some(option=>option.value===worker.name)&&selector.value!==worker.name){
+      selector.value=worker.name;selectIntakeWorker();
+     }
+     selector.focus();
+    });
+    controls.append(intake);
    }
    card.append(controls);
   }
@@ -3752,7 +3799,8 @@ window.loadUsage=async()=>{
    "Inbound monthly allowance enforcement is active.":
    "Usage tracking is active. Automatic limits are NOT yet enforcing calls on this number. Setup and billing must be validated first.";
   const reserved=p.provisioning==="provisioned";
-  $("usageActivateForm").hidden=!reserved||orgs.find(workspace=>workspace.id===organization())?.role!=="owner";
+  const canActivate=reserved||(p.provisioning==="linked"&&!u.enforcement_enabled);
+  $("usageActivateForm").hidden=!canActivate||orgs.find(workspace=>workspace.id===organization())?.role!=="owner";
   $("usagePhoneStatus").textContent=reserved?
    "Reserved number "+(p.phone_number||"")+" · waiting for activation":p.connected?
    "Connected Vapi number"+(p.phone_number?": "+p.phone_number:" (number ID linked)")+
