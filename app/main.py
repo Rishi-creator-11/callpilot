@@ -205,6 +205,24 @@ def check_integrations_on_boot():
                              unrelated is None,negative.get("reason"),negative.get("similarity","n/a"))
         except Exception as e:
             log.warning("callpilot_semantic_rollout error_type=%s",type(e).__name__)
+    # Diagnostic smoke for the real caller's paraphrases; scores only, no private data.
+    if db_url and db_secret:
+        try:
+            from app.semantic import embeddings,to_pgvector
+            from app.account import rpc
+            for question in ("I wanna know more information about CallPilot",
+                             "Can you tell me what Copilot does?",
+                             "What does CallPilot do?",
+                             "What are the subscriptions?",
+                             "Do you repair motorcycles?"):
+                v=embeddings([question])[0]
+                ranked=rpc("match_callpilot_knowledge",{
+                    "p_org_id":"b550c0af-7d9c-4231-8eec-cb9f6ba9e724",
+                    "p_embedding":to_pgvector(v),"p_limit":3})
+                log.info("callpilot_semantic_voice_diagnostic query=%s matches=%s",
+                    question,[(r.get("question"),round(float(r.get("similarity",0)),3)) for r in ranked])
+        except Exception as exc:
+            log.warning("callpilot_semantic_voice_diagnostic error_type=%s",type(exc).__name__)
     # Import initial historical calls once for clearly matched, configured workspaces.
     # A private assistant is linked only when its name uniquely matches the business.
     if db_url and db_secret and vapi_key:
