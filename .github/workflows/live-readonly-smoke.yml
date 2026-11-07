@@ -1,0 +1,56 @@
+name: CallPilot live read-only smoke
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-readonly-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Read-only checks against Render (no credentials or customer mutations)
+        env:
+          BASE: https://callpilot-internal.onrender.com
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request, urllib.error
+          base=os.environ["BASE"]
+          def get(path):
+              req=urllib.request.Request(base+path, headers={"User-Agent":"CallPilot-ReadOnly-Smoke/1.0"})
+              try:
+                  with urllib.request.urlopen(req, timeout=35) as r:
+                      return r.status,r.read(400000).decode("utf-8","replace")
+              except urllib.error.HTTPError as e:
+                  return e.code,e.read(3000).decode("utf-8","replace")
+          ready=False
+          for attempt in range(20):
+              try:
+                  status,body=get("/health")
+                  status_page,html=get("/app")
+                  if status==200 and status_page==200 and "CallPilot" in html and "One-time professional setup: $25" in html:
+                      ready=True
+                      break
+                  print(f"Starting up attempt {attempt+1}: health={status} app={status_page} updated={'One-time professional setup: $25' in html}")
+              except Exception as e:
+                  print(f"Starting up attempt {attempt+1}: {type(e).__name__}")
+              time.sleep(10)
+          if not ready:
+              raise SystemExit("Render did not serve the approved current CallPilot version")
+          cfg_status,config=get("/api/account/config")
+          assert cfg_status==200, f"Public auth config status {cfg_status}"
+          parsed=json.loads(config)
+          assert parsed.get("supabase_publishable_key"), "Supabase client authentication is not configured"
+          private=[
+            "/api/account/me",
+            "/api/account/organizations/00000000-0000-0000-0000-000000000001/usage",
+            "/api/account/organizations/00000000-0000-0000-0000-000000000001/billing",
+          ]
+          for path in private:
+              status,_=get(path)
+              assert status==401, f"Expected unauthenticated request to be denied on {path}, got {status}"
+          print("PASS: live page with $25 setup, health endpoint, public auth config, and denied unauthenticated account APIs")
+          PY
