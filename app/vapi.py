@@ -110,7 +110,14 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
         question=args.get("question","") if isinstance(args,dict) else ""
         if not isinstance(question,str) or not (1<=len(question)<=500):
             results.append({"toolCallId":call_id,"error":"Invalid question"});continue
-        if PRICE.search(question):
+        from app.account import CALLPILOT_ORG,PLAN_ANSWER
+        if organization_id==CALLPILOT_ORG and PRICE.search(question):
+            import re
+            if re.search(r"\\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\\b",question,re.I):
+                answer="Published prices are fixed. Our team can discuss requirements, but I cannot negotiate or offer deals."
+            else:
+                answer=PLAN_ANSWER
+        elif PRICE.search(question):
             answer=NO_PRICE
         else:
             try:
