@@ -228,11 +228,14 @@ def run(workspace: str, row: dict, values: dict, call_id: str) -> str:
             response = client.send(request, stream=True)
             try:
                 chunks, size = [], 0
-                for chunk in response.iter_raw():
-                    chunks.append(chunk)
-                    size += len(chunk)
-                    if size >= MAX_RESPONSE_BYTES:
-                        break
+                try:
+                    for chunk in response.iter_raw():
+                        chunks.append(chunk)
+                        size += len(chunk)
+                        if size >= MAX_RESPONSE_BYTES:
+                            break
+                except httpx.StreamConsumed:  # a transport that already buffered the body
+                    chunks = [response.content]
                 body = b"".join(chunks)[:MAX_RESPONSE_BYTES].decode("utf-8", "replace")
             finally:
                 response.close()
