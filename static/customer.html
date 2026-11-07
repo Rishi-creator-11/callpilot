@@ -629,7 +629,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
  <div class="cp-pricing-card cp-pricing-featured"><span class="cp-pricing-tag">POPULAR CHOICE</span><h3>Growth</h3><div class="cp-price">$99 <small>/ month</small></div><strong>300 minutes / month</strong><p class="cp-price-calls">About 150 calls at 2 minutes each</p><p>For growing teams managing customer inquiries.</p><button data-plan="growth" onclick="window.pickPlan('growth')">Choose Growth</button></div>
  <div class="cp-pricing-card"><h3>Business</h3><div class="cp-price">$179 <small>/ month</small></div><strong>600 minutes / month</strong><p class="cp-price-calls">About 300 calls at 2 minutes each</p><p>For businesses with more incoming calls.</p><button class="secondary" data-plan="business" onclick="window.pickPlan('business')">Choose Business</button></div>
 </div>
-<div class="cp-setup-strip"><span class="cp-setup-icon">✓</span><div><strong>One-time professional setup: $100 per business</strong>
+<div class="cp-setup-strip"><span class="cp-setup-icon">✓</span><div><strong>One-time professional setup: $25 per business</strong>
 <p>Includes business setup, initial knowledge configuration, phone-number connection assistance and launch testing. Collected with your first subscription payment, never at renewal.</p></div></div>
 <div class="cp-section-box">
  <h3 id="billingHeading">Subscription status</h3>
@@ -1132,9 +1132,9 @@ async function loadBilling(){
   b.pending_confirmation?"Your checkout was started, but Stripe has not confirmed an active subscription yet. Refresh this page to verify payment. Do not pay again.":
   b.status==="past_due"?"Your subscription payment is overdue. Open Stripe to update payment details.":
   b.has_customer?"A Stripe customer exists, but no active subscription is confirmed. Use the Stripe portal or contact support before paying again.":
-  "Choose a plan above. Monthly subscriptions have one mandatory $100 setup payment for new businesses.";
+  "Choose a plan above. Monthly subscriptions have one mandatory $25 setup payment for new businesses.";
  $("billingCheckoutNote").textContent=b.mode==="sandbox"?
-  "Sandbox test only — no real payment is charged. Your first checkout includes $100 setup, followed by the plan's monthly charge.":
+  "Sandbox test only — no real payment is charged. Your first checkout includes $25 setup, followed by the plan's monthly charge.":
   "Plan pricing is final, but live charging remains disabled until billing and usage limits are verified.";
  $("portal").style.display=b.has_customer?"inline-block":"none";
  $("verifyCheckoutButton").style.display=b.pending_confirmation?"inline-block":"none";
