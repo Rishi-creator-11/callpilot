@@ -550,6 +550,14 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
   <article class="cp-studio-step cp-studio-wide"><div class="cp-studio-step-head"><span class="cp-studio-num">05</span><div><h3>Connect, verify, launch</h3><p>See what is connected—and what still needs a real-world test.</p></div></div>
    <div id="studioConnections" class="cp-studio-connections" role="status">Checking integrations…</div>
    <div class="cp-studio-activation">
+    <h3>Verified product pricing</h3>
+    <p>Only your own current, approved published prices can be quoted. CallPilot will never invent an estimate or discount.</p>
+    <label class="cp-studio-check"><input type="checkbox" id="studioAllowPrices"> Let the AI quote exact prices that I approve in the Knowledge base</label>
+    <label class="cp-studio-check"><input type="checkbox" id="studioPricesVerified"> I will provide only accurate prices for specific products, quantities and options.</label>
+    <div class="cp-studio-actions"><button id="studioSavePrices" onclick="window.studioSavePricing()">Save pricing policy</button><span id="studioPriceStatus" class="muted" role="status">Pricing is off by default.</span></div>
+    <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Add or edit approved price FAQs →</button>
+   </div>
+   <div class="cp-studio-activation">
     <h3>Activate real voice actions</h3>
     <p>These tools perform real operations during calls. They are off until the business owner enables them and the managed assistant is synced.</p>
     <label class="cp-studio-check"><input type="checkbox" id="studioCaptureLeads"> Save customer-approved callback requests to Calls &amp; Leads</label>
@@ -1588,11 +1596,16 @@ window.loadStudio=async()=>{
  const oid=organization();if(!oid)return;
  const o=orgs.find(x=>x.id===oid);
  $("studioBusiness").textContent=(o?.name||"Your business")+(o?.industry?" · "+o.industry:"");
- const paths=["/agent","/descriptions","/calendar","/phone","/voice-capabilities"];
+ const paths=["/agent","/descriptions","/calendar","/phone","/voice-capabilities","/verified-pricing"];
  const settled=await Promise.allSettled(paths.map(p=>request("/organizations/"+oid+p)));
  if(oid!==organization())return;
  const values=settled.map(x=>x.status==="fulfilled"?x.value:null);
  const [agent,docs,calendar,phone,capabilities]=values;
+ const pricing=values[5];
+ $("studioAllowPrices").checked=Boolean(pricing?.enabled);
+ $("studioPriceStatus").textContent=pricing?.enabled?
+  "Exact, approved price FAQ answers are enabled.":"Unverified numeric prices remain blocked.";
+
  $("studioCaptureLeads").checked=Boolean(capabilities?.leads_enabled);
  $("studioVoiceBookings").checked=Boolean(capabilities?.booking_enabled);
  $("studioVoiceBookings").disabled=!Boolean(capabilities?.calendar_connected);
@@ -1646,6 +1659,26 @@ window.studioSaveAgent=()=>safe(async()=>{
  await request("/organizations/"+organization()+"/agent","PUT",{agent_name,greeting});
  await window.loadStudio();
  return "Greeting saved in your workspace. Existing live Vapi assistants require a separate sync.";
+});
+window.studioSavePricing=()=>safe(async()=>{
+ const enabled=$("studioAllowPrices").checked;
+ if(enabled&&!$("studioPricesVerified").checked)
+  throw Error("Confirm your business pricing will be current and accurate before enabling quotes.");
+ if(enabled&&!confirm("Only exact owner-approved product prices should be quoted. Enable this business pricing policy?"))return;
+ const btn=$("studioSavePrices");btn.disabled=true;
+ $("studioPriceStatus").textContent="Saving your pricing policy…";
+ try{
+  const r=await request("/organizations/"+organization()+"/verified-pricing","PUT",{
+   enabled,owner_confirms_prices_are_verified:enabled&&$("studioPricesVerified").checked
+  });
+  $("studioPriceStatus").textContent=r.enabled?
+   "Verified pricing is enabled. Add exact price FAQs in Knowledge base.":
+   "Price quotes are disabled for this business.";
+  $("studioPricesVerified").checked=false;
+  await window.loadStudio();
+  return "Business pricing policy saved.";
+ }catch(e){$("studioPriceStatus").textContent=e.message;throw e}
+ finally{btn.disabled=false}
 });
 window.studioSaveActions=()=>safe(async()=>{
  const leads=$("studioCaptureLeads").checked,booking=$("studioVoiceBookings").checked;
