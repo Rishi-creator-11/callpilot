@@ -45,6 +45,46 @@ def embeddings(texts:list[str])->list[list[float]]:
 def to_pgvector(vector:list[float])->str:
     return "["+",".join(format(v,".9g") for v in vector)+"]"
 
+def split_description(content:str)->list[str]:
+    """Divide owner-written prose into short meaning-preserving passages.
+
+    Preserve paragraph boundaries, avoid cutting words, and keep each passage
+    short enough for the embedding service and conversational retrieval.
+    """
+    paragraphs=[p.strip() for p in re.split(r"\n\s*\n+",content) if p.strip()]
+    pieces=[]
+    for paragraph in paragraphs:
+        sentences=re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])",paragraph)
+        current=""
+        for sentence in sentences:
+            if len(sentence)>700:
+                if current:
+                    pieces.append(current)
+                    current=""
+                # Split oversized product lists while preserving word boundaries.
+                words=sentence.split()
+                for word in words:
+                    if len(word)>700:
+                        if current:pieces.append(current);current=""
+                        pieces.extend(word[i:i+700] for i in range(0,len(word),700))
+                    elif len(current)+len(word)+1>700:
+                        pieces.append(current)
+                        current=word
+                    else:
+                        current=(current+" "+word).strip()
+                continue
+            if len(current)+len(sentence)+1>700 and current:
+                pieces.append(current)
+                current=sentence
+            else:
+                current=(current+" "+sentence).strip()
+        if current:pieces.append(current)
+    # Extremely short adjacent paragraphs (e.g. short list items) can be indexed
+    # independently; never combine conflicting headings into one answer.
+    if len(pieces)>25:
+        raise HTTPException(422,"Description is too long. Split it into smaller documents.")
+    return [p for p in pieces if p]
+
 def index_fact(organization_id:str,fact_id:str,question:str,approved_by:str|None=None):
     v=embeddings([question])[0]
     data={"question_embedding_384":to_pgvector(v),"embedding_model":MODEL,
@@ -109,7 +149,11 @@ _SYNONYMS={"subscriptions":"plan","subscription":"plan","plans":"plan","packages
            "functions":"feature","function":"feature","capabilities":"feature",
            "services":"service","offerings":"service","offers":"service",
            "recordings":"recording","calls":"call","customers":"customer",
-           "appointments":"appointment","prices":"price","pricing":"price"}
+           "appointments":"appointment","prices":"price","pricing":"price",
+           "delivery":"shipping","deliver":"shipping","deliveries":"shipping",
+           "shipped":"shipping","ships":"shipping","shipping":"shipping",
+           "sell":"product","sells":"product","selling":"product","products":"product",
+           "returns":"return","refunds":"refund"}
 def _terms(text:str)->set[str]:
     tokens=re.findall(r"[a-z0-9]+",text.casefold())
     return {_SYNONYMS.get(w,w[:-1] if w.endswith("s") and len(w)>5 else w)
@@ -200,7 +244,15 @@ def retrieve(organization_id:str,question:str):
     if not content_terms and not intent_match and not (
         query_terms and query_terms & _terms(best["question"])):
         return None,{"reason":"insufficient_topic_evidence","similarity":round(similarity,3)}
+    # Owner-written passages are grounded answers, not FAQ prompts.
+    # They have more detailed text than a short query; allow retrieval when
+    # a strong vector match and a supported topic align. Still reject unrelated
+    # questions rather than making up company policies.
+    is_description=best["question"].startswith("Business description — ")
     if len(ranked)>1 and score-ranked[1][0]<0.015 and not (
-        question_overlap>ranked[1][3] or intent_match and not ranked[1][5]):
+        question_overlap>ranked[1][3] or intent_match and not ranked[1][5]
+        or is_description and (question_overlap>0 or answer_overlap>0)
+            and similarity>=0.86):
         return None,{"reason":"ambiguous_retrieval","similarity":round(similarity,3)}
-    return best,{"reason":"approved_hybrid_semantic_match","similarity":round(similarity,3)}
+    return best,{"reason":"approved_description_passage" if is_description else
+                 "approved_hybrid_semantic_match","similarity":round(similarity,3)}
