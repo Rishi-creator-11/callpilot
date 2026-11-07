@@ -223,6 +223,21 @@ def check_integrations_on_boot():
                     question,[(r.get("question"),round(float(r.get("similarity",0)),3)) for r in ranked])
         except Exception as exc:
             log.warning("callpilot_semantic_voice_diagnostic error_type=%s",type(exc).__name__)
+    # Keep already-provisioned managed assistants on the same global voice policy.
+    if db_url and db_secret and vapi_key:
+        try:
+            from app.cloud import api as cloud_api
+            from app.call_intel import refresh_receptionist_prompt
+            for org in cloud_api("organizations",params={"select":"id","limit":100}):
+                try:
+                    outcome=refresh_receptionist_prompt(org["id"])
+                    log.info("callpilot_global_voice_policy updated=%s reason=%s",
+                             outcome["updated"],outcome["reason"])
+                except Exception as exc:
+                    log.warning("callpilot_global_voice_policy_failed org=%s error_type=%s",
+                                org["id"],type(exc).__name__)
+        except Exception as exc:
+            log.warning("callpilot_global_voice_policy_rollout_failed error_type=%s",type(exc).__name__)
     # Import initial historical calls once for clearly matched, configured workspaces.
     # A private assistant is linked only when its name uniquely matches the business.
     if db_url and db_secret and vapi_key:
