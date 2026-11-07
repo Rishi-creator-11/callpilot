@@ -24,12 +24,13 @@ class CatalogItemInput(BaseModel):
     description: str = Field(default="", max_length=1200)
     unit_price_cents: int | None = Field(default=None, ge=0, le=1000000000)
     stock_quantity: int | None = Field(default=None, ge=0, le=100000000)
+    use_shopify_inventory: bool | None = None
 
 
 def _item(oid: str, iid: uuid.UUID) -> dict:
     rows = api("catalog_items", params={
         "organization_id": "eq." + oid, "id": "eq." + str(iid),
-        "select": "id,sku,name,description,unit_price_cents,stock_quantity,active,approved_at",
+        "select": "id,sku,name,description,unit_price_cents,stock_quantity,use_shopify_inventory,active,approved_at,updated_at",
         "limit": 1,
     })
     if not rows:
@@ -42,7 +43,7 @@ def list_catalog(oid: str, user=Depends(current_user)):
     membership(oid, user)
     return api("catalog_items", params={
         "organization_id": "eq." + oid,
-        "select": "id,sku,name,description,unit_price_cents,stock_quantity,active,approved_at,updated_at",
+        "select": "id,sku,name,description,unit_price_cents,stock_quantity,use_shopify_inventory,active,approved_at,updated_at",
         "order": "name.asc", "limit": 200,
     })
 
@@ -51,6 +52,7 @@ def list_catalog(oid: str, user=Depends(current_user)):
 def create_catalog_item(oid: str, body: CatalogItemInput, user=Depends(current_user)):
     membership(oid, user, ("owner","admin"))
     clean = body.model_dump()
+    clean["use_shopify_inventory"]=bool(clean["use_shopify_inventory"])
     clean.update({"sku": clean["sku"].strip().upper(), "name":clean["name"].strip(),
                   "description":clean["description"].strip()})
     rows = api("catalog_items", "POST", data={
@@ -66,6 +68,7 @@ def edit_catalog_item(oid: str, iid: uuid.UUID, body: CatalogItemInput,
     membership(oid, user, ("owner","admin"))
     _item(oid, iid)
     clean=body.model_dump()
+    if clean["use_shopify_inventory"] is None:del clean["use_shopify_inventory"]
     clean.update({"sku":clean["sku"].strip().upper(),"name":clean["name"].strip(),
                   "description":clean["description"].strip(),
                   "active":False,"approved_at":None,"approved_by":None,
@@ -75,14 +78,38 @@ def edit_catalog_item(oid: str, iid: uuid.UUID, body: CatalogItemInput,
     return {"saved":True,"active":False,"requires_reapproval":True}
 
 
+class InventorySource(BaseModel):
+    use_shopify_inventory: bool
+
+
+@router.patch("/catalog/{iid}/inventory-source")
+def change_inventory_source(oid: uuid.UUID, iid: uuid.UUID, body: InventorySource, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    item = _item(workspace, iid)
+    if item["use_shopify_inventory"] == body.use_shopify_inventory:
+        return {"requires_reapproval": not item["active"]}
+    api("catalog_items", "PATCH", params={"organization_id": "eq." + workspace, "id": "eq." + str(iid)},
+        data={"use_shopify_inventory": body.use_shopify_inventory, "active": False,
+              "approved_at": None, "approved_by": None, "updated_at": datetime.now(timezone.utc).isoformat()},
+        prefer="return=minimal")
+    return {"requires_reapproval": True}
+
+
 @router.post("/catalog/{iid}/approve")
 def approve_catalog_item(oid: str, iid: uuid.UUID,user=Depends(current_user)):
     membership(oid, user, ("owner","admin"))
-    _item(oid, iid)
+    item=_item(oid, iid)
+    if item["use_shopify_inventory"]:
+        from app.shopify_connection import lookup_inventory
+        variant=lookup_inventory(uuid.UUID(oid), item["sku"])
+        if not variant or variant["quantity"] is None:
+            raise HTTPException(409,"Connect Shopify and choose a unique active SKU with tracked inventory before approving.")
     now=datetime.now(timezone.utc).isoformat()
-    api("catalog_items", "PATCH", params={"organization_id":"eq."+oid,
-        "id":"eq."+str(iid)},data={"active":True,"approved_at":now,
-           "approved_by":user["id"],"updated_at":now},prefer="return=minimal")
+    changed=api("catalog_items", "PATCH", params={"organization_id":"eq."+oid,
+        "id":"eq."+str(iid),"updated_at":"eq."+item["updated_at"] if item["updated_at"] else "is.null"},
+        data={"active":True,"approved_at":now,"approved_by":user["id"],"updated_at":now},prefer="return=representation")
+    if not changed:raise HTTPException(409,"This product changed. Refresh and review it again.")
     return {"approved":True,"active":True}
 
 

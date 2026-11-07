@@ -178,8 +178,9 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "You cannot directly book an appointment for this business yet. Do not claim one is booked. "
     )
     catalog_policy=(
-        "Use lookup_catalog_item for SKU, recorded quantity and product questions. "
-        "Only describe owner-approved catalog records; no supplier feed is connected. "
+        "Use lookup_catalog_item for SKU, stock and product questions. "
+        "Only describe owner-approved catalog records. If stock is unavailable or unverified, "
+        "offer staff assistance and never substitute a recorded quantity for a failed live lookup. "
         if flags.get("voice_catalog_enabled") else
         "Do not claim to check real-time stock because catalog lookup is not enabled. "
     )

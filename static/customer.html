@@ -737,7 +737,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
    <p class="cp-studio-warning">Before taking customer calls, verify live voice answers, caller contact capture, appointment booking, call transfers and recording consent. A connected calendar does not mean voice booking is enabled.</p>
   </article>
   <article class="cp-studio-step cp-studio-wide">
-   <div class="cp-studio-step-head"><span class="cp-studio-num">06</span><div><h3>Products &amp; order requests</h3><p>Maintain an approved product catalog. Calls can check recorded stock and request an order for staff review, but cannot charge customers.</p></div></div>
+   <div class="cp-studio-step-head"><span class="cp-studio-num">06</span><div><h3>Products &amp; order requests</h3><p>Maintain an approved product catalog and choose recorded stock or live Shopify inventory for each SKU.</p></div></div>
    <div class="cp-form-grid">
     <div><label for="studioSku">SKU</label><input id="studioSku" maxlength="60" placeholder="BC-1000"></div>
     <div><label for="studioItemName">Product name</label><input id="studioItemName" maxlength="160" placeholder="Business cards, 1000 pack"></div>
@@ -746,8 +746,9 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
    </div>
    <label for="studioItemDescription">What should the AI know about this product?</label>
    <textarea id="studioItemDescription" maxlength="1200" rows="2" placeholder="Size, material, variants, turnaround and important conditions"></textarea>
+   <label class="cp-studio-check"><input type="checkbox" id="studioShopifyStock"> Check live inventory for this SKU in my connected Shopify store</label>
    <div class="cp-studio-actions"><button onclick="window.studioAddProduct()">Save draft product</button><button class="secondary" onclick="window.studioLoadCatalog()">Refresh catalog</button></div>
-   <p class="muted">New and edited products are drafts until an authorized business owner approves them. Stock is not synced with an external supplier.</p>
+   <p class="muted">Approve each product before callers can hear it. For Shopify inventory, connect the store first and sync your managed assistant after enabling catalog lookup.</p>
    <div id="studioCatalogList" aria-live="polite" class="cp-studio-catalog">Loading products…</div>
    <h3 style="margin-top:22px">Order requests awaiting staff action</h3>
    <button class="cp-studio-textbtn" onclick="window.section('orders')">Open order requests →</button>
@@ -1518,7 +1519,7 @@ window.loadWorkspace=async({destination}={})=>{
     for(const id of ["studioDescription","studioAgentName","studioGreeting","studioQuestion","studioSku","studioItemName",
      "studioItemPrice","studioItemStock","studioItemDescription"])$(id).value="";
     for(const id of ["studioApproveKnowledge","studioPricesVerified","studioAllowPrices","studioCaptureLeads",
-     "studioVoiceBookings","studioCatalogEnabled","studioOrdersEnabled"])$(id).checked=false;
+     "studioVoiceBookings","studioCatalogEnabled","studioOrdersEnabled","studioShopifyStock"])$(id).checked=false;
     $("studioEnableVoice").disabled=true;
     $("studioActionStatus").textContent="Loading voice action settings…";
     $("studioCatalogList").textContent="Loading products…";
@@ -3095,13 +3096,24 @@ window.studioLoadCatalog=async()=>{
   cat.innerHTML=items.length?items.map(p=>{
    const status=p.active&&p.approved_at?"✓ Approved for AI":"Draft · not shared with callers";
    const price=p.unit_price_cents==null?"Price not entered":"$"+(p.unit_price_cents/100).toFixed(2);
-   const stock=p.stock_quantity==null?"Stock not tracked":p.stock_quantity+" recorded";
+   const stock=p.use_shopify_inventory?"Live Shopify inventory":p.stock_quantity==null?"Stock not tracked":p.stock_quantity+" recorded";
    return '<div class="cp-studio-product"><div><strong>'+esc(p.name)+'</strong><p>SKU '+esc(p.sku)+' · '+esc(status)+'</p><p>'+esc(price)+' · '+esc(stock)+'</p></div><div class="cp-studio-product-actions">'+
+    '<button class="secondary" data-inventory-id="'+esc(p.id)+'" data-inventory-next="'+(!p.use_shopify_inventory)+'">'+(p.use_shopify_inventory?'Use recorded stock':'Use Shopify stock')+'</button>'+
     (!p.active?'<button class="secondary" data-catalog-approve="'+esc(p.id)+'">Approve</button>':'<button class="secondary" data-catalog-archive="'+esc(p.id)+'">Archive</button>')+
    '</div></div>'
   }).join(""):'<p class="muted">No products yet. Add a draft above and approve it.</p>';
   cat.querySelectorAll("[data-catalog-approve]").forEach(btn=>btn.addEventListener("click",()=>window.studioApproveProduct(btn.dataset.catalogApprove)));
   cat.querySelectorAll("[data-catalog-archive]").forEach(btn=>btn.addEventListener("click",()=>window.studioArchiveProduct(btn.dataset.catalogArchive)));
+  cat.querySelectorAll("[data-inventory-id]").forEach(btn=>btn.addEventListener("click",()=>safe(async()=>{
+   if(oid!==organization()||btn.disabled||!confirm("Change the inventory source? The product must be approved again before callers can use it."))return;
+   btn.disabled=true;
+   try{
+    await request("/organizations/"+oid+"/catalog/"+encodeURIComponent(btn.dataset.inventoryId)+"/inventory-source","PATCH",{
+     use_shopify_inventory:btn.dataset.inventoryNext==="true"
+    });
+    if(oid===organization())await window.studioLoadCatalog();
+   }finally{btn.disabled=false}
+  })));
  }
  if(!orders)orderBox.textContent="Could not load order requests.";
  else orderBox.innerHTML=orders.length?orders.map(o=>
@@ -3123,8 +3135,10 @@ window.studioAddProduct=()=>safe(async()=>{
   stock=Number(stockInput);
  }
  await request("/organizations/"+organization()+"/catalog","POST",{
-  sku,name,description:v("studioItemDescription").trim(),unit_price_cents:price,stock_quantity:stock
+  sku,name,description:v("studioItemDescription").trim(),unit_price_cents:price,stock_quantity:stock,
+  use_shopify_inventory:$("studioShopifyStock").checked
  });
+ $("studioShopifyStock").checked=false;
  for(const id of ["studioSku","studioItemName","studioItemPrice","studioItemStock","studioItemDescription"])$(id).value="";
  await window.studioLoadCatalog();
  return "Draft saved. Approve the product before the AI can use it.";

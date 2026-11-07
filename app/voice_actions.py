@@ -10,6 +10,7 @@ import hashlib
 import re
 from datetime import datetime, timezone, timedelta
 from typing import Any
+from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
@@ -97,7 +98,7 @@ def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
         tools.append(_definition(
             "lookup_catalog_item",
             "Read-only lookup of an owner-approved SKU or exact product name. "
-            "Never claim live upstream inventory if no quantity is configured. "
+            "Report live Shopify stock only if the result confirms it; otherwise qualify the source. "
             "Prices may be quoted only with the owner's separate pricing permission.",
             {"item": s("Product SKU or exact product name stated by the caller.")},
             ["item"], oid, credential,
@@ -347,7 +348,7 @@ def confirm_calendar_booking(oid, call_id, start, end, duration, name, contact, 
 def _catalog_match(oid: str, item: str) -> dict | None:
     items=api("catalog_items",params={
         "organization_id":"eq."+oid,"active":"eq.true",
-        "select":"id,sku,name,description,unit_price_cents,stock_quantity",
+        "select":"id,sku,name,description,unit_price_cents,stock_quantity,use_shopify_inventory",
         "limit":200,
     })
     query=item.casefold().strip()
@@ -360,6 +361,23 @@ def _catalog_match(oid: str, item: str) -> dict | None:
     return None
 
 
+def _product_stock(oid: str, product: dict) -> tuple[int | None, str]:
+    if product.get("use_shopify_inventory"):
+        from app.shopify_connection import lookup_inventory
+        try:
+            variant=lookup_inventory(UUID(oid), product["sku"])
+        except HTTPException:
+            variant=None
+        quantity=variant.get("quantity") if variant else None
+        if type(quantity) is int:
+            available=max(0,quantity)
+            return available,"Live Shopify stock: "+str(available)+" units available at lookup time. "
+        return None,"Live Shopify stock could not be verified. Offer staff assistance. "
+    quantity=product.get("stock_quantity")
+    return quantity,("Stock on record: "+str(quantity)+" units. " if quantity is not None
+                     else "Stock availability is not configured. ")
+
+
 def lookup_catalog_item(oid: str,message: dict,args: dict) -> str:
     _call_context(oid,message)
     flags=feature_flags(oid)
@@ -369,9 +387,7 @@ def lookup_catalog_item(oid: str,message: dict,args: dict) -> str:
     product=_catalog_match(oid,item)
     if not product:
         return "I cannot find that product in the business's approved catalog. Ask for a SKU or offer a staff follow-up."
-    stock=product.get("stock_quantity")
-    availability=("Stock on record: "+str(stock)+" units. " if stock is not None
-                  else "Live stock availability is not configured. ")
+    _,availability=_product_stock(oid,product)
     price=product.get("unit_price_cents")
     pricing=(" Approved unit price: $"+format(price/100,".2f")+" USD. "
              if flags.get("allow_price_quotes") and price is not None else
@@ -402,14 +418,14 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
     product=_catalog_match(oid,sku)
     if not product or product.get("sku")!=sku:
         raise ValueError("Product SKU is not in the approved catalog")
-    stock=product.get("stock_quantity")
-    if stock is not None and qty>stock:
-        return "The requested quantity exceeds recorded stock. No order request was submitted. Offer human assistance."
     key=hashlib.sha256((oid+"|"+call_id+"|"+sku+"|"+str(qty)+"|"+contact.casefold()).encode()).hexdigest()
     existing=api("order_requests",params={"organization_id":"eq."+oid,
         "idempotency_key":"eq."+key,"select":"id,status","limit":1})
     if existing:
-        return "Pending order request already saved with reference "+existing[0]["id"]+". Staff must still approve it."
+        return "Order request already submitted with reference "+existing[0]["id"]+". Do not submit it again."
+    stock,_=_product_stock(oid,product)
+    if stock is not None and qty>stock:
+        return "The requested quantity exceeds the available stock shown. No order request was submitted. Offer human assistance."
     rows=api("order_requests","POST",params={"on_conflict":"organization_id,idempotency_key"},
         data={"organization_id":oid,"provider_call_id":call_id,
               "idempotency_key":key,"item_id":product["id"],"sku":sku,
@@ -420,7 +436,7 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
     found=api("order_requests",params={"organization_id":"eq."+oid,
         "idempotency_key":"eq."+key,"select":"id","limit":1})
     if not found:raise ValueError("Could not verify the order request was recorded")
-    return "Pending order request "+str(found[0]["id"])+" already recorded. Staff approval is required."
+    return "Order request "+str(found[0]["id"])+" already submitted. Do not submit it again."
 
 
 def execute_voice_action(oid: str, message: dict, name: str, args: dict) -> str:

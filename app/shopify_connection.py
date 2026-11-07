@@ -41,7 +41,7 @@ def request_json(domain: str, path: str, **kwargs) -> dict:
     if not SHOP.fullmatch(domain):
         raise HTTPException(422, "Enter your store’s myshopify.com domain.")
     try:
-        response = httpx.post("https://" + domain + path, timeout=10.0, follow_redirects=False, **kwargs)
+        response = httpx.post("https://" + domain + path, timeout=6.0, follow_redirects=False, **kwargs)
     except httpx.RequestError as exc:
         raise HTTPException(503, "Shopify is temporarily unreachable.") from exc
     if response.status_code in (400, 401, 403):
@@ -133,6 +133,10 @@ def disconnect(oid: UUID, user=Depends(current_user)):
 @router.post("/inventory")
 def inventory(oid: UUID, body: SkuInput, user=Depends(current_user)):
     membership(str(oid), user, MANAGERS)
+    return {"product": lookup_inventory(oid, body.sku)}
+
+
+def lookup_inventory(oid: UUID, sku: str) -> dict | None:
     rows = api(TABLE, params={**filters(oid), "select": "account_ref,token_ciphertext", "limit": 1})
     if not rows:
         raise HTTPException(409, "Connect Shopify first.")
@@ -142,18 +146,18 @@ def inventory(oid: UUID, body: SkuInput, user=Depends(current_user)):
     except (InvalidToken, ValueError) as exc:
         raise HTTPException(503, "Reconnect Shopify to refresh its stored credentials.") from exc
     domain = account["account_ref"]
-    data = graphql(domain, access_token(domain, credentials), STOCK_QUERY, {"search": "sku:" + json.dumps(body.sku)})
+    data = graphql(domain, access_token(domain, credentials), STOCK_QUERY, {"search": "sku:" + json.dumps(sku)})
     connection = data.get("productVariants") or {}
     variants = [
         row for row in connection.get("nodes", [])
-        if str(row.get("sku") or "").casefold() == body.sku.casefold()
+        if str(row.get("sku") or "").casefold() == sku.casefold()
         and (row.get("product") or {}).get("status") == "ACTIVE"
     ]
     if len(variants) > 1 or (connection.get("pageInfo") or {}).get("hasNextPage"):
         raise HTTPException(409, "The SKU search returned multiple possible variants. Use a unique SKU.")
     if not variants:
-        return {"product": None}
+        return None
     row = variants[0]
     tracked = (row.get("inventoryItem") or {}).get("tracked") is True
-    return {"product": {"sku": row["sku"], "name": row["product"]["title"], "variant": row["title"],
-                        "quantity": row.get("inventoryQuantity") if tracked else None}}
+    return {"sku": row["sku"], "name": row["product"]["title"], "variant": row["title"],
+            "quantity": row.get("inventoryQuantity") if tracked else None}
