@@ -39,7 +39,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 ## Authenticated app
 
-`/app#workers` supports creating, editing, reordering and disabling named call playbooks. Channels can enable separate runtime specialists and deterministic inbound rules. In-call branching and provider verification remain open.
+`/app#workers` supports creating, editing, reordering and disabling named call playbooks. Channels can enable separate runtime specialists and deterministic inbound rules. The operator supports a spoken menu, and runtime specialists can save structured intake to the call. Multi-step branching and provider verification remain open.
 
 The `/app#orders` review page supports staff approval, Shopify checkout creation and recovery, a copyable checkout link, live payment and fulfillment status, and shipment review and tracking entry for eligible paid Shopify orders, plus a Shopify shortcut for other shipping options. Customer confirmation and live checkout and fulfillment testing remain open.
 
@@ -62,7 +62,7 @@ The `/app#orders` review page supports staff approval, Shopify checkout creation
 | [ ] | `/agent/workers`, worker list and Add worker | List and Create Worker dialog observed, including Free Prompt and Structured Form | Build worker CRUD, validations, and assignment. |
 | [ ] | Operator detail, Greeting tab | Observed | `/app#voice` supports greeting. Add open/closed greeting and routing rules. |
 | [ ] | Operator detail, Directory tab | Observed | Channels stores human transfer destinations with routing descriptions, enable controls and managed assistant sync. Escalation defaults, failure behavior and live verification remain. |
-| [ ] | Worker detail, specialist and tool configuration | Some workers observed, detail forms pending | Build worker-specific panels and supported tools. |
+| [ ] | Worker detail, specialist and tool configuration | MetroPrint Lead Capture fields and post-form tools inspected | CallPilot Workers supports question type, required or optional answers, post-form return or call end, and a saved-answer viewer. Email and SMS chains and specialist history remain open. |
 | [ ] | Workers, Knowledge tab and source list | Observed | `/app#knowledge` has source attribution, editable drafts, approval, and search testing. |
 | [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link and PDF import verified in the authenticated sandbox. PDF extraction creates a reviewable draft. Scanned-document OCR remains open. |
 | [ ] | Knowledge source detail and lifecycle controls | Source detail, View content, Edit and History observed | CallPilot edits and approval available. Compare source detail and deletion behavior. |

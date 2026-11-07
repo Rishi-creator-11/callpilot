@@ -756,6 +756,8 @@ from app.shopify_fulfillment import router as shopify_fulfillment_router
 app.include_router(shopify_fulfillment_router)
 from app.call_menu import router as call_menu_router
 app.include_router(call_menu_router)
+from app.worker_forms import router as worker_forms_router
+app.include_router(worker_forms_router)
 
 from app.workers import router as workers_router
 app.include_router(workers_router)

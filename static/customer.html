@@ -804,6 +804,22 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </div>
  </form>
  <p id="workerStatus" role="status" class="muted"></p>
+ <details class="cp-section-box" id="workerIntake" hidden>
+  <summary>Structured intake forms</summary>
+  <p>Choose what a specialist asks and which answers are required. Completed forms stay with the call.</p>
+  <label for="intakeWorker">Worker</label><select id="intakeWorker"><option value="">Select a saved worker</option></select>
+  <form id="intakeForm" hidden>
+   <div id="intakeFields"></div>
+   <label for="intakeAfter">After saving</label><select id="intakeAfter">
+    <option value="operator">Return to the receptionist when needed</option><option value="end">Thank the caller and end the call</option>
+   </select>
+   <div class="cp-inline-actions"><button id="intakeAdd" type="button" class="secondary">Add question</button>
+    <button id="intakeSave" type="submit">Save form</button><button id="intakeRefresh" type="button" class="secondary">Refresh forms</button>
+    <button id="intakeReview" type="button" class="secondary">View saved answers</button></div>
+  </form>
+  <p id="intakeStatus" role="status" class="muted"></p>
+  <div id="intakeSubmissions" aria-live="polite"></div>
+ </details>
  <details class="cp-section-box">
   <summary>Spoken call menu</summary>
   <p>Offer callers numbered choices. Each phrase opens a specific workflow. Callers can ask for the receptionist at any time.</p>
@@ -976,7 +992,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <form id="routingForm">
    <label class="cp-studio-check"><input id="routingEnabled" type="checkbox"> Enable screening rules</label>
    <label class="cp-studio-check"><input id="routingWorkers" type="checkbox"> Enable runtime specialists from Workers</label>
-   <p class="muted">Specialists answer approved questions and hand bookings, transfers, order requests and callbacks back to the operator.</p>
+   <p class="muted">Specialists answer approved questions, collect any configured intake form, and hand bookings, transfers and order requests back to the operator.</p>
    <div id="routingRows"></div>
    <div class="cp-inline-actions"><button type="button" class="secondary" id="addRoutingRule">Add rule</button>
    <button type="submit" id="saveRouting">Save routing</button>
@@ -1892,6 +1908,7 @@ window.loadWorkspace=async({destination}={})=>{
     resetTransfers();
     resetRouting();
     resetCallMenu();
+    resetIntakeForms();
     $("phoneReserveForm").reset();$("phoneReserveForm").hidden=true;
     $("phoneReserveCheck").hidden=true;$("phoneReserveStatus").textContent="";
     $("usageActivateForm").reset();$("usageActivateForm").hidden=true;
@@ -2925,6 +2942,126 @@ $("syncCallMenu").addEventListener("click",async event=>{
  }catch(e){if(oid===organization())status.textContent=e.message}
  finally{if(oid===organization())button.disabled=callMenuDirty}
 });
+const intakePath=oid=>workersPath(oid)+"/forms";
+const intakeKinds={name:"Name",phone:"Phone",email:"Email",postal:"Postal code",text:"Open question"};
+let intakeForms=[],intakeDraft=null,intakeDirty=false;
+function resetIntakeForms(){
+ intakeForms=[];intakeDraft=null;intakeDirty=false;
+ $("workerIntake").hidden=true;$("intakeForm").hidden=true;
+ $("intakeWorker").replaceChildren(new Option("Select a saved worker",""));
+ $("intakeFields").replaceChildren();$("intakeSubmissions").replaceChildren();$("intakeStatus").textContent="";
+}
+async function loadIntakeForms(oid){
+ if(!workersEditable)return;
+ $("workerIntake").hidden=false;
+ const worker=$("intakeWorker"),selected=worker.value;
+ worker.replaceChildren(new Option("Select a saved worker",""));
+ worker.disabled=true;$("intakeForm").hidden=true;$("intakeSubmissions").replaceChildren();
+ $("intakeStatus").textContent="Loading saved forms…";
+ try{
+  const result=await request(intakePath(oid));
+  if(oid!==organization())return;
+  intakeForms=result.forms;
+  for(const saved of workersSaved)worker.add(new Option(saved.name,saved.name));
+  worker.value=workersSaved.some(saved=>saved.name===selected)?selected:"";
+  worker.disabled=false;selectIntakeWorker();
+ }catch(e){if(oid===organization())$("intakeStatus").textContent=e.message}
+}
+function selectIntakeWorker(){
+ const name=v("intakeWorker"),saved=intakeForms.find(form=>form.worker_name===name);
+ intakeDraft=name?structuredClone(saved||{worker_name:name,revision:null,configuration:{fields:[],after:"operator"}}):null;
+ intakeDirty=false;$("intakeSubmissions").replaceChildren();
+ $("intakeForm").hidden=!intakeDraft;
+ $("intakeStatus").textContent=workersSaved.length?"":"Add and save a worker first.";
+ if(!intakeDraft)return;
+ $("intakeAfter").value=intakeDraft.configuration.after;
+ renderIntakeFields();
+}
+function renderIntakeFields(){
+ const fields=intakeDraft.configuration.fields,container=$("intakeFields");
+ $("intakeAdd").disabled=fields.length>=10;$("intakeReview").disabled=!intakeDraft.id;
+ container.replaceChildren();
+ if(!fields.length)container.textContent="Add questions to enable structured intake for this worker.";
+ fields.forEach((field,index)=>{
+  const group=document.createElement("fieldset"),heading=document.createElement("legend");
+  group.className="cp-section-box";heading.textContent="Question "+(index+1);
+  const kind=document.createElement("select"),kindLabel=document.createElement("label");
+  kindLabel.textContent="Answer type";kindLabel.append(kind);
+  for(const [key,label] of Object.entries(intakeKinds))kind.add(new Option(label,key));
+  kind.value=field.kind;
+  kind.addEventListener("change",()=>{field.kind=kind.value;intakeDirty=true});
+  const question=document.createElement("input"),questionLabel=document.createElement("label");
+  question.id="intake-question-"+index;question.required=true;question.minLength=3;question.maxLength=160;
+  question.value=field.question;questionLabel.textContent="What should the worker ask?";questionLabel.append(question);
+  question.addEventListener("input",()=>{field.question=question.value;intakeDirty=true});
+  const required=document.createElement("input"),requiredLabel=document.createElement("label");
+  required.type="checkbox";required.checked=field.required;requiredLabel.className="cp-studio-check";
+  requiredLabel.append(required," Required");
+  required.addEventListener("change",()=>{field.required=required.checked;intakeDirty=true});
+  const remove=document.createElement("button");
+  remove.type="button";remove.className="secondary";remove.textContent="Remove question";
+  remove.addEventListener("click",()=>{fields.splice(index,1);intakeDirty=true;renderIntakeFields()});
+  group.append(heading,kindLabel,questionLabel,requiredLabel,remove);container.append(group);
+ });
+}
+$("intakeWorker").addEventListener("change",()=>{
+ if(intakeDirty&&!window.confirm("Discard unsaved intake questions?")){
+  $("intakeWorker").value=intakeDraft.worker_name;return;
+ }
+ selectIntakeWorker();
+});
+$("intakeAfter").addEventListener("change",()=>{
+ if(!intakeDraft)return;
+ intakeDraft.configuration.after=v("intakeAfter");intakeDirty=true;
+});
+$("intakeAdd").addEventListener("click",()=>{
+ if(!intakeDraft||intakeDraft.configuration.fields.length>=10)return;
+ intakeDraft.configuration.fields.push({kind:"text",question:"",required:true});
+ intakeDirty=true;renderIntakeFields();$("intake-question-"+(intakeDraft.configuration.fields.length-1)).focus();
+});
+$("intakeRefresh").addEventListener("click",()=>{
+ if(!intakeDirty||window.confirm("Discard unsaved intake questions?"))void loadIntakeForms(organization());
+});
+$("intakeForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),draft=intakeDraft,button=$("intakeSave"),status=$("intakeStatus");
+ if(!draft||button.disabled)return;
+ const sent=structuredClone(draft.configuration);
+ button.disabled=true;status.textContent="Saving intake form…";
+ try{
+  const saved=await request(intakePath(oid),"PUT",{worker_name:draft.worker_name,
+   revision:draft.revision,configuration:sent});
+  if(oid!==organization())return;
+  intakeForms=intakeForms.filter(form=>form.worker_name!==saved.worker_name);intakeForms.push(saved);
+  if(draft!==intakeDraft)return;
+  intakeDirty=JSON.stringify(sent)!==JSON.stringify(draft.configuration);
+  draft.id=saved.id;draft.revision=saved.revision;
+  if(!intakeDirty){draft.configuration=saved.configuration;renderIntakeFields()}
+  status.textContent=intakeDirty?"Save again to include your latest edits.":sent.fields.length?
+   "Saved. New calls can use the form when runtime specialists are enabled in Channels.":"Intake form disabled.";
+ }catch(e){if(oid===organization()&&draft===intakeDraft)status.textContent=e.message}
+ finally{button.disabled=false}
+});
+$("intakeReview").addEventListener("click",async()=>{
+ const oid=organization(),draft=intakeDraft,list=$("intakeSubmissions");
+ if(!draft?.id)return;
+ list.textContent="Loading saved answers…";
+ try{
+  const rows=await request(intakePath(oid)+"/"+encodeURIComponent(draft.id)+"/submissions");
+  if(oid!==organization()||draft!==intakeDraft)return;
+  list.replaceChildren();
+  if(!rows.length){list.textContent="No completed forms yet.";return}
+  for(const row of rows){
+   const record=document.createElement("details"),title=document.createElement("summary"),answers=document.createElement("dl");
+   title.textContent=new Date(row.created_at).toLocaleString();
+   for(const field of row.answers){
+    const question=document.createElement("dt"),answer=document.createElement("dd");
+    question.textContent=field.question;answer.textContent=field.answer||"Skipped";answers.append(question,answer);
+   }
+   record.append(title,answers);list.append(record);
+  }
+ }catch(e){if(oid===organization()&&draft===intakeDraft)list.textContent=e.message}
+});
 async function loadWorkers(refresh=false){
  const oid=organization();
  if(!refresh&&workersWorkspace===oid)return;
@@ -2939,6 +3076,7 @@ async function loadWorkers(refresh=false){
   $("workerControls").hidden=!workersEditable;
   $("syncWorkers").disabled=!workersEditable;
   renderWorkers();
+  if(!intakeDirty)await loadIntakeForms(oid);
  }catch(e){if(oid===organization())$("workerList").textContent=e.message}
 }
 function markWorkersDirty(){
@@ -3011,6 +3149,7 @@ $("workerForm").addEventListener("submit",async event=>{
   const result=await request(workersPath(oid),"PUT",{previous:workersSaved,playbooks:sent});
   if(oid!==organization())return;
   workersSaved=result.playbooks;
+  if(!intakeDirty)void loadIntakeForms(oid);
   workersDirty=JSON.stringify(sent)!==JSON.stringify(workersDraft);
   $("syncWorkers").disabled=workersDirty;
   $("workerStatus").textContent=workersDirty?"Saved the earlier draft. Save again to include your latest edits.":"Playbooks saved. Sync the managed assistant when ready.";

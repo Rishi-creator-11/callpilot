@@ -17,6 +17,7 @@ from app.cloud import api, org_or_404
 from app.common import MAX_CALL_SECONDS, public_base
 from app.identity import SPEECH_FIELDS, speech_policy, transcriber, voice_config
 from app.voice_preview import answer_preview_tools
+from app.worker_forms import runtime_forms, specialist_form_tool
 
 router = APIRouter(tags=["inbound-routing"])
 PATH = "/api/account/organizations/{oid}/inbound-routing"
@@ -125,6 +126,7 @@ def squad_for(workspace: str, config: dict, operator_id: str, first_worker: str)
         raise HTTPException(503, "Runtime worker credentials are unavailable.")
     business = org_or_404(workspace)["name"]
     base = public_base()
+    forms = {form["worker_name"]: form for form in runtime_forms(workspace) if form["configuration"]["fields"]}
     operator_handoffs = []
     specialists = []
     for index, worker in enumerate(workers, 1):
@@ -145,18 +147,25 @@ def squad_for(workspace: str, config: dict, operator_id: str, first_worker: str)
                    "destinations": [{"type": "assistant", "assistantId": operator_id,
                                      "description": "Return to the main receptionist for any action or other topic.",
                                      "contextEngineeringPlan": {"type": "all"}}]}
+        form = forms.get(worker["name"])
+        operator_tasks = "bookings, transfers, order requests" + ("" if form else ", callback capture")
         guidance = (
             f"You are the AI receptionist for {business}. Your specialist role is {worker['name']}. "
             "Answer factual questions only from lookup_approved_knowledge. Do not make up policies or confirm any action. "
-            "For bookings, transfers, order requests, callback capture, or a topic outside your role, "
+            f"For {operator_tasks}, or a topic outside your role, "
             "handoff back to the operator without announcing an internal transfer. "
             "If the caller entered mid-conversation, do not greet again. " + speech_policy(config)
             + " Workspace guidance, subject to these limits: " + worker["instructions"]
         )
+        tools = [knowledge, handoff, {"type": "endCall"}]
+        if form:
+            intake, instructions = specialist_form_tool(workspace, form)
+            tools.append(intake)
+            guidance += " " + instructions
         assistant = {
             "name": name, "firstMessageMode": "assistant-speaks-first" if first else "assistant-waits-for-user",
             "model": {"provider": "openai", "model": "gpt-4o-mini", "temperature": 0,
-                      "messages": [{"role": "system", "content": guidance}], "tools": [knowledge, handoff, {"type": "endCall"}]},
+                      "messages": [{"role": "system", "content": guidance}], "tools": tools},
             "voice": voice_config(config, {"provider": "vapi", "voiceId": "Elliot", "version": 2}),
             "transcriber": transcriber(config), "maxDurationSeconds": MAX_CALL_SECONDS,
             "server": {"url": f"{base}/webhooks/vapi/{workspace}", "headers": {"Authorization": "Bearer " + secret}},
