@@ -636,7 +636,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
  <p id="billingInfo">Checking your subscription…</p>
  <div class="cp-inline-actions">
   <button id="portal" class="secondary" onclick="window.billingPortal()" style="display:none">Manage in Stripe ↗</button>
-  <button class="secondary" onclick="window.loadBilling()">Refresh billing status</button>
+  <button class="secondary" onclick="window.loadBilling()">Refresh billing status</button><button id="verifyCheckoutButton" class="secondary" onclick="window.verifyCheckout()" style="display:none">Verify completed checkout</button>
  </div>
  <p id="billingCheckoutNote" class="muted cp-price-disclaimer">Billing activation requires a verified Stripe integration. No payments are taken directly by CallPilot.</p>
 </div>
@@ -1112,6 +1112,11 @@ window.pickPlan=plan=>{
  }
  window.checkout();
 };
+window.verifyCheckout=()=>safe(async()=>{
+ const check=await request("/organizations/"+organization()+"/billing/confirm-checkout","POST");
+ await loadBilling();
+ return check.confirmed?"Your subscription has been verified with Stripe.":"Payment confirmation is still pending. No additional payment has been requested.";
+});
 async function loadBilling(){
  const oid=organization();
  const b=await request("/organizations/"+oid+"/billing");
@@ -1132,6 +1137,7 @@ async function loadBilling(){
   "Sandbox test only — no real payment is charged. Your first checkout includes $100 setup, followed by the plan's monthly charge.":
   "Plan pricing is final, but live charging remains disabled until billing and usage limits are verified.";
  $("portal").style.display=b.has_customer?"inline-block":"none";
+ $("verifyCheckoutButton").style.display=b.pending_confirmation?"inline-block":"none";
  if(b.selected_plan&&["starter","growth","business"].includes(b.selected_plan))billingPlan=b.selected_plan;
  updatePlanSelection();
  document.querySelectorAll("[data-plan]").forEach(button=>{
