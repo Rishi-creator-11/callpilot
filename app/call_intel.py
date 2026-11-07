@@ -132,8 +132,11 @@ def persist(oid:str,call:dict):
                 data[k]=previous[k]
         # Keep caller-confirmed details captured by live voice tools even
         # when post-call AI analysis omits them.
+        confirmed_by_voice=(previous.get("lead_reason") or "").startswith(
+            "Caller explicitly requested a callback about:")
         for k in ("caller_phone","caller_name","product_interest"):
-            if previous.get(k) and not data.get(k):
+            if previous.get(k) and (
+                not data.get(k) or confirmed_by_voice or previous.get("lead_source")=="human_reviewed"):
                 data[k]=previous[k]
         if previous.get("follow_up_needed") is True:
             data["follow_up_needed"]=True
