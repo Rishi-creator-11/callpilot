@@ -14,19 +14,6 @@ DATA.mkdir(parents=True, exist_ok=True)
 DB = DATA / "callpilot.db"
 app = FastAPI(title="CallPilot", version="0.2.0")
 
-@app.on_event("startup")
-def callpilot_voice_regression_run():
-    """One-time offline unit test runner; remove once results are verified."""
-    import logging
-    import pytest
-    log=logging.getLogger("uvicorn.error")
-    try:
-        result=pytest.main(["-q","tests/test_voice_actions.py","tests/test_catalog_actions.py"])
-        log.info("callpilot_voice_regression_tests exit_status=%s",int(result))
-    except Exception as exc:
-        log.error("callpilot_voice_regression_tests crashed=%s",type(exc).__name__)
-
-
 def connect():
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
