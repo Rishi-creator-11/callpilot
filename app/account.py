@@ -171,9 +171,11 @@ class BusinessDescription(BaseModel):
     content:str=Field(min_length=20,max_length=12000)
 
 def _description_policy(oid,content):
-    # Match the same existing financial restrictions as the public agent FAQ tool.
-    if MONEY.search(content) or PRICE.search(content):
-        raise HTTPException(400,"Remove prices, fees and quotes from the description; those require separate approved pricing rules.")
+    # An owner may describe shipping rates, payment policies or pricing procedures
+    # in ordinary language. Numeric price quotes remain restricted under the
+    # platform's existing tenant policy; the voice tool also blocks price asks.
+    if MONEY.search(content):
+        raise HTTPException(400,"Remove monetary amounts from the description; published prices require a separately approved pricing rule.")
 
 @router.get("/organizations/{oid}/descriptions")
 def list_descriptions(oid:str,user=Depends(current_user)):
