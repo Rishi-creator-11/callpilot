@@ -27,3 +27,7 @@ Progress is shown as a six-dot stepper with a small mascot above the heading and
 ## Dashboard and navigation (observed, mobile-width pane)
 - Dashboard `/agent/dashboard`: header with business name, new-conversation button and a status line (version live, all changes published). Chat with the builder assistant, composer with voice-mode button, thumbs up/down feedback per reply, bottom switcher between the builder assistant and a test of the agent, mute toggle.
 - Sidebar: logo and close; builder assistant, Analytics, Sessions, Channels; divider; Identity, Workers, Connections; footer with account switcher and Support. Not recorded: feedback persistence and the voice-mode flow.
+
+## Channels and Connections (observed, mobile-width pane)
+- Channels `/agent/channels`: Phone card (Connect, plus Get a Number in the header), Shareable demo card (Share copies a no-sign-in link), and a Shorten and track links in texts toggle with explanatory copy.
+- Connections `/agent/connections`: tabs Integrations and Custom APIs (count). Groups OAuth (Google Sheets, Google Calendar), API key (GoHighLevel), MCP server (Zapier actions) with Connect buttons, an empty MCP state and an Add custom MCP server action.

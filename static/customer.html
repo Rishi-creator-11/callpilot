@@ -64,6 +64,16 @@ body.cp-signed-in .sidebar .cp-side-scroll>button.cp-active,body.cp-signed-in .s
 body.cp-signed-in .sidebar .cp-side-scroll>.cp-nav-divider{background:rgba(255,255,255,.14)}
 body.cp-signed-in .sidebar .cp-sidebar-bottom{border-top:1px solid rgba(255,255,255,.14)}
 body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
+.cn-tabs{display:flex;gap:22px;border-bottom:1px solid var(--cp-border);margin:4px 0 18px}
+.cn-tabs button{background:transparent;color:#667085;box-shadow:none;border-radius:0;padding:10px 2px;border-bottom:3px solid transparent;font-weight:700}
+.cn-tabs button[aria-pressed="true"]{color:#101629;border-bottom-color:#07104f}
+.cn-group{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#07104f;margin:22px 0 10px;grid-column:1/-1}
+.cn-empty{grid-column:1/-1;border:2px dashed var(--cp-border);border-radius:16px;padding:26px;text-align:center;color:#667085;display:grid;gap:6px;margin-top:10px}
+.cn-empty strong{color:#344e65}
+.cn-soon{opacity:.8}
+.ch-card{text-align:center;padding:30px 22px}
+.ch-card .ch-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:#eef1f4;font-size:24px;margin:0 auto 12px;color:#344e65}
+.ch-card h3{margin:0 0 6px}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -773,19 +783,23 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 
 <section id="connections" class="panel card" style="display:none">
  <div class="cp-panel-heading"><div><h2>Connections</h2><p>Check what is linked to this business and open the setup for each service.</p></div></div>
- <div class="connection-filters" role="group" aria-label="Filter connections">
-  <button type="button" data-connection-group="all" aria-pressed="true">All</button>
-  <button type="button" data-connection-group="calendar" aria-pressed="false">Calendar</button>
-  <button type="button" data-connection-group="phone" aria-pressed="false">Voice &amp; phone</button>
-  <button type="button" data-connection-group="business" aria-pressed="false">CRM &amp; commerce</button>
- </div>
+  <div class="cn-tabs" role="group" aria-label="Connection types">
+   <button type="button" data-cn-tab="integrations" aria-pressed="true">Integrations</button>
+   <button type="button" data-cn-tab="custom" aria-pressed="false">Custom APIs <span class="wk-badge">0</span></button>
+  </div>
+  <div id="cnIntegrations">
  <div class="cp-studio-connections">
+   <h3 class="cn-group">OAuth</h3>
   <article class="cp-studio-connection" data-connection-type="calendar"><h3>Google Calendar</h3><p>Check availability and create confirmed appointments.</p>
    <p id="connectionCalendar" role="status"></p><button class="secondary" onclick="window.section('appointments')">Manage calendar</button></article>
+  <article class="cp-studio-connection cn-soon" data-connection-type="business"><h3>Google Sheets</h3><p>Append, read, update and search spreadsheet rows from calls.</p>
+   <p class="muted" role="status">Not available yet. We will add it with least-privilege access and approved sheets.</p><button type="button" class="secondary" disabled>Coming soon</button></article>
+  <h3 class="cn-group">Voice and phone</h3>
   <article class="cp-studio-connection" data-connection-type="phone"><h3>Vapi voice assistant</h3><p>Connect the assistant that answers your business calls.</p>
    <p id="connectionVoice" role="status"></p><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage voice assistant</button></article>
   <article class="cp-studio-connection" data-connection-type="phone"><h3>Business phone</h3><p>Link a managed number and review your call fallback.</p>
    <p id="connectionPhone" role="status"></p><button class="secondary" onclick="window.section('usage')">Manage business phone</button></article>
+  <h3 class="cn-group">API key</h3>
   <article class="cp-studio-connection" data-connection-type="business"><h3>HighLevel CRM</h3><p>Find contacts by exact email or phone in your connected sub-account.</p>
    <p id="connectionHighLevel" role="status"></p>
    <div class="cp-inline-actions">
@@ -823,6 +837,14 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    </form>
    <p id="shopifyResult" role="status" class="muted"></p>
   </article>
+  <h3 class="cn-group">MCP server</h3>
+  <article class="cp-studio-connection cn-soon"><h3>Zapier actions</h3><p>Let the agent run Zapier actions you choose during a call.</p>
+   <p class="muted" role="status">Not available yet. It needs reviewed action schemas, an allowlist and delivery retries.</p><button type="button" class="secondary" disabled>Coming soon</button></article>
+  <div class="cn-empty"><strong>No MCP servers connected yet</strong><span>Custom MCP servers are not available yet.</span></div>
+ </div>
+ </div>
+ <div id="cnCustom" hidden>
+  <div class="cn-empty"><strong>No custom APIs yet</strong><span>Custom REST APIs need a secret vault, reviewed request schemas, a destination allowlist and audit logging before they can run during calls. This is not available yet.</span></div>
  </div>
 </section>
 
@@ -1060,8 +1082,8 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <section id="channels" class="panel card" style="display:none">
  <div class="cp-panel-heading"><div><h2>Channels</h2><p>Choose how people reach your receptionist.</p></div></div>
  <div class="cp-studio-connections">
-  <article class="cp-studio-connection"><h3>Phone</h3><p>Link your managed number, set forwarding and review your fallback.</p>
-   <p id="channelPhone" role="status">Checking connection…</p><button class="secondary" onclick="window.section('usage')">Manage phone</button>
+  <article class="cp-studio-connection ch-card"><span class="ch-icon" aria-hidden="true">☎</span><h3>Phone</h3><p>Receive inbound calls through a dedicated phone number.</p>
+   <p id="channelPhone" role="status">Checking connection…</p><button onclick="window.section('usage')">Connect</button>
    <form id="phoneReserveForm" hidden>
     <label for="phoneReserveArea">U.S. area code</label><input id="phoneReserveArea" inputmode="numeric" pattern="[2-9][0-9]{2}" minlength="3" maxlength="3" placeholder="212" required>
     <label class="cp-fallback-check"><input id="phoneReserveConfirm" type="checkbox" required> Reserve an inbound number for this workspace</label>
@@ -1069,7 +1091,9 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    </form>
    <button type="button" id="phoneReserveCheck" class="secondary" hidden>Check pending number</button>
    <p id="phoneReserveStatus" role="status"></p></article>
-  <article class="cp-studio-connection"><h3>Browser practice</h3><p>Try the assistant from your workspace before routing calls.</p>
+  <article class="cp-studio-connection ch-card"><span class="ch-icon" aria-hidden="true">⛓</span><h3>Shareable demo</h3><p>Send colleagues a link to talk to your agent, no sign in needed.</p>
+   <p id="channelShareHint" role="status" class="muted"></p><button id="channelShareButton" type="button">Share</button></article>
+  <article class="cp-studio-connection ch-card"><span class="ch-icon" aria-hidden="true">◇</span><h3>Browser practice</h3><p>Try the assistant from your workspace before routing calls.</p>
    <p id="channelPractice" role="status">Checking availability…</p><button class="secondary" onclick="window.section('simulator')">Open practice</button></article>
  </div>
  <div class="cp-section-box" id="channelShare" hidden>
@@ -1799,7 +1823,7 @@ const pageMeta={
  studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
  builder:["Assistant","Draft, review and sync your receptionist’s configuration."],
  analytics:["Analytics","Track call volume, caller activity and lead outcomes."],
- channels:["Channels","Manage the ways people reach your receptionist."],
+ channels:["Channels","Manage how callers connect with your agent."],
  workers:["Workers","Organize the playbooks your receptionist follows on calls."],
  calls:["Sessions","Review calls, transcripts and follow-up activity."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
@@ -1808,7 +1832,7 @@ const pageMeta={
  simulator:["Test assistant","Test approved answers before customers hear them."],
  appointments:["Appointments","Manage appointment requests and calendar connections."],
  orders:["Order requests","Review and resolve customer order requests."],
- connections:["Connections","Manage the services your receptionist uses."],
+ connections:["Connections","External services your agent can use."],
  billing:["Settings","Manage your plan, payment methods and invoices."],
  workspace:["Settings","Manage your team and business workspace."],
  account:["Settings","Manage your account profile and sign-in."],
@@ -3039,6 +3063,20 @@ async function loadConnections(){
   if(oid===organization())$(id).textContent=status;
  }),loadHighLevel(),loadShopify()]);
 }
+for(const tab of document.querySelectorAll("[data-cn-tab]")){
+ tab.addEventListener("click",()=>{
+  for(const other of document.querySelectorAll("[data-cn-tab]"))other.setAttribute("aria-pressed",String(other===tab));
+  $("cnIntegrations").hidden=tab.dataset.cnTab!=="integrations";
+  $("cnCustom").hidden=tab.dataset.cnTab!=="custom";
+ });
+}
+$("channelShareButton").addEventListener("click",()=>{
+ const box=$("channelShare");
+ if(box.hidden){$("channelShareHint").textContent="Only workspace owners and admins can share a demo.";return}
+ $("channelShareHint").textContent="";
+ box.scrollIntoView({block:"center"});
+ $("channelDemoLabel").focus();
+});
 const connectionFilters=[...document.querySelectorAll("[data-connection-group]")];
 const connectionCards=[...document.querySelectorAll("[data-connection-type]")];
 function setConnectionGroup(group){
