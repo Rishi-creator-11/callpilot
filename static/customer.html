@@ -675,7 +675,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 </details>
 <label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
 <label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
-<div class="cp-inline-actions"><button id="descriptionSaveBtn" onclick="window.saveDescription()">Save, approve &amp; index</button><button id="descriptionCancelEdit" class="secondary" style="display:none" onclick="window.cancelDescriptionEdit()">Cancel edit</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out monetary amounts and private details.</span></div>
+<div class="cp-inline-actions"><button id="descriptionSaveBtn" onclick="window.saveDescription()">Save, approve &amp; index</button><button id="descriptionDraftBtn" class="secondary" onclick="window.saveDescription(false)">Save draft</button><button id="descriptionCancelEdit" class="secondary" style="display:none" onclick="window.cancelDescriptionEdit()">Cancel edit</button><span class="muted">Approve only information that is accurate for callers. Leave out monetary amounts and private details.</span></div>
 <h3 style="margin-top:20px">Business descriptions</h3><div id="descriptions" role="region" aria-label="Business descriptions"></div></div>
 <div class="cp-section-box"><h3>Optional: Add a specific Q&amp;A</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
 <label for="faqQ">Customer question</label><input id="faqQ" placeholder="Can I order less than a full container?">
@@ -1153,6 +1153,11 @@ window.saveWorkspace=()=>safe(async()=>{
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
 let descriptionItems=[];
+let knowledgeItems=[];
+function updateKnowledgeCount(){
+ const count=knowledgeItems.filter(f=>f.approved_at).length+descriptionItems.filter(d=>d.approved_at).length;
+ $("knowledgeCount").textContent=count+" approved knowledge "+(count===1?"entry":"entries");
+}
 let descriptionEditingId=null;
 let websiteImportRun=0;
 $("websiteImportForm").addEventListener("submit",async event=>{
@@ -1182,6 +1187,7 @@ async function loadDescriptions(){
  const docs=await request("/organizations/"+encodeURIComponent(oid)+"/descriptions");
  if(oid!==organization())return;
  descriptionItems=docs;
+ updateKnowledgeCount();
  $("descriptions").innerHTML=docs.map(d=>
   '<div class="item"><strong>'+esc(d.title)+'</strong>'+
   (d.source_url?'<p class="muted" style="overflow-wrap:anywhere">Source · '+esc(d.source_url)+'</p>':'')+
@@ -1199,23 +1205,44 @@ window.cancelDescriptionEdit=()=>{
  descriptionEditingId=null;
  $("descriptionTitle").value="";$("descriptionBody").value="";
  $("descriptionSaveBtn").textContent="Save, approve & index";
+ $("descriptionDraftBtn").hidden=false;
  $("descriptionCancelEdit").style.display="none";
 };
-window.saveDescription=()=>safe(async()=>{
+window.saveDescription=(approve=true)=>safe(async()=>{
  const title=v("descriptionTitle").trim(),content=v("descriptionBody").trim();
  if(title.length<3||content.length<20)throw Error("Enter a title and at least 20 characters describing your business.");
- const oid=organization();
- let id=descriptionEditingId;
- if(id){
-  await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(id),"PUT",{title,content});
- }else{
-  const created=await request("/organizations/"+oid+"/descriptions","POST",{title,content});
-  id=created.id;
+ const oid=organization(),publishButton=$("descriptionSaveBtn"),draftButton=$("descriptionDraftBtn");
+ if(publishButton.disabled)return;
+ publishButton.disabled=draftButton.disabled=true;
+ try{
+  let id=descriptionEditingId;
+  if(id){
+   await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(id),"PUT",{title,content});
+  }else{
+   const created=await request("/organizations/"+oid+"/descriptions","POST",{title,content});
+   id=created.id;
+  }
+  if(oid!==organization())return;
+  window.cancelDescriptionEdit();
+  if(approve){
+   let result;
+   try{
+    result=await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
+   }catch(e){
+    if(oid!==organization())return;
+    await loadDescriptions();
+    throw Error("Draft saved. Approval failed. Retry with Approve & index. "+e.message);
+   }
+   if(oid!==organization())return;
+   await loadDescriptions();await loadSemanticStatus();
+   const count=result.indexed_passages;
+   return "Business description approved and indexed into "+count+" searchable "+(count===1?"passage.":"passages.");
+  }
+  await loadDescriptions();
+  return "Draft saved. Approve it when it is ready for callers.";
+ }finally{
+  publishButton.disabled=draftButton.disabled=false;
  }
- const result=await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
- window.cancelDescriptionEdit();
- await loadDescriptions();await loadSemanticStatus();
- return "Business description approved and indexed into "+result.indexed_passages+" searchable passages.";
 });
 window.approveDescription=id=>safe(async()=>{
  const doc=descriptionItems.find(d=>d.id===id);
@@ -1229,7 +1256,8 @@ window.editDescription=id=>{
  descriptionEditingId=id;
  $("descriptionTitle").value=doc.title;
  $("descriptionBody").value=doc.content;
- $("descriptionSaveBtn").textContent="Save changes & reindex";
+ $("descriptionSaveBtn").textContent=doc.approved_at?"Save changes & reindex":"Save, approve & index";
+ $("descriptionDraftBtn").hidden=Boolean(doc.approved_at);
  $("descriptionCancelEdit").style.display="";
  $("descriptionTitle").focus();
  $("descriptionTitle").scrollIntoView({behavior:"smooth",block:"center"});
@@ -1243,21 +1271,20 @@ window.deleteDescription=id=>{
   return "Description and searchable passages deleted.";
  });
 };
-let knowledgeItems=[];
 async function loadFacts(){
  const oid=organization();if(!oid)return;
  await loadDescriptions();
  const facts=await request("/organizations/"+oid+"/knowledge");
  if(oid!==organization())return;
  knowledgeItems=facts;
- $("knowledgeCount").textContent=(facts.filter(f=>f.approved_at).length+descriptionItems.filter(d=>d.approved_at).length)+" approved knowledge entries";
+ updateKnowledgeCount();
  $("facts").innerHTML=facts.map(f=>
   '<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p>'+
   '<span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+
   (!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+
   '<button type="button" class="secondary" data-edit-fact="'+esc(f.id)+'">Edit</button> '+
   '<button type="button" class="secondary" data-delete-fact="'+esc(f.id)+'">Delete</button></div>'
- ).join("")||'<p>No approved knowledge yet.</p>';
+ ).join("")||'<p>No individual answers yet.</p>';
  $("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)));
  $("facts").querySelectorAll("[data-edit-fact]").forEach(b=>b.addEventListener("click",()=>window.editFact(b.dataset.editFact)));
  $("facts").querySelectorAll("[data-delete-fact]").forEach(b=>b.addEventListener("click",()=>window.deleteFact(b.dataset.deleteFact)));
