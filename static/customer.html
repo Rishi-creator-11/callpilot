@@ -875,7 +875,20 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <select id="analyticsRange"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="custom">Custom range</option></select>
   <div id="analyticsDates" class="cp-inline-actions" hidden><div><label for="analyticsFrom">From</label><input id="analyticsFrom" type="date"></div><div><label for="analyticsTo">To</label><input id="analyticsTo" type="date"></div></div>
   <button type="submit" class="secondary">Apply range</button>
+  <button id="analyticsAddMetric" type="button" hidden>＋ Metric</button>
  </form>
+ <form id="analyticsMetricForm" class="card cp-analytics-card" hidden>
+  <h2>Add a metric</h2><p>Count calls that match every condition you select.</p>
+  <div class="cp-form-grid">
+   <div><label for="metricLabel">Metric name</label><input id="metricLabel" required minlength="2" maxlength="50" placeholder="Long inbound calls"></div>
+   <div><label for="metricDirection">Direction</label><select id="metricDirection"><option value="">Any</option><option value="inbound">Inbound</option><option value="outbound">Outbound</option><option value="other">Other</option></select></div>
+   <div><label for="metricStage">Lead outcome</label><select id="metricStage"><option value="">Any</option><option value="hot">Hot lead</option><option value="warm">Warm lead</option><option value="general">General inquiry</option><option value="not_qualified">Not qualified</option><option value="needs_review">Needs review</option></select></div>
+   <div><label for="metricSeconds">Minimum duration in seconds</label><input id="metricSeconds" type="number" min="1" max="14400" step="1"></div>
+  </div>
+  <label class="cp-studio-check"><input id="metricFollowUp" type="checkbox"> Only calls with an open follow-up</label>
+  <div class="cp-inline-actions"><button type="submit">Save metric</button><button id="analyticsCloseMetric" type="button" class="secondary">Close</button></div>
+ </form>
+ <p id="analyticsMetricStatus" role="status" class="muted"></p>
  <p id="analyticsStatus" role="status" class="muted">Loading analytics…</p>
  <div class="cp-analytics-metrics">
   <article class="card"><span>Calls</span><strong id="analyticsCalls">—</strong></article>
@@ -883,6 +896,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <article class="card"><span>Average duration</span><strong id="analyticsDuration">—</strong></article>
   <article class="card"><span>Open follow-ups</span><strong id="analyticsFollowUps">—</strong></article>
  </div>
+ <div id="analyticsCustomMetrics" class="cp-analytics-metrics" style="margin-top:10px" aria-live="polite"></div>
  <article class="card cp-analytics-card"><div class="row"><h2>Call volume</h2><button type="button" class="secondary" onclick="window.section('calls')">Open sessions</button></div>
   <p id="analyticsChartLabel" class="muted"></p><div id="analyticsChart" aria-hidden="true"></div>
   <details><summary>Daily totals</summary><div id="analyticsDaily"></div></details>
@@ -1770,6 +1784,9 @@ window.loadWorkspace=async({destination}={})=>{
     $("analyticsDates").hidden=true;
     $("analyticsFrom").required=$("analyticsTo").required=false;
     $("analyticsStatus").textContent="Loading analytics…";
+    $("analyticsMetricForm").reset();
+    $("analyticsMetricForm").hidden=true;
+    $("analyticsMetricStatus").textContent="";
     resetWorkers();
     orderReviewRows=[];
     $("orderQuery").value="";
@@ -3344,7 +3361,8 @@ let analyticsRun=0;
 function clearAnalytics(){
  analyticsRun++;
  for(const id of ["analyticsCalls","analyticsCallers","analyticsDuration","analyticsFollowUps"])$(id).textContent="—";
- for(const id of ["analyticsChart","analyticsDaily","analyticsOutcomes"])$(id).replaceChildren();
+ for(const id of ["analyticsChart","analyticsDaily","analyticsOutcomes","analyticsCustomMetrics"])$(id).replaceChildren();
+ $("analyticsAddMetric").hidden=true;
  $("analyticsChartLabel").textContent="";
 }
 function analyticsList(target,rows){
@@ -3376,6 +3394,8 @@ async function loadAnalytics(){
   $("analyticsCallers").textContent=data.unique_callers.toLocaleString();
   $("analyticsDuration").textContent=ciDuration(data.average_duration_seconds);
   $("analyticsFollowUps").textContent=data.follow_ups.toLocaleString();
+  $("analyticsAddMetric").hidden=!data.can_manage;
+  renderAnalyticsMetrics(oid,data.metrics||[],data.can_manage);
   status.textContent=data.start+" to "+data.end+" · "+data.time_zone;
   if(selection!=="custom"){$("analyticsFrom").value=data.start;$("analyticsTo").value=data.end}
   $("analyticsChartLabel").textContent=data.total?data.inbound+" inbound calls in this period.":"No calls in this date range.";
@@ -3400,6 +3420,65 @@ $("analyticsRange").addEventListener("change",()=>{
  if(!custom)void loadAnalytics();
 });
 $("analyticsFilter").addEventListener("submit",event=>{event.preventDefault();void loadAnalytics()});
+const analyticsMetricsPath=oid=>"/organizations/"+oid+"/analytics/metrics";
+function renderAnalyticsMetrics(oid,metrics,canManage){
+ const target=$("analyticsCustomMetrics");
+ for(const metric of metrics){
+  const card=document.createElement("article"),label=document.createElement("span");
+  const value=document.createElement("strong"),conditions=document.createElement("p");
+  card.className="card";
+  label.textContent=metric.label;
+  value.textContent=metric.calls.toLocaleString();
+  conditions.className="muted";
+  conditions.textContent=[metric.direction,ciStageLabels[metric.stage],
+   metric.min_seconds?"At least "+metric.min_seconds+"s":null,metric.open_follow_up?"Open follow-up":null].filter(Boolean).join(" · ");
+  card.append(label,value,conditions);
+  if(canManage){
+   const remove=document.createElement("button");
+   remove.type="button";remove.className="secondary";remove.textContent="Remove";
+   remove.setAttribute("aria-label","Remove metric "+metric.label);
+   remove.addEventListener("click",async()=>{
+    if(oid!==organization()||remove.disabled||!window.confirm("Remove the saved metric “"+metric.label+"”?"))return;
+    remove.disabled=true;
+    try{
+     await request(analyticsMetricsPath(oid)+"/"+encodeURIComponent(metric.id),"DELETE");
+     if(oid!==organization())return;
+     $("analyticsMetricStatus").textContent="Metric removed.";
+     await loadAnalytics();
+    }catch(e){if(oid===organization())$("analyticsMetricStatus").textContent=e.message}
+    finally{remove.disabled=false}
+   });
+   card.append(remove);
+  }
+  target.append(card);
+ }
+}
+$("analyticsAddMetric").addEventListener("click",()=>{
+ $("analyticsMetricForm").hidden=false;
+ $("metricLabel").focus();
+});
+$("analyticsCloseMetric").addEventListener("click",()=>{
+ $("analyticsMetricForm").hidden=true;
+ $("analyticsAddMetric").focus();
+});
+$("analyticsMetricForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),form=event.currentTarget,button=event.submitter,status=$("analyticsMetricStatus");
+ if(button.disabled)return;
+ button.disabled=true;
+ status.textContent="Saving metric…";
+ try{
+  await request(analyticsMetricsPath(oid),"POST",{
+   label:v("metricLabel").trim(),direction:v("metricDirection")||null,stage:v("metricStage")||null,
+   min_seconds:v("metricSeconds")===""?null:Number(v("metricSeconds")),open_follow_up:$("metricFollowUp").checked
+  });
+  if(oid!==organization())return;
+  form.reset();form.hidden=true;
+  status.textContent="Metric saved.";
+  await loadAnalytics();
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{button.disabled=false}
+});
 async function loadChannels(){
  const oid=organization();
  const items=[

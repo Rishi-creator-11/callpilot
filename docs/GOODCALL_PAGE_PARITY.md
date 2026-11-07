@@ -46,7 +46,7 @@ Order requests have a dedicated CallPilot review page at `/app#orders`. Provider
 | Done | Goodcall page, tab, or dialog | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
 | [ ] | `/agent/dashboard` and persistent Gabi composer | Observed | CallPilot opens at `/app#builder` with private persistent conversation, new-conversation control, review panel, and a desktop assistant dock. Voice input, feedback, and worker generation remain. |
-| [ ] | `/agent/performance`, date presets/custom range and empty results | Observed | `/app#analytics` shows date filters, call totals, a daily volume chart, and lead outcomes. Configurable metrics, worker attribution, and runtime verification remain. |
+| [ ] | `/agent/performance`, date presets/custom range and empty results | Observed | `/app#analytics` shows date filters, call totals, a daily volume chart, and lead outcomes. Owners and admins can add or remove saved metrics by lead outcome, call direction, duration, and open follow-up. Worker attribution and runtime verification remain. |
 | [ ] | `/agent/calls`, search and session list | Observed | `/app#calls` search and date controls verified. Goodcall populated session-detail screens remain uninspected in the empty reference account. |
 | [ ] | Session detail, transcript, recording, and tags | Documented, populated Goodcall detail pending | CallPilot detail panel exists. Verify playback, edits and error states. |
 | [ ] | `/agent/channels`, shareable demo and link tracking | Observed | `/app#channels` shows actual linked phone and browser practice availability. Shareable demo and link tracking remain. |
