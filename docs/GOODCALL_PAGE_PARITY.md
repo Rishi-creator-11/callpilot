@@ -7,22 +7,22 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | Done | Goodcall page or page family | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
 | [ ] | `/` homepage | Observed | `/` has a redesigned navigation, signup entry point, and interactive receptionist walkthrough. Live desktop walkthrough and scheduling link verified. Added selectable lead, booking, CRM, and commerce workflows, plus agent identity, call review, forwarding, and resource sections. Mobile, proof, and comparison coverage remain. |
-| [ ] | `/pricing` | Observed | `/pricing` shows current CallPilot plans. Add customer-facing plan comparison and verify checkout separately. |
+| [ ] | `/pricing` | Observed | `/pricing` shows current CallPilot plans. Includes a comparison table sourced from actual plan configuration and a billing FAQ. Checkout verification remains. |
 | [ ] | `/how-it-works` | Observed | `/how-it-works` covers setup, test, and connection. Expand walkthrough as setup and practice features ship. |
 | [ ] | `/faq` | Observed | `/faq` has expandable original answers. Complete topic coverage. |
 | [ ] | `/answering-services` | Observed | `/answering-services` links to Launch Studio. Expand comparison and industry content. |
 | [ ] | `/appointment-scheduling` | Observed | `/appointment-scheduling` explains booking and links to Appointments. Carrier and calendar tests are tracked separately. |
 | [ ] | Lead capture, catalog and order, call review, and phone setup | Homepage and product documentation observed | Dedicated CallPilot pages link to the corresponding workspace tools. Expand industry-specific journeys. |
-| [ ] | `/business-productivity-ai` and individual integration pages | Index observed, child enumeration pending | Build integration directory and provider detail pages. |
+| [ ] | `/business-productivity-ai` and individual integration pages | Index observed, child enumeration pending | Directory and detail pages cover Google Calendar, HighLevel, Shopify and Vapi. Goodcall’s broader catalog remains. |
 | [ ] | `/business-phone-number` area-code lookup | Observed | Standalone lookup and area-code pages missing. |
 | [ ] | `/local-phone-numbers` | Observed | `/local-phone-numbers` explains number connection and forwarding. Live area-code inventory and self-service provisioning remain. |
 | [ ] | `/enterprise` | Observed | Enterprise details and lead entry point missing. |
 | [ ] | `/case-study-goodcall-ai-phone-assistant` and case-study details | Index observed, details pending | CallPilot case studies and proof pages missing. |
-| [ ] | `/about` | Observed | Company page missing. |
-| [ ] | `/news` | Observed | News page missing. |
+| [ ] | `/about` | Observed | `/about` describes CallPilot’s supported product and privacy workflow. |
+| [ ] | `/news` | Observed | `/news` lists actual CallPilot product updates. |
 | [ ] | `/blog` and article details | Index observed, child enumeration pending | Searchable `/resources` and five original setup guides now cover core journeys. Editorial and industry coverage remains. |
 | [ ] | `/voice-ai` and article details | Index observed, child enumeration pending | Educational index and article template missing. |
-| [ ] | Help Center index, collection and article pages | Index observed, collections and articles partially documented | In-app Help & support exists. Public support search and collections missing. |
+| [ ] | Help Center index, collection and article pages | Index observed, collections and articles partially documented | `/support` offers public guide search, help categories, FAQ and workspace help links. Additional support collections remain. |
 | [ ] | Industry, geographic, comparison and campaign landing-page families | Discovery pending | Inventory linked routes and model reusable original detail pages. |
 | [ ] | Privacy, terms, trust and support links | Footer and official help observed | `/legal` exists. Inventory individual public pages and their navigation. |
 

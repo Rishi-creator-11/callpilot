@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Header, HTTPException, Depends, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from app.common import authorize, PRICE, MONEY, NO_PRICE, UNKNOWN
+from app.common import authorize, MAX_CALL_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
@@ -82,7 +82,29 @@ def home():
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing():
-    return marketing_page("pricing", "Pricing")
+    from app.billing import PLANS, SETUP_FEE_CENTS
+
+    columns = "".join(f'<th scope="col">{plan["name"]}</th>' for plan in PLANS.values())
+    rows = (
+        ("Monthly price", [f'${plan["monthly_cents"] / 100:,.2f}' for plan in PLANS.values()]),
+        ("Included minutes", [f'{plan["included_minutes"]:,}' for plan in PLANS.values()]),
+        ("One-time setup fee", [f"${SETUP_FEE_CENTS / 100:,.2f}"] * len(PLANS)),
+        ("Maximum call duration", [f"{MAX_CALL_SECONDS // 60} minutes"] * len(PLANS)),
+        ("Automatic overage charges", ["None"] * len(PLANS)),
+    )
+    comparison = "".join(f'<tr><th scope="row">{label}</th>'
+                         + "".join(f"<td>{value}</td>" for value in values) + "</tr>" for label, values in rows)
+    extras = f"""
+<section class="band shaded"><div class="wrap"><p class="eyebrow">Plan comparison</p><h2>Find your monthly fit.</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="CallPilot plan comparison">
+<table class="plan-compare"><thead><tr><th scope="col">Plan details</th>{columns}</tr></thead>
+<tbody>{comparison}</tbody></table></div></div></section>
+<section class="band"><div class="wrap faq"><h2>Billing questions</h2>
+<details><summary>When is the setup fee collected?</summary><p>The setup fee is collected with your first subscription payment.</p></details>
+<details><summary>Where can I manage my subscription?</summary><p>Open Billing &amp; plans in your workspace to see subscription status and manage your payment details when billing is connected.</p></details>
+<details><summary>Where can I review the full terms?</summary><p>See the terms for billing, cancellation, usage, and recording.</p><a href="/legal">Read the terms</a></details>
+</div></section>"""
+    return marketing_page("pricing", "Pricing", after_section=extras)
 
 
 @app.get("/how-it-works", response_class=HTMLResponse)
@@ -177,7 +199,7 @@ def render_product_page(product_page: str):
     return marketing_page(title=heading, content=content)
 
 
-def marketing_page(section_id=None, title=None, content=None):
+def marketing_page(section_id=None, title=None, content=None, after_section=""):
     from app.billing import PLANS, SETUP_FEE_CENTS
 
     plans = [
@@ -192,7 +214,7 @@ def marketing_page(section_id=None, title=None, content=None):
         header, main = html.split('<main id="main">', 1)
         if section_id:
             section = re.search(r'<section [^>]*id="' + re.escape(section_id) + r'".*?</section>', main, re.DOTALL)
-            content = section.group().replace("<h2>", "<h1>", 1).replace("</h2>", "</h1>", 1)
+            content = section.group().replace("<h2>", "<h1>", 1).replace("</h2>", "</h1>", 1) + after_section
         _, footer = main.split("</main>", 1)
         header = header.replace("<title>CallPilot | An AI front desk for your business</title>",
                                 f"<title>{title} | CallPilot</title>")
@@ -297,6 +319,94 @@ def guide(slug: str):
 <p class="lead">{summary}</p>{steps}<a class="button dark" href="{destination}">Open the workspace →</a>
 </article></div></section>"""
     return marketing_page(title=title, content=content)
+
+
+INTEGRATIONS = {
+    "google-calendar": (
+        "Google Calendar", "Scheduling", "Check availability and manage appointments on your connected primary calendar.",
+        "Connect from Appointments, then review your time zone, regular hours, and date exceptions.",
+        "/resources/booking-hours", "/app#appointments",
+    ),
+    "highlevel": (
+        "HighLevel", "CRM", "Look up contacts from an authorized HighLevel sub-account by exact email or phone.",
+        "Create a private integration token with contacts.readonly and locations.readonly, then enter the token and sub-account ID.",
+        "/resources/connect-highlevel", "/app#connections",
+    ),
+    "shopify": (
+        "Shopify", "Commerce", "Look up live stock for active variants and approved catalog SKUs.",
+        "Connect a merchant-owned app with read_products and read_inventory. Approve the individual SKUs your assistant may use.",
+        "/resources/shopify-stock", "/app#connections",
+    ),
+    "vapi": (
+        "Vapi", "Voice", "Connect a managed phone assistant and review the number that receives your calls.",
+        "Link your assistant to the business, configure the managed number, and confirm carrier forwarding and fallback behavior.",
+        "/resources/forward-your-business-number", "/app#channels",
+    ),
+}
+
+
+@app.get("/business-productivity-ai", response_class=HTMLResponse, include_in_schema=False)
+def integration_directory():
+    cards = "".join(f'<article class="card"><p class="eyebrow">{category}</p><h3>{name}</h3><p>{summary}</p>'
+                    f'<a class="card-link" href="/integrations/{slug}">View setup →</a></article>'
+                    for slug, (name, category, summary, *_rest) in INTEGRATIONS.items())
+    return marketing_page(title="Integrations", content=f"""
+<section class="band"><div class="wrap"><p class="eyebrow">CallPilot integrations</p>
+<h1>Connect the tools your team uses.</h1><p class="lead">Choose the calendar, contact, catalog and phone services you want to connect.</p>
+<div class="feature-list">{cards}</div></div></section>""")
+
+
+@app.get("/integrations/{slug}", response_class=HTMLResponse, include_in_schema=False)
+def integration_details(slug: str):
+    if slug not in INTEGRATIONS:
+        raise HTTPException(404, "Integration not found")
+    name, category, summary, steps, guide_url, workspace = INTEGRATIONS[slug]
+    return marketing_page(title=name + " integration", content=f"""
+<section class="band guide"><div class="wrap"><article>
+<p><a href="/business-productivity-ai">← All integrations</a></p><p class="eyebrow">{category}</p>
+<h1>Connect {name}.</h1><p class="lead">{summary}</p>
+<h2>Set up the connection</h2><p>{steps}</p>
+<div class="actions"><a class="button dark" href="{workspace}">Open the workspace →</a>
+<a href="{guide_url}">Read the setup guide</a></div></article></div></section>""")
+
+
+@app.get("/support", response_class=HTMLResponse, include_in_schema=False)
+def support():
+    return marketing_page(title="Help center", content="""
+<section class="band"><div class="wrap"><p class="eyebrow">CallPilot support</p><h1>How can we help?</h1>
+<p class="lead">Find setup guides and answers for your account, assistant, phone and connected tools.</p>
+<form class="resource-search" action="/resources" method="get" role="search"><label for="support-query">Search setup guides</label>
+<input type="search" id="support-query" name="q" maxlength="120"><button class="button dark" type="submit">Search</button></form>
+<div class="grid">
+<article class="card"><h3>Set up your assistant</h3><p>Start with your identity, greeting, and approved information.</p><a href="/resources/build-your-receptionist">Read the setup guide</a></article>
+<article class="card"><h3>Manage connected tools</h3><p>Connect Calendar, HighLevel, Shopify, or your phone.</p><a href="/business-productivity-ai">Browse integrations</a></article>
+<article class="card"><h3>Plans and usage</h3><p>Compare minute allowances and find billing information.</p><a href="/pricing">View pricing</a></article>
+</div><p class="price-note"><a href="/faq">Frequently asked questions</a> · <a href="/app#help">Help inside your workspace</a></p>
+</div></section>""")
+
+
+@app.get("/about", response_class=HTMLResponse, include_in_schema=False)
+def about():
+    return marketing_page(title="About CallPilot", content="""
+<section class="band"><div class="wrap"><p class="eyebrow">About CallPilot</p><h1>Give callers a clear next step.</h1>
+<p class="lead">CallPilot gives businesses a front desk for calls, appointment requests, and customer questions.</p>
+<div class="grid">
+<article class="card"><h3>Use information you approve</h3><p>Review imported business information before your assistant uses it on a call.</p></article>
+<article class="card"><h3>Keep your workflow</h3><p>Connect the calendar and phone tools your team already uses.</p></article>
+<article class="card"><h3>Review what happened</h3><p>Find available call transcripts, follow-up notes, and order requests in your workspace.</p></article>
+</div></div></section>""")
+
+
+@app.get("/news", response_class=HTMLResponse, include_in_schema=False)
+def product_updates():
+    return marketing_page(title="Product updates", content="""
+<section class="band"><div class="wrap"><p class="eyebrow">What’s new</p><h1>CallPilot product updates.</h1>
+<p class="lead">Read about changes to the assistant, workspace, and connected tools.</p>
+<div class="grid">
+<article class="card"><p class="eyebrow"><time datetime="2026-11-07">November 7, 2026</time></p><h3>An assistant-first workspace</h3><p>Open your conversation next to the dashboard, revisit earlier proposals, and review identity settings in their own tabs.</p><a class="card-link" href="/resources/build-your-receptionist">Explore assistant setup →</a></article>
+<article class="card"><p class="eyebrow"><time datetime="2026-11-07">November 7, 2026</time></p><h3>Connections and orders</h3><p>Configure Shopify and HighLevel, choose live inventory for approved products, and review order requests in their own queue.</p><a class="card-link" href="/business-productivity-ai">Browse integrations →</a></article>
+<article class="card"><p class="eyebrow"><time datetime="2026-11-07">November 7, 2026</time></p><h3>Manage appointment bookings</h3><p>Check available times, create appointments, and cancel verified CallPilot events from your workspace.</p><a class="card-link" href="/resources/booking-hours">Read the booking guide →</a></article>
+</div></div></section>""")
 
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])

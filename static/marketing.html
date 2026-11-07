@@ -21,6 +21,10 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 @media(max-width:650px){.hero,.grid,.feature-list{grid-template-columns:1fr}.hero h1{max-width:12ch}.site-nav{padding-block:13px;gap:10px}.site-nav .nav-links{gap:11px;font-size:.87rem}.site-nav .button{min-height:38px;padding:7px 10px}.site-nav .brand{font-size:1.25rem}.brand-mark{width:27px;height:27px}.scenario{min-height:0}.site-footer .nav-links{column-gap:15px}.card{padding:20px}}
 .use-cases{margin:26px 0 0;padding:0;border:0;min-width:0}.use-cases legend{font-weight:700;margin-bottom:10px}.use-cases .choice{background:#fff;padding:9px 14px}.use-cases .choice:has(:checked){background:#d9f4eb}.use-case{display:none;min-height:210px;margin-top:15px;gap:24px;grid-template-columns:1fr .8fr;align-items:center}.use-cases:has(#use-leads:checked) .use-leads,.use-cases:has(#use-booking:checked) .use-booking,.use-cases:has(#use-crm:checked) .use-crm,.use-cases:has(#use-shop:checked) .use-shop{display:grid}.use-example{border-radius:12px;background:#eaf5ef;padding:18px}.use-example p:last-child{margin-bottom:0}.feature-split{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}.feature-split .card{box-shadow:0 12px 34px #132a1e12}.footer-grid{display:grid!important;grid-template-columns:1.3fr repeat(3,1fr);align-items:start}.footer-grid h2{font-size:1rem;margin:0 0 .7em;letter-spacing:0}.footer-grid ul{margin:0;padding:0;list-style:none}.footer-grid li{margin-bottom:.45em;font-size:.93rem}.footer-grid .brand{margin-bottom:12px}.resource-search{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:20px}.resource-search label{width:100%;font-weight:700}.resource-search input{min-width:0;flex:1;padding:12px;border:1px solid #95a7a2;border-radius:8px;font:inherit}.resource-search button{cursor:pointer}.guide article{max-width:750px}.guide article h2{font-size:1.55rem;margin-top:26px}
 @media(max-width:700px){.feature-split,.use-case{grid-template-columns:1fr;gap:14px}.footer-grid{grid-template-columns:1fr 1fr}.footer-grid>div:first-child{grid-column:1/-1}}
+.table-scroll{overflow:auto;border:1px solid var(--line);border-radius:12px;background:white}
+.plan-compare{width:100%;min-width:550px;border-collapse:collapse;text-align:left}
+.plan-compare th,.plan-compare td{padding:13px 15px;border-bottom:1px solid var(--line)}
+.plan-compare thead th{background:#e4f2e9}.plan-compare tbody tr:last-child>*{border-bottom:0}
 </style>
 </head>
 <body>
@@ -30,7 +34,7 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <div class="nav-links"><details class="product-menu"><summary>Product</summary><ul>
 <li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointment scheduling</a></li>
 <li><a href="/lead-capture">Lead capture</a></li><li><a href="/product-orders">Products and orders</a></li>
-<li><a href="/crm-integrations">CRM connections</a></li><li><a href="/call-history">Call history</a></li><li><a href="/local-phone-numbers">Business numbers</a></li>
+<li><a href="/business-productivity-ai">Integrations</a></li><li><a href="/call-history">Call history</a></li><li><a href="/local-phone-numbers">Business numbers</a></li>
 </ul></details><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/resources">Resources</a><a href="/app">Sign in</a><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div>
 </nav></header>
 <main id="main">
@@ -106,8 +110,8 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <footer class="site-footer"><div class="wrap footer-grid">
 <div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a><p>A front desk for businesses that work on the phone.</p></div>
 <div><h2>Product</h2><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointments</a></li></ul></div>
-<div><h2>Resources</h2><ul><li><a href="/resources">Setup guides</a></li><li><a href="/faq">FAQ</a></li><li><a href="/crm-integrations">CRM connections</a></li><li><a href="/local-phone-numbers">Business numbers</a></li></ul></div>
-<div><h2>CallPilot</h2><ul><li><a href="/app">Sign in</a></li><li><a href="/app#help">Support</a></li><li><a href="/legal">Terms and privacy</a></li></ul></div>
+<div><h2>Resources</h2><ul><li><a href="/resources">Setup guides</a></li><li><a href="/faq">FAQ</a></li><li><a href="/business-productivity-ai">Integration directory</a></li><li><a href="/local-phone-numbers">Business numbers</a></li></ul></div>
+<div><h2>CallPilot</h2><ul><li><a href="/about">About</a></li><li><a href="/news">Product updates</a></li><li><a href="/support">Help center</a></li><li><a href="/app">Sign in</a></li><li><a href="/legal">Terms and privacy</a></li></ul></div>
 </div></footer>
 <script>
 const productMenu = document.querySelector(".product-menu");
