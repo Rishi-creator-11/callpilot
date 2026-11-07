@@ -30,4 +30,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: uv run pywrangler deploy
+        run: |
+          set -o pipefail
+          uv run pywrangler deploy 2>&1 | tee /tmp/callpilot-cloudflare-deploy.txt
+          URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\\.workers\\.dev' /tmp/callpilot-cloudflare-deploy.txt | tail -n 1 || true)"
+          if [ -z "$URL" ]; then
+            echo "No workers.dev staging URL found; check whether workers.dev is enabled in Cloudflare."
+            exit 1
+          fi
+          echo "Cloudflare staging endpoint: $URL"
+          curl --fail --show-error --silent --retry 3 --retry-delay 3 --max-time 20 "$URL/health" |
+             python -c 'import sys,json; d=json.load(sys.stdin); assert d["status"]=="ok" and d["environment"]=="cloudflare-staging" and d["backend_ready"] is False'
