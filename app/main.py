@@ -325,75 +325,63 @@ def check_integrations_on_boot():
         except Exception as e:
             log.warning("callpilot_vapi_probe failed error_type=%s",type(e).__name__)
 
-# Operator-initiated, one-time request: try to provision a FREE Vapi-managed
-# inbound number for Metro Print. No paid telephony purchase, no tenant transfer.
+# One-time authorized test-number reassignment. Only move this exact existing
+# line from the known Call Pilot assistant to the Metro Print assistant.
 @app.on_event("startup")
-def metroprint_free_phone_once():
+def metroprint_transfer_test_line_once():
     import logging
     log=logging.getLogger("uvicorn.error")
-    oid="0e7de94e-d12f-4a9a-96f9-5d3b91588a5a"
-    aid="7eb2a057-c5ff-4243-bed6-37f175cfb695"
-    stage="validate"
+    old_oid="b550c0af-7d9c-4231-8eec-cb9f6ba9e724"
+    new_oid="0e7de94e-d12f-4a9a-96f9-5d3b91588a5a"
+    old_assistant="48b785c7-4b05-45f8-af8e-8670510c23e7"
+    new_assistant="7eb2a057-c5ff-4243-bed6-37f175cfb695"
+    pid="a14f1205-f52e-4617-80b3-050dea2513f8"
     try:
         from app.cloud import api as db
         from app.call_intel import vapi,owns_assistant
-        config=db("agent_configs",params={"organization_id":"eq."+oid,
+        old=db("agent_configs",params={"organization_id":"eq."+old_oid,
             "select":"provider_agent_id,provider_phone_id","limit":1})
-        if (len(config)!=1 or config[0].get("provider_agent_id")!=aid
-            or config[0].get("provider_phone_id")):
-            log.warning("metroprint_free_phone result=blocked_existing_or_changed_configuration")
+        new=db("agent_configs",params={"organization_id":"eq."+new_oid,
+            "select":"provider_agent_id,provider_phone_id","limit":1})
+        assigned=db("phone_assignments",params={"provider_phone_id":"eq."+pid,
+            "select":"organization_id,provider_number","limit":1})
+        if (len(old)!=1 or len(new)!=1 or len(assigned)!=1 or
+            old[0].get("provider_agent_id")!=old_assistant or
+            new[0].get("provider_agent_id")!=new_assistant or
+            assigned[0].get("provider_number")!="+13513453081" or
+            new[0].get("provider_phone_id") not in (None,pid)):
+            log.warning("metroprint_transfer result=blocked_changed_database")
             return
-        if db("phone_assignments",params={"organization_id":"eq."+oid,"select":"id","limit":1}):
-            log.warning("metroprint_free_phone result=blocked_existing_number")
+        if assigned[0].get("organization_id")==new_oid:
+            log.info("metroprint_transfer result=already_linked_in_database")
             return
-        stage="get_assistant"
-        assistant=vapi("GET","/assistant/"+aid)
-        if not owns_assistant(assistant,oid):
-            log.warning("metroprint_free_phone result=blocked_assistant_ownership")
+        if (assigned[0].get("organization_id")!=old_oid or
+            old[0].get("provider_phone_id")!=pid):
+            log.warning("metroprint_transfer result=blocked_source_not_owner")
             return
-        stage="list_numbers"
-        phones=vapi("GET","/phone-number",params={"limit":100})
-        listings=phones if isinstance(phones,list) else (phones.get("results") or [])
-        # Reuse a previously-created, not-yet-persisted phone to avoid accidental
-        # duplicates if the process restarted after provider provisioning.
-        candidates=[p for p in listings if p.get("assistantId")==aid]
-        if len(candidates)>1:
-            log.warning("metroprint_free_phone result=blocked_multiple_provider_numbers")
+        target=vapi("GET","/assistant/"+new_assistant)
+        source=vapi("GET","/assistant/"+old_assistant)
+        if not owns_assistant(target,new_oid) or not owns_assistant(source,old_oid):
+            log.warning("metroprint_transfer result=blocked_assistant_identity")
             return
-        phone=(candidates[0] if candidates else None)
-        if phone is None:
-            # Vapi's free-telephony API, not its paid Twilio import/buy API.
-            stage="create_free_number"
-            phone=vapi("POST","/phone-number",body={
-                "provider":"vapi","assistantId":aid,"numberDesiredAreaCode":"201"})
-        if phone.get("assistantId")!=aid or not phone.get("id") or not phone.get("number"):
-            log.warning("metroprint_free_phone result=provider_response_unexpected")
+        phone=vapi("GET","/phone-number/"+pid)
+        if (phone.get("id")!=pid or phone.get("number")!="+13513453081" or
+            phone.get("assistantId") not in (old_assistant,new_assistant) or
+            phone.get("server") or phone.get("squadId")):
+            log.warning("metroprint_transfer result=blocked_unexpected_vapi_routing")
             return
-        pid=phone["id"]
-        claimed=db("phone_assignments",params={"provider_phone_id":"eq."+pid,
-            "select":"organization_id","limit":1})
-        if claimed and claimed[0]["organization_id"]!=oid:
-            log.warning("metroprint_free_phone result=blocked_number_in_use")
+        if phone.get("assistantId")==old_assistant:
+            vapi("PATCH","/phone-number/"+pid,body={"assistantId":new_assistant})
+        verified=vapi("GET","/phone-number/"+pid)
+        if verified.get("assistantId")!=new_assistant:
+            log.warning("metroprint_transfer result=provider_verification_failed")
             return
-        stage="save_assignment"
-        db("phone_assignments","POST",params={"on_conflict":"provider_phone_id"},
-           data={"organization_id":oid,"provider_phone_id":pid,
-                 "provider_number":phone["number"],"status":"linked"},
-           prefer="resolution=ignore-duplicates,return=minimal")
-        stage="save_agent_link"
-        db("agent_configs","PATCH",params={"organization_id":"eq."+oid,
-           "provider_agent_id":"eq."+aid,"provider_phone_id":"is.null"},
-           data={"provider_phone_id":pid},prefer="return=minimal")
-        final=db("agent_configs",params={"organization_id":"eq."+oid,
-            "select":"provider_phone_id","limit":1})
-        log.info("metroprint_free_phone result=%s",
-                 "linked_number_"+phone["number"] if final and final[0].get("provider_phone_id")==pid
-                 else "database_link_unconfirmed")
+        # Database reconciliation is performed separately as one checked SQL
+        # transaction, avoiding partially moved ownership between tenant rows.
+        log.info("metroprint_transfer result=provider_routed_to_metroprint")
     except Exception as exc:
-        # Only log status/error types; never log provider credentials.
-        log.warning("metroprint_free_phone result=failed stage=%s error_type=%s detail=%s",
-                    stage,type(exc).__name__,str(getattr(exc,"detail","unavailable"))[:120])
-
+        log.warning("metroprint_transfer result=failed error_type=%s detail=%s",
+                    type(exc).__name__,str(getattr(exc,"detail","unavailable"))[:110])
 
 from app.account import router as account_router
 from app.billing import router as billing_router
