@@ -32,7 +32,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | --- | --- | --- | --- |
 | [ ] | Sign-in, email/Google options, account recovery and errors | Login observed, recovery end-to-end pending | `/app` supports email and Google. Signed-in dashboard verified. Verify recovery and persistence across reloads. |
 | [ ] | Onboarding business lookup | Observed | Google Maps search and selection missing. |
-| [ ] | Website input and scan progress | Input observed, authorized user supplied a site | Live QA created a workspace, imported a public page, and opened the unapproved draft in Knowledge. The website step can resume after a refresh in the same browser tab. Multi-page discovery and structured metadata review remain. |
+| [ ] | Website input and scan progress | Input observed, authorized user supplied a site | Live QA created a workspace, imported a public page, and opened the unapproved draft in Knowledge. Live QA also refreshed the website step in the same tab, resumed the same workspace, and skipped to Launch Studio. Multi-page discovery and structured metadata review remain. |
 | [ ] | Manual business details | Observed | Guided setup collects name and industry and offers a path to Launch Studio. Timezone and structured details remain. |
 | [ ] | Initial build progress and first-practice prompt | Observed | Launch Studio has a checklist. Generated agent, progress, and voice practice missing. |
 | [ ] | Welcome, finish setup and testing navigation | Observed | Launch Studio and text test partially cover this. Test with no number and publishing remain. |
@@ -60,7 +60,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Workers, Knowledge tab and source list | Observed | `/app#knowledge` has source attribution, editable drafts, approval, and search testing. |
 | [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link and PDF import verified in the authenticated sandbox. PDF extraction creates a reviewable draft. Scanned-document OCR remains open. |
 | [ ] | Knowledge source detail and lifecycle controls | Source detail, View content, Edit and History observed | CallPilot edits and approval available. Compare source detail and deletion behavior. |
-| [ ] | `/agent/connections`, Integrations tab | Observed | `/app#connections` reports live Calendar, Vapi, and business phone status and links to management. Other providers remain. |
+| [ ] | `/agent/connections`, Integrations tab | Observed | `/app#connections` reports live Calendar, Vapi, and business phone status and links to management. Live sandbox status and Calendar navigation verified. Connected states, other providers, and remaining management paths are open. |
 | [ ] | Connections, Custom APIs tab and Add Custom API dialog | Observed | Build scoped endpoint definitions and validations. |
 | [ ] | Connections, custom MCP and tool-request forms | Custom MCP name, URL, and optional bearer token fields observed. Tool-request submission pending. | No equivalent yet. |
 | [ ] | `/agent/settings`, Profile and account security | Observed | `/app#account` partially covers account settings. Verify recovery and deletion lifecycle. |
