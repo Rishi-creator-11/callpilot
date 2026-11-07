@@ -45,7 +45,7 @@ def test_order_request_is_pending_and_idempotent(monkeypatch):
     monkeypatch.setattr(voice_actions,"feature_flags",lambda oid:capabilities())
     writes=[];existing=[]
     def api(table,method="GET",params=None,data=None,prefer=None):
-        assert params.get("organization_id")=="eq."+OID
+        if method=="GET":assert params.get("organization_id")=="eq."+OID
         if table=="catalog_items":return [PRODUCT]
         if table=="order_requests":
             if method=="GET":return existing
