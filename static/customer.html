@@ -1360,7 +1360,7 @@ async function boot(){
    if(new URLSearchParams(location.search).get("billing")==="success"&&current&&organization()){
      try{
        const check=await request("/organizations/"+organization()+"/billing/confirm-checkout","POST");
-       if(check.confirmed)msg("Your "+(planDisplay[check.selected_plan]||"subscription")+" plan is confirmed"".");
+       if(check.confirmed)msg("Your "+(planDisplay[check.selected_plan]||"subscription")+" plan is confirmed.");
        else msg("Checkout returned successfully, but Stripe confirmation is still pending. Please refresh Billing.",true);
      }catch(e){
        msg("Stripe confirmation is pending. Your plan will appear once the payment is verified.",true);
