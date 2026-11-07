@@ -525,6 +525,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 <button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
 <button data-section="simulator" onclick="window.section('simulator')"><span class="cp-nav-icon">◇</span> Test assistant</button>
 <button data-section="appointments" onclick="window.section('appointments')"><span class="cp-nav-icon">▣</span> Appointments</button>
+<button data-section="orders" onclick="window.section('orders')"><span class="cp-nav-icon">▧</span> Order requests</button>
 <button data-section="connections" onclick="window.section('connections')"><span class="cp-nav-icon">↔</span> Connections</button>
 <div class="cp-nav-divider"></div><div class="cp-nav-group">MANAGEMENT</div>
 <button data-section="usage" onclick="window.section('usage')"><span class="cp-nav-icon">◷</span> Usage &amp; phone</button>
@@ -604,6 +605,25 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
     <button type="submit" class="secondary">Find contact</button>
    </form>
    <p id="highlevelResult" role="status" class="muted"></p>
+  </article>
+  <article class="cp-studio-connection"><h3>Shopify products</h3><p>Look up the available quantity for an active variant by SKU.</p>
+   <p id="connectionShopify" role="status"></p>
+   <div class="cp-inline-actions">
+    <button id="shopifyConfigure" type="button" class="secondary" hidden>Connect Shopify</button>
+    <button id="shopifyDisconnect" type="button" class="secondary" hidden>Disconnect Shopify</button>
+   </div>
+   <form id="shopifySetup" hidden>
+    <label for="shopifyDomain">Store domain</label><input id="shopifyDomain" required maxlength="80" placeholder="your-store.myshopify.com" autocomplete="off">
+    <label for="shopifyClient">App client ID</label><input id="shopifyClient" required maxlength="128" autocomplete="off">
+    <label for="shopifySecret">App client secret</label><input id="shopifySecret" type="password" required maxlength="512" autocomplete="new-password">
+    <p class="muted">Install an app owned by your Shopify organization with read_products and read_inventory.</p>
+    <button type="submit">Save connection</button>
+   </form>
+   <form id="shopifyLookup" hidden>
+    <label for="shopifySku">Exact product SKU</label><input id="shopifySku" required minlength="2" maxlength="60" autocomplete="off">
+    <button type="submit" class="secondary">Check inventory</button>
+   </form>
+   <p id="shopifyResult" role="status" class="muted"></p>
   </article>
  </div>
 </section>
@@ -709,6 +729,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
    <p class="muted">New and edited products are drafts until an authorized business owner approves them. Stock is not synced with an external supplier.</p>
    <div id="studioCatalogList" aria-live="polite" class="cp-studio-catalog">Loading products…</div>
    <h3 style="margin-top:22px">Order requests awaiting staff action</h3>
+   <button class="cp-studio-textbtn" onclick="window.section('orders')">Open order requests →</button>
    <div id="studioOrderList" aria-live="polite" class="cp-studio-catalog">Loading order requests…</div>
   </article>
  </div>
@@ -938,6 +959,20 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 <div class="cp-section-box"><div class="cp-panel-heading"><div><h3>Booking history</h3><p>See bookings made by your receptionist and your team.</p></div>
 <div><label for="bookingFilter">Status</label><select id="bookingFilter"><option value="">All appointments</option><option value="confirmed">Confirmed</option><option value="requested">Requested</option><option value="cancelled">Cancelled</option><option value="rejected">Rejected</option></select></div></div>
 <div id="bookings" aria-live="polite">Loading appointments…</div></div></section>
+<section id="orders" class="panel card" style="display:none">
+ <div class="cp-panel-heading"><div><h2>Order requests</h2><p>Review customer requests collected by your receptionist.</p></div></div>
+ <div class="cp-section-box">
+  <div class="cp-form-grid">
+   <div><label for="orderQuery">Search by SKU or customer</label><input id="orderQuery" type="search" maxlength="160"></div>
+   <div><label for="orderFilter">Status</label><select id="orderFilter">
+    <option value="">All requests</option><option value="requested">Awaiting review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
+   </select></div>
+  </div>
+  <p class="muted">Approval records your team’s review decision. Handle payment, fulfillment and any customer confirmation in your order system.</p>
+  <p id="orderReviewStatus" class="muted" role="status"></p>
+  <div id="orderReviewList" aria-live="polite">Loading order requests…</div>
+ </div>
+</section>
 <div id="usage" class="panel card" style="display:none">
 <div class="cp-panel-heading"><div><h2>Usage &amp; business phone</h2><p class="muted">See exactly how many AI minutes your business uses, and connect its phone number.</p></div><span class="pill">Monthly allowance</span></div>
 <div class="cp-section-box">
@@ -1169,6 +1204,7 @@ const pageMeta={
  voice:["AI receptionist","Choose the identity, greeting and voice for your front desk."],
  simulator:["Test assistant","Test approved answers before customers hear them."],
  appointments:["Appointments","Manage appointment requests and calendar connections."],
+ orders:["Order requests","Review and resolve customer order requests."],
  connections:["Connections","Manage the services your receptionist uses."],
  billing:["Billing & plans","Subscription status, payment methods and invoices."],
  workspace:["Business settings","Profile, team and workspace management."],
@@ -1180,7 +1216,7 @@ function loadActivePage(id){
  const load={
    studio:()=>window.loadStudio(),builder:()=>loadBuilder(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
-   billing:()=>loadBilling(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
+   billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
 }
@@ -1477,7 +1513,13 @@ window.loadWorkspace=async({destination}={})=>{
     $("calendarResult").textContent="";
     $("bookings").textContent="Loading appointments…";
     clearHighLevel();
+    clearShopify();
     resetBuilder();
+    orderReviewRows=[];
+    $("orderQuery").value="";
+    $("orderFilter").value="";
+    $("orderReviewList").textContent="Loading order requests…";
+    $("orderReviewStatus").textContent="";
    }
    $("headerWorkspace").textContent=o?.name||"Your business";
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
@@ -2088,7 +2130,7 @@ async function loadConnections(){
   try{status=describe(await request("/organizations/"+oid+path))}
   catch{status="Could not check this connection"}
   if(oid===organization())$(id).textContent=status;
- }),loadHighLevel()]);
+ }),loadHighLevel(),loadShopify()]);
 }
 const highlevelPath=oid=>"/organizations/"+oid+"/connections/highlevel";
 let highlevelConnected=false;
@@ -2156,6 +2198,68 @@ $("highlevelLookup").addEventListener("submit",async event=>{
    [[contact.firstName,contact.lastName].filter(Boolean).join(" "),contact.email,contact.phone].filter(Boolean).join(" · "):
    "No exact match in this sub-account.";
  }catch(e){if(oid===organization())$("highlevelResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+const shopifyPath=oid=>"/organizations/"+oid+"/connections/shopify";
+function clearShopify(){
+ for(const id of ["shopifyConfigure","shopifyDisconnect","shopifySetup","shopifyLookup"])$(id).hidden=true;
+ $("shopifySetup").reset();
+ $("shopifyLookup").reset();
+ $("shopifyResult").textContent="";
+}
+async function loadShopify(){
+ const oid=organization();
+ clearShopify();
+ $("connectionShopify").textContent="Checking connection…";
+ try{
+  const state=await request(shopifyPath(oid));
+  if(oid!==organization())return;
+  $("connectionShopify").textContent=state.connected?"Connected · "+state.account_name:"No store connected";
+  $("shopifyConfigure").hidden=!state.can_manage;
+  $("shopifyConfigure").textContent=state.connected?"Replace connection":"Connect Shopify";
+  $("shopifyDisconnect").hidden=!state.can_manage||!state.connected;
+  $("shopifyLookup").hidden=!state.can_manage||!state.connected;
+ }catch(e){if(oid===organization())$("connectionShopify").textContent=e.message}
+}
+$("shopifyConfigure").addEventListener("click",()=>{
+ $("shopifySetup").hidden=!$("shopifySetup").hidden;
+ if(!$("shopifySetup").hidden)$("shopifyDomain").focus();
+});
+$("shopifySetup").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter;
+ if(button.disabled)return;
+ button.disabled=true;
+ $("shopifyResult").textContent="Connecting Shopify…";
+ try{
+  await request(shopifyPath(oid),"PUT",{domain:v("shopifyDomain").trim(),client_id:v("shopifyClient").trim(),client_secret:v("shopifySecret")});
+  if(oid===organization())await loadShopify();
+ }catch(e){if(oid===organization())$("shopifyResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("shopifyDisconnect").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled||!window.confirm("Disconnect this Shopify store from CallPilot?"))return;
+ button.disabled=true;
+ try{
+  await request(shopifyPath(oid),"DELETE");
+  if(oid===organization())await loadShopify();
+ }catch(e){if(oid===organization())$("shopifyResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("shopifyLookup").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter;
+ if(button.disabled)return;
+ button.disabled=true;
+ $("shopifyResult").textContent="Checking Shopify inventory…";
+ try{
+  const {product}=await request(shopifyPath(oid)+"/inventory","POST",{sku:v("shopifySku").trim()});
+  if(oid!==organization()||$("shopifyLookup").hidden)return;
+  $("shopifyResult").textContent=product?
+   product.name+" · "+product.variant+" · "+(product.quantity===null?"Inventory is not tracked":product.quantity+" available"):
+   "No active variant matched this SKU.";
+ }catch(e){if(oid===organization())$("shopifyResult").textContent=e.message}
  finally{button.disabled=false}
 });
 const builderPath=oid=>"/organizations/"+oid+"/agent";
@@ -2346,6 +2450,63 @@ async function loadBookings(){
   appointmentRows=rows;renderBookings();
  }catch(e){if(oid===organization())$("bookings").textContent=e.message}
 }
+let orderReviewRows=[];
+const orderReviewPath=oid=>"/organizations/"+oid+"/orders/requests";
+const orderLabels={requested:"Awaiting review",approved:"Approved",rejected:"Rejected",cancelled:"Cancelled"};
+async function loadOrderReview(){
+ const oid=organization();
+ try{
+  const rows=await request(orderReviewPath(oid));
+  if(oid!==organization())return;
+  orderReviewRows=rows;
+  renderOrderReview();
+ }catch(e){if(oid===organization())$("orderReviewList").textContent=e.message}
+}
+function renderOrderReview(){
+ const oid=organization(),filter=v("orderFilter"),query=v("orderQuery").trim().toLowerCase(),list=$("orderReviewList");
+ const canEdit=["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role);
+ const rows=orderReviewRows.filter(row=>(!filter||filter===row.status)&&
+  [row.sku,row.caller_name].some(value=>String(value||"").toLowerCase().includes(query)));
+ list.replaceChildren();
+ if(!rows.length){list.textContent="No order requests match this view.";return}
+ for(const row of rows){
+  const item=document.createElement("article"),details=document.createElement("div"),title=document.createElement("strong"),description=document.createElement("p");
+  item.className="item row";
+  title.textContent=row.quantity+" × "+row.sku+" · "+row.caller_name;
+  description.textContent=[orderLabels[row.status]||row.status,row.caller_contact,new Date(row.created_at).toLocaleString()].filter(Boolean).join(" · ");
+  description.className="muted";
+  details.append(title,description);
+  item.append(details);
+  const actions=row.status==="requested"?[["Approve request","approved"],["Reject","rejected"],["Cancel","cancelled"]]:
+   row.status==="approved"?[["Cancel","cancelled"]]:[];
+  if(canEdit&&actions.length){
+   const controls=document.createElement("div");
+   controls.className="cp-inline-actions";
+   for(const [label,status] of actions){
+    const button=document.createElement("button");
+    button.type="button";
+    button.textContent=label;
+    button.className="secondary";
+    button.addEventListener("click",async()=>{
+     if(oid!==organization()||button.disabled||!window.confirm(label+" for "+row.sku+"?"))return;
+     for(const control of controls.children)control.disabled=true;
+     try{
+      await request(orderReviewPath(oid)+"/"+encodeURIComponent(row.id),"PATCH",{expected_status:row.status,status});
+      if(oid!==organization())return;
+      $("orderReviewStatus").textContent="Request updated to "+orderLabels[status].toLowerCase()+".";
+      await loadOrderReview();
+     }catch(e){if(oid===organization())$("orderReviewStatus").textContent=e.message}
+     finally{for(const control of controls.children)control.disabled=false}
+    });
+    controls.append(button);
+   }
+   item.append(controls);
+  }
+  list.append(item);
+ }
+}
+$("orderQuery").addEventListener("input",renderOrderReview);
+$("orderFilter").addEventListener("change",renderOrderReview);
 
 window.loadUsage=async()=>{
  if(!organization())return;

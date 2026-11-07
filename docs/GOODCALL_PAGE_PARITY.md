@@ -39,6 +39,8 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 ## Authenticated app
 
+Order requests have a dedicated CallPilot review page at `/app#orders`. Provider order placement, fulfillment, and customer confirmation remain open.
+
 | Done | Goodcall page, tab, or dialog | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
 | [ ] | `/agent/dashboard` and persistent Gabi composer | Observed | `/app#builder` includes a text composer, suggested edits, review, save and managed assistant sync. Persistent builder, voice input and worker generation remain. |
@@ -60,7 +62,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Workers, Knowledge tab and source list | Observed | `/app#knowledge` has source attribution, editable drafts, approval, and search testing. |
 | [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link and PDF import verified in the authenticated sandbox. PDF extraction creates a reviewable draft. Scanned-document OCR remains open. |
 | [ ] | Knowledge source detail and lifecycle controls | Source detail, View content, Edit and History observed | CallPilot edits and approval available. Compare source detail and deletion behavior. |
-| [ ] | `/agent/connections`, Integrations tab | Observed | `/app#connections` reports live Calendar, Vapi, and business phone status and links to management. Live sandbox status and Calendar navigation verified. The Appointments page now supports disconnect, booking creation, filtering, and calendar-backed cancellation. HighLevel has a connection, disconnect and contact lookup card. Remaining providers and live checks are open. |
+| [ ] | `/agent/connections`, Integrations tab | Observed | `/app#connections` reports live Calendar, Vapi, and business phone status and links to management. Live sandbox status and Calendar navigation verified. The Appointments page now supports disconnect, booking creation, filtering, and calendar-backed cancellation. HighLevel and Shopify have connection, disconnect and lookup controls for contacts and inventory respectively. Remaining providers and live checks are open. |
 | [ ] | Connections, Custom APIs tab and Add Custom API dialog | Observed | Build scoped endpoint definitions and validations. |
 | [ ] | Connections, custom MCP and tool-request forms | Custom MCP name, URL, and optional bearer token fields observed. Tool-request submission pending. | No equivalent yet. |
 | [ ] | `/agent/settings`, Profile and account security | Observed | `/app#account` partially covers account settings. Verify recovery and deletion lifecycle. |

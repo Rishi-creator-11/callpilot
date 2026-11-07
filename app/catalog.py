@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -101,3 +102,26 @@ def order_requests(oid: str,user=Depends(current_user)):
     return api("order_requests",params={"organization_id":"eq."+oid,
         "select":"id,sku,quantity,caller_name,caller_contact,status,created_at",
         "order":"created_at.desc","limit":200})
+
+
+class OrderReview(BaseModel):
+    expected_status: Literal["requested", "approved"]
+    status: Literal["approved", "rejected", "cancelled"]
+
+
+@router.patch("/orders/requests/{rid}")
+def review_order_request(oid: uuid.UUID, rid: uuid.UUID, body: OrderReview, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    if body.expected_status == "approved" and body.status != "cancelled":
+        raise HTTPException(422, "An approved request can only be cancelled.")
+    key = {"organization_id": "eq." + workspace, "id": "eq." + str(rid)}
+    rows = api("order_requests", "PATCH", params={**key, "status": "eq." + body.expected_status},
+               data={"status": body.status}, prefer="return=representation")
+    if not rows:
+        current = api("order_requests", params={**key, "select": "status", "limit": 1})
+        if not current:
+            raise HTTPException(404, "Order request not found.")
+        if current[0]["status"] != body.status:
+            raise HTTPException(409, "This order request changed. Refresh and review it again.")
+    return {"status": body.status}

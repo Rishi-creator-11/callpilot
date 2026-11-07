@@ -21,11 +21,11 @@ BASE_URL = "https://services.leadconnectorhq.com"
 MANAGERS = ("owner", "admin")
 
 
-def vault() -> Fernet:
+def vault(provider: str = "highlevel") -> Fernet:
     key = os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY")
     if not key:
         raise HTTPException(503, "Workspace credential storage is not configured.")
-    derived = hmac.digest(key.encode(), b"callpilot/highlevel/private-integration/v1", "sha256")
+    derived = hmac.digest(key.encode(), f"callpilot/{provider}/private-integration/v1".encode(), "sha256")
     return Fernet(base64.urlsafe_b64encode(derived))
 
 
