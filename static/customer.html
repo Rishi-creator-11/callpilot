@@ -586,6 +586,24 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
    <p id="connectionVoice" role="status"></p><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage voice assistant</button></article>
   <article class="cp-studio-connection"><h3>Business phone</h3><p>Link a managed number and review your call fallback.</p>
    <p id="connectionPhone" role="status"></p><button class="secondary" onclick="window.section('usage')">Manage business phone</button></article>
+  <article class="cp-studio-connection"><h3>HighLevel CRM</h3><p>Find contacts by exact email or phone in your connected sub-account.</p>
+   <p id="connectionHighLevel" role="status"></p>
+   <div class="cp-inline-actions">
+    <button id="highlevelConfigure" type="button" class="secondary" hidden>Connect HighLevel</button>
+    <button id="highlevelDisconnect" type="button" class="secondary" hidden>Disconnect HighLevel</button>
+   </div>
+   <form id="highlevelSetup" hidden>
+    <label for="highlevelLocation">Sub-account ID</label><input id="highlevelLocation" required maxlength="80" autocomplete="off">
+    <label for="highlevelToken">Private integration token</label><input id="highlevelToken" type="password" required maxlength="1024" autocomplete="new-password">
+    <p class="muted">Use a sub-account token with locations.readonly and contacts.readonly.</p>
+    <button type="submit">Save connection</button>
+   </form>
+   <form id="highlevelLookup" hidden>
+    <label for="highlevelContact">Contact email or phone</label><input id="highlevelContact" required maxlength="160" autocomplete="off">
+    <button type="submit" class="secondary">Find contact</button>
+   </form>
+   <p id="highlevelResult" role="status" class="muted"></p>
+  </article>
  </div>
 </section>
 
@@ -1427,6 +1445,7 @@ window.loadWorkspace=async({destination}={})=>{
     $("calendarStatus").textContent="Checking connection…";
     $("calendarResult").textContent="";
     $("bookings").textContent="Loading appointments…";
+    clearHighLevel();
    }
    $("headerWorkspace").textContent=o?.name||"Your business";
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
@@ -2031,14 +2050,82 @@ async function loadConnections(){
   ["connectionVoice","/voice-capabilities",value=>value.assistant_connected?"Connected":"No assistant linked"],
   ["connectionPhone","/phone",value=>value.connected?"Connected":"No number linked"]
  ];
- await Promise.all(services.map(async([id,path,describe])=>{
+ await Promise.all([...services.map(async([id,path,describe])=>{
   $(id).textContent="Checking connection…";
   let status;
   try{status=describe(await request("/organizations/"+oid+path))}
   catch{status="Could not check this connection"}
   if(oid===organization())$(id).textContent=status;
- }));
+ }),loadHighLevel()]);
 }
+const highlevelPath=oid=>"/organizations/"+oid+"/connections/highlevel";
+let highlevelConnected=false;
+function clearHighLevel(){
+ highlevelConnected=false;
+ for(const id of ["highlevelConfigure","highlevelDisconnect","highlevelSetup","highlevelLookup"])$(id).hidden=true;
+ $("highlevelSetup").reset();
+ $("highlevelLookup").reset();
+ $("highlevelResult").textContent="";
+}
+async function loadHighLevel(){
+ const oid=organization();
+ clearHighLevel();
+ $("connectionHighLevel").textContent="Checking connection…";
+ try{
+  const state=await request(highlevelPath(oid));
+  if(oid!==organization())return;
+  highlevelConnected=state.connected;
+  $("connectionHighLevel").textContent=state.connected?"Connected · "+state.account_name:"No sub-account connected";
+  $("highlevelConfigure").hidden=!state.can_manage;
+  $("highlevelConfigure").textContent=state.connected?"Replace connection":"Connect HighLevel";
+  $("highlevelDisconnect").hidden=!state.can_manage||!state.connected;
+  $("highlevelLookup").hidden=!state.can_manage||!state.connected;
+ }catch(e){if(oid===organization())$("connectionHighLevel").textContent=e.message}
+}
+$("highlevelConfigure").addEventListener("click",()=>{
+ $("highlevelSetup").hidden=!$("highlevelSetup").hidden;
+ if(!$("highlevelSetup").hidden)$("highlevelLocation").focus();
+});
+$("highlevelSetup").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,form=event.currentTarget;
+ if(button.disabled)return;
+ button.disabled=true;
+ $("highlevelResult").textContent="Connecting HighLevel…";
+ try{
+  await request(highlevelPath(oid),"PUT",{location_id:v("highlevelLocation").trim(),token:v("highlevelToken")});
+  if(oid!==organization())return;
+  form.reset();
+  await loadHighLevel();
+  if(oid===organization())$("highlevelResult").textContent="HighLevel connected.";
+ }catch(e){if(oid===organization())$("highlevelResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("highlevelDisconnect").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled||!window.confirm("Disconnect this HighLevel sub-account from CallPilot?"))return;
+ button.disabled=true;
+ try{
+  await request(highlevelPath(oid),"DELETE");
+  if(oid===organization())await loadHighLevel();
+ }catch(e){if(oid===organization())$("highlevelResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("highlevelLookup").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter;
+ if(!highlevelConnected||button.disabled)return;
+ button.disabled=true;
+ $("highlevelResult").textContent="Looking up contact…";
+ try{
+  const {contact}=await request(highlevelPath(oid)+"/contacts/lookup","POST",{query:v("highlevelContact").trim()});
+  if(oid!==organization()||!highlevelConnected)return;
+  $("highlevelResult").textContent=contact?
+   [[contact.firstName,contact.lastName].filter(Boolean).join(" "),contact.email,contact.phone].filter(Boolean).join(" · "):
+   "No exact match in this sub-account.";
+ }catch(e){if(oid===organization())$("highlevelResult").textContent=e.message}
+ finally{button.disabled=false}
+});
 let calendarCanManage=false,appointmentRows=[],appointmentRequestId=null;
 function appointmentSlot(){
  const start=new Date(v("cstart"));
