@@ -382,7 +382,7 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
     name=_text(args.get("caller_name",""),maximum=100,minimum=2)
     contact=_text(args.get("caller_contact",""),maximum=100,minimum=3)
     if "@" in contact:
-        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+",contact):
+        if not re.fullmatch(r"[^@ ]+@[^@ ]+[.][^@ ]+",contact):
             raise ValueError("Invalid contact email")
     else:
         _phone(contact)
@@ -403,7 +403,7 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
               "quantity":qty,"caller_name":name,"caller_contact":contact,"status":"requested"},
         prefer="resolution=ignore-duplicates,return=representation")
     if rows:
-        return "Pending order request "+str(rows[0]["id"])+" saved for "+qty.__str__()+" units of "+product["name"]+". No payment or final order was placed. Staff approval is required."
+        return "Pending order request "+str(rows[0]["id"])+" saved for "+str(qty)+" units of "+product["name"]+". No payment or final order was placed. Staff approval is required."
     found=api("order_requests",params={"organization_id":"eq."+oid,
         "idempotency_key":"eq."+key,"select":"id","limit":1})
     if not found:raise ValueError("Could not verify the order request was recorded")
