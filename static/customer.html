@@ -562,6 +562,10 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 #analyticsChart{display:flex;align-items:end;gap:3px;height:160px;padding:8px 4px 0;border-bottom:1px solid #d4e4dc;background:#f1f6f2}
 #analyticsChart span{flex:1;background:#228171;border-radius:3px 3px 0 0;min-width:0}
 #analyticsDaily,#analyticsOutcomes{max-height:260px;overflow:auto}
+.identity-tabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid #dce4df;margin-bottom:15px;padding-bottom:8px}
+.identity-tabs button{background:transparent;color:#344e65;box-shadow:none;padding:8px 11px}
+.identity-tabs button[aria-selected="true"]{background:#dcefe7;color:#145a4a}
+#voice details>summary{cursor:pointer;font-weight:700}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
@@ -960,7 +964,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-form-grid"><div><label for="wsName">Business name</label><input id="wsName" maxlength="120" autocomplete="organization" placeholder="Your company"></div>
 <div><label for="wsIndustry">Industry</label><input id="wsIndustry" maxlength="80" placeholder="e.g. Wholesale clothing"></div></div>
 <div id="orgInfo" class="cp-subnav" style="margin-top:13px"></div><button id="wsSaveButton" onclick="window.saveWorkspace()">Save business details</button></div>
-<div class="cp-section-box" id="bookingHoursPanel" hidden>
+<div id="bookingHoursHome"><div class="cp-section-box" id="bookingHoursPanel" hidden>
  <h3>Booking hours</h3>
  <p>Set when CallPilot can schedule appointments. A date override replaces regular hours for that date.</p>
  <form id="bookingHoursForm">
@@ -976,6 +980,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <button type="submit">Save booking hours</button>
  </form>
  <p id="bookingHoursStatus" class="muted" role="status"></p>
+</div>
 </div>
 <div class="cp-section-box"><h3>Team access</h3><p>Your workspace is private. Access is limited to authorized team members.</p>
 <div id="wsTeam" class="muted">Loading team members...</div>
@@ -1038,25 +1043,69 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-inline-actions"><button onclick="window.addFact()">Submit for approval</button><span class="muted">Verified prices can be shared only when your business approves exact product pricing in Launch Studio.</span></div></div>
 <div class="cp-section-box"><div class="cp-panel-heading"><div><h3>Knowledge library</h3><p>Review and approve individual answers below.</p></div></div><div id="facts"></div></div>
 </div>
-<div id="voice" class="panel card">
-<div class="cp-panel-heading"><div><h2>AI receptionist</h2><p class="muted">Set how your business greets callers and connects to its voice assistant.</p></div><span class="pill">AI assistant</span></div>
-<div class="cp-section-box"><h3>Assistant identity</h3><p>A short and friendly introduction that makes it clear the caller is speaking to AI.</p>
-<div class="cp-form-grid"><div><label for="agent">Assistant name</label><input id="agent" placeholder="Alex"></div>
-<div><label>Voice type</label><input value="Standard professional AI voice" disabled></div></div>
-<label for="greeting">Welcome greeting</label><textarea id="greeting" placeholder="Hi, I'm the AI receptionist. How can I help you today?"></textarea>
-<button onclick="window.saveAgent()">Save assistant settings</button></div>
-<div class="cp-section-box"><h3>Live voice connection</h3><p>CallPilot uses Vapi for phone calls. The business's connected assistant appears under Calls &amp; Leads.</p>
-<div class="cp-inline-actions"><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage Vapi connection</button>
-<button class="secondary" onclick="window.testAssistant()">Create new Vapi test assistant</button></div>
-<p class="cp-footnote muted">Creating a new assistant does not automatically reassign a phone number. Existing live phone assignments stay unchanged.</p>
-<pre id="testAgentResult" role="status">No new assistant has been provisioned from this page.</pre></div>
-<div class="cp-section-box"><h3>Custom voice request</h3><p>For voice cloning, the actual voice owner must authorize and verify the voice with the provider. A checkbox alone is not verification.</p>
-<label for="voiceOwnerEmail">Voice owner's contact email</label><input id="voiceOwnerEmail" type="email" placeholder="owner@company.com">
-<label for="voiceId">Verified ElevenLabs voice ID</label><input id="voiceId" placeholder="Voice ID">
-<label><input type="checkbox" id="voiceConsent"> The voice owner has explicitly authorized this request</label>
-<button class="secondary" onclick="window.requestVoice()">Submit verification request</button>
-<pre id="voiceResult" role="status">No custom voice request has been submitted.</pre>
-</div></div>
+<section id="voice" class="panel card">
+ <div class="cp-panel-heading"><div><h2>Identity &amp; business</h2><p>Manage the receptionist’s voice, conversation style, business profile and availability.</p></div>
+  <div class="cp-inline-actions"><button id="identityEdit" class="secondary" type="button" hidden>Edit</button>
+  <button class="secondary" onclick="window.section('builder',{push:true});openIdentityHistory()">Configuration history</button></div></div>
+ <div class="identity-tabs" role="tablist" aria-label="Identity configuration">
+  <button type="button" role="tab" aria-selected="true" aria-controls="identityPersona" id="identityTabPersona">Persona</button>
+  <button type="button" role="tab" aria-selected="false" aria-controls="identitySpeech" id="identityTabSpeech" tabindex="-1">Speech</button>
+  <button type="button" role="tab" aria-selected="false" aria-controls="identityProfile" id="identityTabProfile" tabindex="-1">Business profile</button>
+  <button type="button" role="tab" aria-selected="false" aria-controls="identityHours" id="identityTabHours" tabindex="-1">Open hours</button>
+ </div>
+ <p id="identityStatus" role="status" class="muted"></p>
+ <section role="tabpanel" id="identityPersona" aria-labelledby="identityTabPersona">
+  <form id="identityGreetingForm" class="cp-section-box"><h3>Receptionist persona</h3>
+   <label for="agent">Assistant name</label><input id="agent" maxlength="80" required>
+   <label for="greeting">Opening greeting</label><textarea id="greeting" minlength="10" maxlength="500" required></textarea>
+   <button type="submit">Save name and greeting</button>
+  </form>
+  <form id="identityVoiceForm" class="cp-section-box"><h3>Voice</h3>
+   <p>Choose a stock voice or keep the voice already selected on the managed assistant.</p>
+   <label for="identityStockVoice">Stock voice</label><select id="identityStockVoice"><option value="">Keep the current voice</option></select>
+   <div class="cp-inline-actions"><button type="submit">Save voice selection</button><a href="https://docs.vapi.ai/providers/voice/vapi-voices" target="_blank" rel="noopener noreferrer">Listen to provider samples</a></div>
+  </form>
+  <div class="cp-section-box"><h3>Live assistant</h3><p>Sync saved identity and speech settings to your CallPilot-managed assistant.</p>
+   <div class="cp-inline-actions"><button id="identitySync" type="button">Sync live assistant</button>
+   <button type="button" class="secondary" onclick="window.section('channels')">Manage channels</button></div>
+  </div>
+  <details class="cp-section-box"><summary>Custom voice verification</summary><p>Custom voices require verification from the voice owner.</p>
+   <label for="voiceOwnerEmail">Voice owner’s contact email</label><input id="voiceOwnerEmail" type="email" placeholder="owner@company.com">
+   <label for="voiceId">Verified ElevenLabs voice ID</label><input id="voiceId">
+   <label><input type="checkbox" id="voiceConsent"> The voice owner has explicitly authorized this request</label>
+   <button class="secondary" onclick="window.requestVoice()">Submit verification request</button>
+   <pre id="voiceResult" role="status"></pre>
+  </details>
+  <details class="cp-section-box"><summary>Assistant connection tools</summary><p>Create a test assistant or connect an existing managed assistant.</p>
+   <div class="cp-inline-actions"><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage Vapi connection</button>
+   <button class="secondary" onclick="window.testAssistant()">Create test assistant</button></div>
+   <pre id="testAgentResult" role="status"></pre>
+  </details>
+ </section>
+ <section role="tabpanel" id="identitySpeech" aria-labelledby="identityTabSpeech" hidden>
+  <form id="identitySpeechForm" class="cp-section-box">
+   <h3>Speech settings</h3>
+   <label for="identityLanguage">Call language</label><select id="identityLanguage"><option value="multi">English and Spanish</option><option value="en">English</option><option value="es">Spanish</option></select>
+   <p class="muted">Use a saved greeting in the language you want callers to hear first.</p>
+   <label for="identityTerms">Recognition terms</label><textarea id="identityTerms" maxlength="1625" rows="4" placeholder="One business or product term per line"></textarea>
+   <p class="muted">Add up to 25 terms for the transcription provider to listen for.</p>
+   <label for="identityPronunciations">Pronunciation hints</label><textarea id="identityPronunciations" maxlength="2160" rows="4" placeholder="Brand name = sounds like"></textarea>
+   <p class="muted">Add up to 16 hints, one per line. Use a word or phrase, an equals sign, and how it sounds.</p>
+   <button type="submit">Save speech settings</button>
+  </form>
+ </section>
+ <section role="tabpanel" id="identityProfile" aria-labelledby="identityTabProfile" hidden>
+  <form id="identityProfileForm" class="cp-section-box"><h3>Business information</h3>
+   <div class="cp-form-grid"><div><label for="identityName">Business name</label><input id="identityName" minlength="2" maxlength="120" required autocomplete="organization"></div>
+   <div><label for="identityIndustry">Industry</label><input id="identityIndustry" maxlength="80"></div></div>
+   <label for="identityAddress">Address</label><input id="identityAddress" maxlength="240" autocomplete="street-address">
+   <label for="identityWebsite">Website</label><input id="identityWebsite" type="url" maxlength="500" placeholder="https://example.com">
+   <p class="muted">Save your business details here. Review and approve facts in Knowledge before callers can hear them.</p>
+   <button type="submit">Save business profile</button>
+  </form>
+ </section>
+ <section role="tabpanel" id="identityHours" aria-labelledby="identityTabHours" hidden><p id="identityHoursInfo" class="muted" role="status"></p><div id="identityHoursMount"></div></section>
+</section>
 <div id="simulator" class="panel card">
 <div class="cp-panel-heading"><div><h2>Test assistant</h2><p>Check what your receptionist would say before taking a real customer call.</p></div><span class="pill">Safe-answer simulator</span></div>
 <div class="cp-section-box"><h3>Semantic knowledge search</h3>
@@ -1415,6 +1464,7 @@ window.section=(x,options={})=>{
  if(!Object.hasOwn(pageMeta,x))x="builder";
  if(x!=="simulator"&&activePage==="simulator")endVoicePractice();
  activePage=x;
+ moveIdentityHours();
  window.closeSidebar();window.closeAccountMenu();
  for(const id of Object.keys(pageMeta)){
    if($(id))$(id).style.display=id===x?"block":"none";
@@ -1714,6 +1764,7 @@ window.loadWorkspace=async({destination}={})=>{
     clearHighLevel();
     clearShopify();
     resetBuilder();
+    resetIdentity();
     clearAnalytics();
     $("analyticsFilter").reset();
     $("analyticsDates").hidden=true;
@@ -1970,8 +2021,177 @@ window.saveWorkspace=()=>safe(async()=>{
  $("org").selectedOptions[0].textContent=name;$("headerWorkspace").textContent=name;
  return "Business details saved.";
 });
-async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
-window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
+const identityPath=oid=>"/organizations/"+oid+"/identity";
+const identityTabs=[...document.querySelectorAll(".identity-tabs [role=tab]")];
+let selectedIdentityTab=identityTabs[0],identityCanManage=false,identityEditing=false,identityRun=0;
+function moveIdentityHours(){
+ const target=activePage==="voice"&&selectedIdentityTab.id==="identityTabHours"?"identityHoursMount":"bookingHoursHome";
+ const panel=$("bookingHoursPanel");
+ if(panel.parentElement!==$(target))$(target).append(panel);
+}
+function selectIdentityTab(tab){
+ selectedIdentityTab=tab;
+ for(const item of identityTabs){
+  const selected=item===tab;
+  item.setAttribute("aria-selected",String(selected));
+  item.tabIndex=selected?0:-1;
+  $(item.getAttribute("aria-controls")).hidden=!selected;
+ }
+ moveIdentityHours();
+ if(activePage==="voice"&&tab.id==="identityTabHours")void loadIdentityHours();
+}
+for(const tab of identityTabs){
+ tab.addEventListener("click",()=>selectIdentityTab(tab));
+ tab.addEventListener("keydown",event=>{
+  const index=identityTabs.indexOf(tab);
+  const next={ArrowRight:(index+1)%identityTabs.length,ArrowLeft:(index+identityTabs.length-1)%identityTabs.length,Home:0,End:identityTabs.length-1}[event.key];
+  if(next===undefined)return;
+  event.preventDefault();
+  selectIdentityTab(identityTabs[next]);identityTabs[next].focus();
+ });
+}
+const identityForms=["identityGreetingForm","identityVoiceForm","identitySpeechForm","identityProfileForm"];
+const identityUnsaved=new Map();
+let identityEditSequence=0;
+for(const id of identityForms)$(id).addEventListener("input",()=>identityUnsaved.set(id,++identityEditSequence));
+function updateIdentityControls(){
+ for(const id of identityForms)for(const field of $(id).elements)field.disabled=!identityCanManage||!identityEditing;
+ $("identityEdit").hidden=!identityCanManage;
+ $("identityEdit").textContent=identityEditing?"Finish editing":"Edit";
+ $("identitySync").disabled=!identityCanManage;
+}
+$("identityEdit").addEventListener("click",()=>{
+ if(!identityCanManage)return;
+ if(identityEditing){
+  if(identityUnsaved.size&&!window.confirm("Discard unsaved identity changes?"))return;
+  identityUnsaved.clear();
+  identityEditing=false;
+  void loadAgent();
+ }else{
+  identityEditing=true;
+  updateIdentityControls();
+  $("identityStatus").textContent="Editing. Save each section to keep your changes.";
+ }
+});
+function resetIdentity(){
+ identityRun++;
+ identityCanManage=identityEditing=false;
+ identityUnsaved.clear();
+ for(const id of identityForms)$(id).reset();
+ $("identityStatus").textContent="";
+ updateIdentityControls();
+ selectIdentityTab(identityTabs[0]);
+}
+async function loadAgent(){
+ const oid=organization(),run=++identityRun;
+ $("identityStatus").textContent="Loading identity…";
+ identityCanManage=false;
+ updateIdentityControls();
+ try{
+  const [agent,identity]=await Promise.all([request("/organizations/"+oid+"/agent"),request(identityPath(oid))]);
+  if(oid!==organization()||run!==identityRun)return;
+  $("agent").value=agent.agent_name||"Alex";
+  $("greeting").value=agent.greeting||"";
+  const speech=identity.speech,profile=identity.profile;
+  $("identityStockVoice").replaceChildren(new Option("Keep the current voice",""),...identity.voices.map(voice=>new Option(voice,voice)));
+  $("identityStockVoice").value=speech.stock_voice_id||"";
+  $("identityLanguage").value=speech.speech_language||"multi";
+  $("identityTerms").value=(speech.speech_keyterms||[]).join("\n");
+  $("identityPronunciations").value=(speech.speech_pronunciations||[]).map(entry=>entry.term+" = "+entry.sounds_like).join("\n");
+  $("identityName").value=profile.name||"";
+  $("identityIndustry").value=profile.industry||"";
+  $("identityAddress").value=profile.business_address||"";
+  $("identityWebsite").value=profile.business_website||"";
+  identityCanManage=identity.can_manage;
+  $("identityStatus").textContent=identityCanManage?"":"View only. Owners and admins can edit this identity.";
+ }catch(e){if(oid===organization()&&run===identityRun)$("identityStatus").textContent=e.message}
+ finally{if(oid===organization()&&run===identityRun)updateIdentityControls()}
+ if(selectedIdentityTab.id==="identityTabHours"&&activePage==="voice")void loadIdentityHours();
+}
+async function loadIdentityHours(){
+ const oid=organization(),status=$("identityHoursInfo");
+ if(!["owner","admin"].includes(orgs.find(org=>org.id===oid)?.role)){
+  status.textContent="Ask a workspace owner or admin to manage appointment hours.";
+  return;
+ }
+ status.textContent="Loading booking hours…";
+ try{
+  await loadBookingHours();
+  if(oid===organization())status.textContent="";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+}
+function registerIdentitySave(formId,path,read,onSuccess){
+ $(formId).addEventListener("submit",async event=>{
+  event.preventDefault();
+  const oid=organization(),button=event.submitter,status=$("identityStatus");
+  if(!identityCanManage||!identityEditing||button.disabled)return;
+  button.disabled=true;
+  const editSequence=identityUnsaved.get(formId);
+  status.textContent="Saving…";
+  try{
+   const values=read();
+   const saved=await request(path(oid),"PUT",values);
+   if(oid!==organization())return;
+   if(identityUnsaved.get(formId)===editSequence)identityUnsaved.delete(formId);
+   onSuccess(saved,values);
+  }catch(e){if(oid===organization())status.textContent=e.message}
+  finally{if(oid===organization())button.disabled=!identityCanManage||!identityEditing}
+ });
+}
+function identitySaved(){
+ $("identityStatus").textContent="Saved. Sync the managed assistant when you want the change to take effect.";
+}
+registerIdentitySave("identityGreetingForm",oid=>"/organizations/"+oid+"/agent",()=>({
+ agent_name:v("agent").trim(),greeting:v("greeting").trim()
+}),(_,values)=>{
+ $("assistantAgentName").textContent=values.agent_name+" assistant";
+ if(!builderDirty&&builderLoaded===organization()){
+  $("builderName").value=values.agent_name;
+  $("builderGreeting").value=values.greeting;
+ }
+ $("studioAgentName").value=values.agent_name;
+ $("studioGreeting").value=values.greeting;
+ identitySaved();
+});
+registerIdentitySave("identityVoiceForm",oid=>identityPath(oid)+"/voice",
+ ()=>({stock_voice_id:v("identityStockVoice")||null}),identitySaved);
+const identityLines=id=>v(id).split("\n").map(line=>line.trim()).filter(Boolean);
+registerIdentitySave("identitySpeechForm",oid=>identityPath(oid)+"/speech",()=>({
+ speech_language:v("identityLanguage"),speech_keyterms:identityLines("identityTerms"),
+ speech_pronunciations:identityLines("identityPronunciations").map(line=>{
+  const separator=line.indexOf("=");
+  if(separator<1||!line.slice(separator+1).trim())throw Error("Write each pronunciation as term = sounds like.");
+  return {term:line.slice(0,separator).trim(),sounds_like:line.slice(separator+1).trim()};
+ })
+}),identitySaved);
+registerIdentitySave("identityProfileForm",oid=>identityPath(oid)+"/profile",()=>({
+ name:v("identityName").trim(),industry:v("identityIndustry").trim(),
+ business_address:v("identityAddress").trim(),business_website:v("identityWebsite").trim()
+}),saved=>{
+ const workspace=orgs.find(item=>item.id===organization());
+ if(workspace)Object.assign(workspace,{name:saved.name,industry:saved.industry});
+ $("headerWorkspace").textContent=saved.name;
+ $("org").selectedOptions[0].textContent=saved.name;
+ $("wsName").value=saved.name;$("wsIndustry").value=saved.industry;
+ $("assistantAgentState").textContent=saved.name;
+ $("identityStatus").textContent="Business profile saved.";
+});
+$("identitySync").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(!identityCanManage||button.disabled||!window.confirm("Sync all saved settings to the managed assistant?"))return;
+ button.disabled=true;
+ $("identityStatus").textContent="Syncing saved settings…";
+ try{
+  await request("/organizations/"+oid+"/agent/sync","POST");
+  if(oid===organization())$("identityStatus").textContent="Saved settings synced to the managed assistant.";
+ }catch(e){if(oid===organization())$("identityStatus").textContent=e.message}
+ finally{if(oid===organization())button.disabled=!identityCanManage}
+});
+function openIdentityHistory(){
+ $("builderHistory").open=true;
+ if(builderCanEdit)$("builderHistory").scrollIntoView({block:"nearest"});
+}
+
 let descriptionItems=[];
 let knowledgeItems=[];
 function updateKnowledgeCount(){
@@ -2635,6 +2855,7 @@ async function loadBuilder(){
   $("builderRequest").hidden=!builderCanEdit;
   $("builderReset").hidden=!builderCanEdit;
   $("builderHistory").hidden=!builderCanEdit;
+  if(builderCanEdit&&$("builderHistory").open)void loadBuilderHistory();
   for(const field of $("builderSettings").elements)field.disabled=!builderCanEdit;
   $("assistantAgentName").textContent=(agent.value.agent_name||"Your")+" assistant";
   $("assistantAgentState").textContent=orgs.find(workspace=>workspace.id===oid)?.name||"Workspace";

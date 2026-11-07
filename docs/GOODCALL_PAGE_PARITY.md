@@ -52,11 +52,11 @@ Order requests have a dedicated CallPilot review page at `/app#orders`. Provider
 | [ ] | `/agent/channels`, shareable demo and link tracking | Observed | `/app#channels` shows actual linked phone and browser practice availability. Shareable demo and link tracking remain. |
 | [ ] | Channels phone connection and number acquisition dialogs | Entry point observed, provisioning flow blocked | CallPilot phone configuration exists. Automatic review blocked opening Goodcall Connect because it may initiate provisioning or a paid setup. Inspect only after a non-committing path is confirmed or the user opens it directly. |
 | [ ] | `/agent/identity` overview | Observed | `/app#voice` partially maps to identity. Overview cards and navigation missing. |
-| [ ] | Identity configuration, Persona tab | Observed | Agent and voice configuration partial. Stock voices, samples, and avatar editing need a counterpart. |
-| [ ] | Identity configuration, Speech tab | Observed | Language, keyword, pronunciation and preview controls missing. |
-| [ ] | Identity configuration, Business Profile tab | Observed | `/app#workspace` has basic business details. Profile sync and expanded fields missing. |
-| [ ] | Identity configuration, Open Hours tab | Observed | `/app#workspace` has timezone editing, split appointment hours, and date overrides. Copy-day controls, spoken hours and after-hours routing remain open. |
-| [ ] | Identity read-only/edit state and History drawer | Observed | Version history and approval workflow missing. |
+| [ ] | Identity configuration, Persona tab | Observed | Identity has an edit/view mode, greeting, name, stock voice selection, and a link to provider samples. Avatar and in-page samples remain. |
+| [ ] | Identity configuration, Speech tab | Observed | Identity saves bilingual or fixed English/Spanish settings, recognition terms, and pronunciation hints. Sync updates managed provider configuration. Live speech verification remains. |
+| [ ] | Identity configuration, Business Profile tab | Observed | Identity saves business name, industry, address, and website. Google Business Profile linking and sync remain. |
+| [ ] | Identity configuration, Open Hours tab | Observed | Identity and Business settings share the same timezone, weekly booking hours and exception editor. Spoken hours and after-hours routing remain. |
+| [ ] | Identity read-only/edit state and History drawer | Observed | Identity includes edit/view mode and links to previous saved greeting and instructions. Versioning for all identity fields and a dedicated history drawer remain. |
 | [ ] | `/agent/workers`, worker list and Add worker | List and Create Worker dialog observed, including Free Prompt and Structured Form | Build worker CRUD, validations, and assignment. |
 | [ ] | Operator detail, Greeting tab | Observed | `/app#voice` supports greeting. Add open/closed greeting and routing rules. |
 | [ ] | Operator detail, Directory tab | Observed | Build contact directory, escalation defaults and fallback routing. |

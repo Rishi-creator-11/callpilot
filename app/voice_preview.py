@@ -40,8 +40,10 @@ def status(oid: UUID, user=Depends(current_user)):
 
 
 def preview_assistant(oid: str) -> dict:
+    from app.identity import SPEECH_FIELDS, transcriber, voice_config
+
     business = org_or_404(oid)
-    rows = api("agent_configs", params={"organization_id": f"eq.{oid}", "select": "agent_name,greeting"})
+    rows = api("agent_configs", params={"organization_id": f"eq.{oid}", "select": "agent_name,greeting," + SPEECH_FIELDS})
     if not rows:
         raise HTTPException(409, "Set up your receptionist first.")
     agent = rows[0]
@@ -71,8 +73,8 @@ def preview_assistant(oid: str) -> dict:
             "messages": [{"role": "system", "content": prompt}],
             "tools": [knowledge, {"type": "endCall"}],
         },
-        "voice": {"provider": "vapi", "voiceId": "Elliot", "version": 2, "language": "auto"},
-        "transcriber": {"provider": "deepgram", "model": "nova-3", "language": "multi"},
+        "voice": voice_config(agent, {"provider": "vapi", "voiceId": "Elliot", "version": 2}),
+        "transcriber": transcriber(agent),
         "maxDurationSeconds": 90,
         "silenceTimeoutSeconds": 25,
         "artifactPlan": {"recordingEnabled": False, "videoRecordingEnabled": False,

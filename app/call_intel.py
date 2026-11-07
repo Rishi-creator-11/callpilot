@@ -438,8 +438,9 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     system/developer messages. Skip external assistants not tagged to this tenant.
     """
     from app.cloud import org_or_404,api as cloud_api,receptionist_prompt
+    from app.identity import SPEECH_FIELDS, transcriber as speech_transcriber, voice_config
     cfg=cloud_api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,agent_name,greeting,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled","limit":1})
+        "select":"provider_agent_id,agent_name,greeting,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled,"+SPEECH_FIELDS,"limit":1})
     if not cfg or not cfg[0].get("provider_agent_id"):
         return {"updated":False,"reason":"no_assistant"}
     aid=cfg[0]["provider_agent_id"]
@@ -481,10 +482,18 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     next_tools=[t for t in base_tools if not (isinstance(t,dict) and t.get("type")=="endCall")]
     next_tools.extend(voice_tool_definitions(oid,credential,flags))
     next_tools.append(end_tool)
-    transcriber={"provider":"deepgram","model":"nova-3","language":"multi"}
+    transcriber=speech_transcriber(cfg[0])
+    def matches_transcriber(candidate):
+        current=candidate or {}
+        return (all(current.get(key)==transcriber[key] for key in ("provider","model","language"))
+                and (current.get("keyterm") or [])==(transcriber.get("keyterm") or []))
     prior_voice=assistant.get("voice") or {}
-    desired_voice=(dict(prior_voice,language="auto") if prior_voice.get("provider")=="vapi"
-                   and prior_voice.get("version")==2 else prior_voice)
+    desired_voice=voice_config(cfg[0],prior_voice)
+    def matches_voice(candidate):
+        current=candidate or {}
+        if desired_voice.get("provider")=="vapi" and desired_voice.get("version")==2:
+            return all(current.get(key)==desired_voice.get(key) for key in ("provider","voiceId","version","language"))
+        return current==desired_voice
     goodbye="Thanks for calling. Goodbye."
     # Defer only the opening greeting, not ordinary conversational responses.
     # The scheduled hook uses the exact existing business-specific greeting.
@@ -503,8 +512,8 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
             and assistant.get("endCallMessage")==goodbye
             and assistant.get("firstMessageMode")=="assistant-waits-for-user"
             and next_hooks==prior_hooks
-            and assistant.get("transcriber")==transcriber
-            and desired_voice==prior_voice):
+            and matches_transcriber(assistant.get("transcriber"))
+            and matches_voice(prior_voice)):
         return {"updated":False,"reason":"already_current"}
     new_model=dict(model,messages=next_messages,tools=next_tools)
     vapi("PATCH","/assistant/"+aid,body={
@@ -523,9 +532,8 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
         or verified.get("endCallMessage")!=goodbye
         or verified.get("firstMessage")!=greeting
         or verified.get("firstMessageMode")!="assistant-waits-for-user"
-        or (verified.get("transcriber") or {}).get("language")!="multi"
-        or (desired_voice.get("provider")=="vapi" and desired_voice.get("version")==2
-            and (verified.get("voice") or {}).get("language")!="auto")
+        or not matches_transcriber(verified.get("transcriber"))
+        or not matches_voice(verified.get("voice"))
         or any((t.get("function") or {}).get("name") not in [
             (z.get("function") or {}).get("name") for z in saved_tools if isinstance(z,dict)]
             for t in next_tools if isinstance(t,dict) and (t.get("function") or {}).get("name") in MANAGED_TOOLS)
