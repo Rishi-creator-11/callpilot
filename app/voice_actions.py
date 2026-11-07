@@ -25,7 +25,7 @@ MANAGED_TOOLS = frozenset({
 def feature_flags(oid: str) -> dict:
     rows = api("agent_configs", params={
         "organization_id": "eq." + oid,
-        "select": "provider_agent_id,voice_leads_enabled,voice_booking_enabled,allow_price_quotes,voice_catalog_enabled,voice_order_requests_enabled,call_instructions",
+        "select": "provider_agent_id,voice_leads_enabled,voice_booking_enabled,allow_price_quotes,voice_catalog_enabled,voice_order_requests_enabled,call_instructions,worker_playbooks",
         "limit": 1,
     })
     return rows[0] if rows else {}

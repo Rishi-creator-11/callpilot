@@ -39,6 +39,8 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 ## Authenticated app
 
+`/app#workers` supports creating, editing, reordering and disabling named call playbooks. Separate runtime workers and deterministic conditional actions remain open.
+
 Order requests have a dedicated CallPilot review page at `/app#orders`. Provider order placement, fulfillment, and customer confirmation remain open.
 
 | Done | Goodcall page, tab, or dialog | Evidence | CallPilot destination and remaining work |

@@ -580,6 +580,9 @@ app.include_router(agent_builder_router)
 from app.shopify_connection import router as shopify_connection_router
 app.include_router(shopify_connection_router)
 
+from app.workers import router as workers_router
+app.include_router(workers_router)
+
 from app.booking_hours import router as booking_hours_router
 app.include_router(booking_hours_router)
 

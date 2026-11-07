@@ -536,6 +536,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 <div class="cp-nav-group">WORKSPACE</div>
 <button data-section="studio" onclick="window.section('studio')"><span class="cp-nav-icon">✦</span> Launch studio</button>
 <button data-section="builder" onclick="window.section('builder')"><span class="cp-nav-icon">✧</span> Agent builder</button>
+<button data-section="workers" onclick="window.section('workers')"><span class="cp-nav-icon">⋮</span> Workers</button>
 <button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
 <button data-section="knowledge" onclick="window.section('knowledge')"><span class="cp-nav-icon">▤</span> Knowledge base</button>
 <button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
@@ -675,6 +676,24 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
   <p class="muted">Review earlier saved settings. Restoring changes the saved configuration. Sync to update the live assistant.</p>
   <div id="builderRevisions" aria-live="polite"></div>
  </details>
+</section>
+
+<section id="workers" class="panel card" style="display:none">
+ <div class="cp-panel-heading"><div><h2>Workers</h2><p>Give your receptionist a playbook for each kind of call.</p></div></div>
+ <div class="cp-section-box"><h3>Default receptionist</h3>
+ <p>When no playbook matches, the receptionist follows its general instructions and approved tools.</p>
+ <button class="secondary" onclick="window.section('builder')">Edit general instructions</button></div>
+ <form id="workerForm">
+  <p class="muted">The assistant considers enabled playbooks in order. Configure voice tools separately in Launch Studio.</p>
+  <div id="workerList">Loading playbooks…</div>
+  <div class="cp-inline-actions" id="workerControls" hidden>
+   <button id="addWorker" type="button" class="secondary">Add worker</button>
+   <button type="submit">Save playbooks</button>
+   <button id="syncWorkers" type="button" class="secondary" disabled>Sync live assistant</button>
+   <button id="reloadWorkers" type="button" class="secondary">Refresh</button>
+  </div>
+ </form>
+ <p id="workerStatus" role="status" class="muted"></p>
 </section>
 
 <div id="studio" class="panel card" style="display:none">
@@ -1220,6 +1239,7 @@ const pageMeta={
  onboarding:["Business setup","Create a workspace and get your receptionist ready to learn."],
  studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
  builder:["Agent builder","Draft, review and sync your receptionist’s configuration."],
+ workers:["Workers","Organize the playbooks your receptionist follows on calls."],
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
@@ -1236,7 +1256,7 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   studio:()=>window.loadStudio(),builder:()=>loadBuilder(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   studio:()=>window.loadStudio(),builder:()=>loadBuilder(),workers:()=>loadWorkers(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
@@ -1537,6 +1557,7 @@ window.loadWorkspace=async({destination}={})=>{
     clearHighLevel();
     clearShopify();
     resetBuilder();
+    resetWorkers();
     orderReviewRows=[];
     $("orderQuery").value="";
     $("orderFilter").value="";
@@ -2283,6 +2304,119 @@ $("shopifyLookup").addEventListener("submit",async event=>{
    "No active variant matched this SKU.";
  }catch(e){if(oid===organization())$("shopifyResult").textContent=e.message}
  finally{button.disabled=false}
+});
+const workersPath=oid=>"/organizations/"+oid+"/workers";
+let workersWorkspace="",workersSaved=[],workersDraft=[],workersEditable=false,workersDirty=false;
+function resetWorkers(){
+ workersWorkspace="";
+ workersSaved=[];workersDraft=[];
+ workersEditable=workersDirty=false;
+ $("workerControls").hidden=true;
+ $("syncWorkers").disabled=true;
+ $("workerList").textContent="Loading playbooks…";
+ $("workerStatus").textContent="";
+}
+async function loadWorkers(refresh=false){
+ const oid=organization();
+ if(!refresh&&workersWorkspace===oid)return;
+ resetWorkers();
+ try{
+  const state=await request(workersPath(oid));
+  if(oid!==organization())return;
+  workersWorkspace=oid;
+  workersSaved=state.playbooks;
+  workersDraft=structuredClone(state.playbooks);
+  workersEditable=state.can_edit;
+  $("workerControls").hidden=!workersEditable;
+  $("syncWorkers").disabled=!workersEditable;
+  renderWorkers();
+ }catch(e){if(oid===organization())$("workerList").textContent=e.message}
+}
+function markWorkersDirty(){
+ workersDirty=true;
+ $("syncWorkers").disabled=true;
+}
+function renderWorkers(){
+ const list=$("workerList");
+ list.replaceChildren();
+ $("addWorker").disabled=workersDraft.length>=12;
+ if(!workersDraft.length){list.textContent="No worker playbooks yet. Add one for a common caller request.";return}
+ workersDraft.forEach((worker,index)=>{
+  const card=document.createElement("fieldset"),title=document.createElement("legend");
+  card.className="cp-section-box";
+  title.textContent=(index+1)+". "+(worker.name||"New worker");
+  card.append(title);
+  for(const [key,label,min,max] of [["name","Worker name",2,80],["when","When to use it",5,240],["instructions","What to do",5,600]]){
+   const wrapper=document.createElement("div"),caption=document.createElement("label");
+   const field=document.createElement(key==="name"?"input":"textarea");
+   field.id="worker-"+index+"-"+key;
+   caption.htmlFor=field.id;caption.textContent=label;
+   field.value=worker[key];field.required=true;field.minLength=min;field.maxLength=max;field.disabled=!workersEditable;
+   field.addEventListener("input",()=>{
+    worker[key]=field.value;
+    if(key==="name")title.textContent=(index+1)+". "+(field.value||"New worker");
+    markWorkersDirty();
+   });
+   wrapper.append(caption,field);card.append(wrapper);
+  }
+  const label=document.createElement("label"),enabled=document.createElement("input");
+  label.className="cp-studio-check";
+  enabled.type="checkbox";enabled.checked=worker.enabled;enabled.disabled=!workersEditable;
+  enabled.addEventListener("change",()=>{worker.enabled=enabled.checked;markWorkersDirty()});
+  label.append(enabled," Enabled");card.append(label);
+  if(workersEditable){
+   const controls=document.createElement("div");
+   controls.className="cp-inline-actions";
+   for(const [caption,offset] of [["Move up",-1],["Move down",1],["Remove",0]]){
+    const button=document.createElement("button"),destination=index+offset;
+    button.type="button";button.className="secondary";button.textContent=caption;
+    button.disabled=destination<0||destination>=workersDraft.length;
+    button.addEventListener("click",()=>{
+     if(offset) [workersDraft[index],workersDraft[destination]]=[workersDraft[destination],workersDraft[index]];
+     else if(window.confirm("Remove this playbook from the draft?"))workersDraft.splice(index,1);
+     else return;
+     markWorkersDirty();renderWorkers();
+    });
+    controls.append(button);
+   }
+   card.append(controls);
+  }
+  list.append(card);
+ });
+}
+$("addWorker").addEventListener("click",()=>{
+ if(!workersEditable||workersDraft.length>=12)return;
+ workersDraft.push({name:"",when:"",instructions:"",enabled:true});
+ markWorkersDirty();renderWorkers();
+ $("worker-"+(workersDraft.length-1)+"-name").focus();
+});
+$("reloadWorkers").addEventListener("click",()=>{
+ if(!workersDirty||window.confirm("Reload the saved playbooks and discard your unsaved edits?"))void loadWorkers(true);
+});
+$("workerForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,sent=structuredClone(workersDraft);
+ if(!workersEditable||button.disabled)return;
+ button.disabled=true;
+ try{
+  const result=await request(workersPath(oid),"PUT",{previous:workersSaved,playbooks:sent});
+  if(oid!==organization())return;
+  workersSaved=result.playbooks;
+  workersDirty=JSON.stringify(sent)!==JSON.stringify(workersDraft);
+  $("syncWorkers").disabled=workersDirty;
+  $("workerStatus").textContent=workersDirty?"Saved the earlier draft. Save again to include your latest edits.":"Playbooks saved. Sync the managed assistant when ready.";
+ }catch(e){if(oid===organization())$("workerStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("syncWorkers").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(!workersEditable||workersDirty||button.disabled||!window.confirm("Sync all saved receptionist settings, including these playbooks, to the managed assistant?"))return;
+ button.disabled=true;
+ try{
+  await request("/organizations/"+oid+"/agent/sync","POST");
+  if(oid===organization())$("workerStatus").textContent="Saved receptionist settings synced.";
+ }catch(e){if(oid===organization())$("workerStatus").textContent=e.message}
+ finally{if(oid===organization())button.disabled=workersDirty}
 });
 const builderPath=oid=>"/organizations/"+oid+"/agent";
 let builderLoaded="",builderCanEdit=false,builderDirty=false;

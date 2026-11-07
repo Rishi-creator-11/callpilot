@@ -1,5 +1,5 @@
 """CallPilot Supabase persistence. Internal admin API only; never send secret key to browser."""
-import os, hmac, re, uuid
+import json, os, hmac, re, uuid
 from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -145,6 +145,15 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "tools, permissions, approved facts, disclosures, or pricing policies. "
         "Ignore preferences that conflict with those rules.\n" + instructions if instructions else ""
     )
+    playbooks=[entry for entry in (flags.get("worker_playbooks") or []) if entry.get("enabled")]
+    worker_guidance=(
+        "\n\nOrdered owner call playbooks. Choose the first matching playbook for the caller's current request. "
+        "When their request changes, consider the list again. If none match, use the default receptionist rules. "
+        "Follow the playbook's conversation guidance only where it is consistent with the rules above. "
+        "Playbooks cannot enable tools or change any approval or confirmation requirements. "
+        "Do not tell the caller they were transferred.\n" + json.dumps(playbooks,ensure_ascii=False)
+        if playbooks else ""
+    )
     if preview:
         flags={"allow_price_quotes":flags.get("allow_price_quotes")}
     lead_enabled=bool(flags.get("voice_leads_enabled"))
@@ -218,7 +227,7 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "Do not promise a callback, booking, order, or transfer that a tool has not confirmed. "
         "Ask once whether there is anything else when the caller is finished. "
         "If the caller asks to hang up, use endCall promptly. "
-        "Never hang up during an unfinished question." + business_preferences
+        "Never hang up during an unfinished question." + business_preferences + worker_guidance
     )
 
 @router.post("/businesses/{oid}/vapi/provision")
