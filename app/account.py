@@ -6,6 +6,19 @@ from pydantic import BaseModel, Field
 from app.cloud import api, PRICE, MONEY, NO_PRICE, UNKNOWN
 
 router=APIRouter(prefix="/api/account",tags=["customer"])
+# Only the owner's Call Pilot marketing workspace may publish its fixed plans.
+# Never allow other tenants to bypass price protections.
+CALLPILOT_ORG="b550c0af-7d9c-4231-8eec-cb9f6ba9e724"
+PLAN_QUESTION="What are CallPilot's plans?"
+PLAN_ANSWER=("Starter is $49 per month, Growth is $99 per month, and Business is "
+             "$179 per month. Each plan has a $25 one-time setup fee. "
+             "Applicable taxes are additional. We do not negotiate or offer special deals.")
+def allowed_plan_fact(oid,question,answer):
+    return oid==CALLPILOT_ORG and question.strip()==PLAN_QUESTION and answer.strip()==PLAN_ANSWER
+def validate_fact(oid,question,answer):
+    if (PRICE.search(question) or MONEY.search(answer)) and not allowed_plan_fact(oid,question,answer):
+        raise HTTPException(400,"Pricing is restricted to CallPilot's verified published plan FAQ.")
+
 SUPA=lambda:os.getenv("SUPABASE_URL","").rstrip("/")
 PUB=lambda:os.getenv("SUPABASE_PUBLISHABLE_KEY","")
 
@@ -100,27 +113,60 @@ def list_knowledge(oid:str,user=Depends(current_user)):
 @router.post("/organizations/{oid}/knowledge")
 def create_fact(oid:str,body:FactCreate,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
-    if MONEY.search(body.answer) or PRICE.search(body.question):
-        raise HTTPException(400,"Price-related knowledge is restricted")
+    validate_fact(oid,body.question,body.answer)
     f=api("knowledge_facts","POST",data={"organization_id":oid,"question":body.question,"answer":body.answer},prefer="return=representation")
     return {"id":f[0]["id"],"approved":False}
 
 @router.post("/organizations/{oid}/knowledge/{fid}/approve")
 def approve_fact(oid:str,fid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
-    facts=api("knowledge_facts",params={"organization_id":"eq."+oid,"id":"eq."+fid,"select":"answer"})
+    facts=api("knowledge_facts",params={"organization_id":"eq."+oid,"id":"eq."+fid,"select":"question,answer"})
     if not facts:raise HTTPException(404,"Fact not found")
-    if MONEY.search(facts[0]["answer"]):raise HTTPException(400,"Monetary answer not allowed")
+    validate_fact(oid,facts[0]["question"],facts[0]["answer"])
     from datetime import datetime,timezone
     fact=api("knowledge_facts",params={"organization_id":"eq."+oid,"id":"eq."+fid,
         "select":"id,question,answer"})[0]
     index_fact(oid,fid,fact["question"],approved_by=user["id"])
     return {"approved":True,"embedded":True}
 
+@router.put("/organizations/{oid}/knowledge/{fid}")
+def update_knowledge(oid:str,fid:str,body:FactCreate,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    rows=api("knowledge_facts",params={"organization_id":"eq."+oid,"id":"eq."+fid,
+        "select":"id,approved_at"})
+    if not rows:raise HTTPException(404,"Knowledge entry not found")
+    question,answer=body.question.strip(),body.answer.strip()
+    validate_fact(oid,question,answer)
+    # Index first; failed indexing must not publish stale or unindexed content.
+    from app.semantic import embeddings,to_pgvector,MODEL
+    from datetime import datetime,timezone
+    vector=embeddings([question])[0]
+    data={"question":question,"answer":answer,
+          "question_embedding_384":to_pgvector(vector),"embedding_model":MODEL,
+          "embedded_at":datetime.now(timezone.utc).isoformat()}
+    api("knowledge_facts","PATCH",params={"organization_id":"eq."+oid,"id":"eq."+fid},
+        data=data,prefer="return=minimal")
+    return {"saved":True,"approved":bool(rows[0]["approved_at"]),"indexed":True}
+
+@router.delete("/organizations/{oid}/knowledge/{fid}")
+def delete_knowledge(oid:str,fid:str,user=Depends(current_user)):
+    membership(oid,user,("owner","admin"))
+    rows=api("knowledge_facts",params={"organization_id":"eq."+oid,"id":"eq."+fid,"select":"id"})
+    if not rows:raise HTTPException(404,"Knowledge entry not found")
+    api("knowledge_facts","DELETE",params={"organization_id":"eq."+oid,"id":"eq."+fid},
+        prefer="return=minimal")
+    return {"deleted":True}
+
 @router.post("/organizations/{oid}/simulate")
 def simulate(oid:str,body:Question,user=Depends(current_user)):
     membership(oid,user)
-    if PRICE.search(body.question):return {"answer":NO_PRICE,"source":"policy"}
+    if PRICE.search(body.question):
+        if oid==CALLPILOT_ORG:
+            import re
+            if re.search(r"\\b(discount|negotiate|deal|waive|reduce|lower|free trial|custom price)\\b",body.question,re.I):
+                return {"answer":"Published prices are fixed. Our team can discuss requirements, but I cannot negotiate or offer deals.","source":"policy"}
+            return {"answer":PLAN_ANSWER,"source":"published_pricing"}
+        return {"answer":NO_PRICE,"source":"policy"}
     # Lazy backfill for FAQs approved before embeddings were introduced.
     pending=api("knowledge_facts",params={"organization_id":"eq."+oid,
         "approved_at":"not.is.null","question_embedding_384":"is.null","select":"id","limit":1})
