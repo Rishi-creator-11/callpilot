@@ -157,7 +157,10 @@ def provision_test_agent(oid:str):
         "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
         "For EVERY business fact or customer question, call lookup_approved_knowledge with the caller's full question. "
         "Use ONLY the exact answer returned by that tool, without inventing or adding any details. "
-        "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. "
+        ("For the CallPilot Demo only, you may state published subscription prices exactly as returned by "
+         "lookup_approved_knowledge. Never negotiate, discount, waive fees, or agree to any deal. "
+         if oid=="d4d04caa-e532-44e8-b692-0c821d912ef5" else
+         "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. ")
         "If the tool returns unknown information, tell the caller a team member can follow up. "
         "Never claim an appointment has been booked, changed or cancelled: you have NO booking tool. "
         "If the tool fails, offer a human follow-up instead of guessing. "
