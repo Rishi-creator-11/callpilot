@@ -445,12 +445,28 @@ def refresh_receptionist_prompt(oid:str):
     if not any(isinstance(t,dict) and t.get("type")=="endCall" for t in next_tools):
         next_tools.append({"type":"endCall"})
     goodbye="Thanks for calling. Goodbye."
+    # Defer only the opening greeting, not ordinary conversational responses.
+    # The scheduled hook uses the exact existing business-specific greeting.
+    from app.common import opening_hook, OPENING_HOOK_NAME
+    greeting=assistant.get("firstMessage")
+    if not isinstance(greeting,str) or not greeting.strip():
+        return {"updated":False,"reason":"missing_first_greeting"}
+    prior_hooks=assistant.get("hooks") or []
+    if not isinstance(prior_hooks,list):
+        return {"updated":False,"reason":"invalid_hooks"}
+    next_hooks=[h for h in prior_hooks if not (
+        isinstance(h,dict) and h.get("name")==OPENING_HOOK_NAME)]
+    next_hooks.insert(0,opening_hook(greeting))
     if (next_messages==messages and next_tools==existing_tools
-            and assistant.get("endCallMessage")==goodbye):
+            and assistant.get("endCallMessage")==goodbye
+            and assistant.get("firstMessageMode")=="assistant-waits-for-user"
+            and next_hooks==prior_hooks):
         return {"updated":False,"reason":"already_current"}
     new_model=dict(model,messages=next_messages,tools=next_tools)
     vapi("PATCH","/assistant/"+aid,body={
-        "model":new_model,"endCallMessage":goodbye})
+        "model":new_model,"endCallMessage":goodbye,
+        "firstMessageMode":"assistant-waits-for-user",
+        "hooks":next_hooks})
     verified=vapi("GET","/assistant/"+aid)
     saved_model=verified.get("model") or {}
     saved=saved_model.get("messages") or []
@@ -458,9 +474,14 @@ def refresh_receptionist_prompt(oid:str):
     if (not any(m.get("role")=="system" and m.get("content")==desired
                 for m in saved if isinstance(m,dict))
         or not any(t.get("type")=="endCall" for t in saved_tools if isinstance(t,dict))
-        or verified.get("endCallMessage")!=goodbye):
-        raise HTTPException(502,"Vapi did not confirm closing policy and hang-up tool")
-    return {"updated":True,"reason":"closing_policy_and_hangup_synced"}
+        or verified.get("endCallMessage")!=goodbye
+        or verified.get("firstMessageMode")!="assistant-waits-for-user"
+        or not any(isinstance(h,dict) and h.get("name")==OPENING_HOOK_NAME
+                   and h.get("options",{}).get("seconds")==1
+                   and any(a.get("exact")==greeting for a in h.get("do",[]) if isinstance(a,dict))
+                   for h in (verified.get("hooks") or []))):
+        raise HTTPException(502,"Vapi did not confirm voice policy and delayed greeting")
+    return {"updated":True,"reason":"voice_policy_and_one_second_opening_synced"}
 
 def disable_knowledge_filler(oid:str):
     """Silence Vapi's default request-start filler on approved FAQ lookups.
