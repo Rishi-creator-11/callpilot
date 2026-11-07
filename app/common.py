@@ -16,6 +16,19 @@ def authorize(x_admin_token: str | None = Header(default=None)):
 def public_base() -> str:
     return os.getenv("PUBLIC_BASE_URL", RENDER_BASE).rstrip("/")
 
+OPENING_PAUSE_SECONDS = 1
+OPENING_HOOK_NAME = "callpilot-one-second-opening"
+
+def opening_hook(greeting: str) -> dict:
+    """Speak the existing greeting once, one second after connection.
+
+    The assistant must use assistant-waits-for-user so the normal first message
+    is not spoken immediately as well. Do not change the actual greeting.
+    """
+    return {"name": OPENING_HOOK_NAME, "on": "call.timeElapsed",
+            "options": {"seconds": OPENING_PAUSE_SECONDS},
+            "do": [{"type": "say", "exact": greeting}]}
+
 def wrapup_hook() -> dict:
     return {"name": WRAPUP_HOOK_NAME, "on": "call.timeElapsed",
             "options": {"seconds": WRAPUP_AT_SECONDS},
