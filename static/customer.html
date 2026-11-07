@@ -949,6 +949,22 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </form>
   <p id="transferStatus" class="muted" role="status"></p>
  </details>
+ <section class="cp-section-box" id="inboundRouting" hidden>
+  <h3>Call screening and routing</h3>
+  <p>Conditions on a rule must all match. The first matching rule is used. Other callers reach the operator.</p>
+  <p id="routingReadiness" class="muted"></p>
+  <form id="routingForm">
+   <label class="cp-studio-check"><input id="routingEnabled" type="checkbox"> Enable screening rules</label>
+   <label class="cp-studio-check"><input id="routingWorkers" type="checkbox"> Enable runtime specialists from Workers</label>
+   <p class="muted">Specialists answer approved questions and hand bookings, transfers, order requests and callbacks back to the operator.</p>
+   <div id="routingRows"></div>
+   <div class="cp-inline-actions"><button type="button" class="secondary" id="addRoutingRule">Add rule</button>
+   <button type="submit" id="saveRouting">Save routing</button>
+   <button type="button" class="secondary" id="refreshRouting">Refresh</button></div>
+  </form>
+  <p id="routingStatus" class="muted" role="status"></p>
+  <details><summary>Recent routing decisions</summary><ul id="routingEvents"></ul></details>
+ </section>
 </section>
 <div id="calls" class="panel">
   <div class="ci-head">
@@ -1849,6 +1865,7 @@ window.loadWorkspace=async({destination}={})=>{
     $("channelDemoLinks").replaceChildren();
     $("channelDemoStatus").textContent="";
     resetTransfers();
+    resetRouting();
     setConnectionGroup("all");
     resetWorkers();
     orderReviewRows=[];
@@ -3611,8 +3628,123 @@ async function loadChannels(){
    const state=await request("/organizations/"+oid+path);
    if(oid===organization())$(id).textContent=describe(state);
   }catch(e){if(oid===organization())$(id).textContent=e.message}
- }),loadDemoLinks(oid),loadTransfers(oid)]);
+ }),loadDemoLinks(oid),loadTransfers(oid),loadRouting(oid)]);
 }
+const routingPath=oid=>"/organizations/"+oid+"/inbound-routing";
+let routingWorkspace="",routingSaved=null,routingDraft=[],routingWorkers=[],routingEditable=false,routingDirty=false;
+function resetRouting(){
+ routingWorkspace="";routingSaved=null;routingDraft=[];routingWorkers=[];routingEditable=routingDirty=false;
+ $("inboundRouting").hidden=true;
+ $("routingForm").reset();$("routingRows").replaceChildren();$("routingEvents").replaceChildren();
+ $("routingStatus").textContent="";
+}
+async function loadRouting(oid,refresh=false){
+ if(!["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role))return;
+ if(routingWorkspace===oid&&!refresh)return;
+ $("inboundRouting").hidden=false;
+ $("routingStatus").textContent="Loading routing settings…";
+ try{
+  const data=await request(routingPath(oid));
+  if(oid!==organization())return;
+  routingWorkspace=oid;routingSaved=data.settings;routingDraft=structuredClone(data.settings.rules);
+  routingWorkers=data.workers;routingEditable=data.can_manage;routingDirty=false;
+  $("routingEnabled").checked=data.settings.enabled;
+  $("routingWorkers").checked=data.settings.runtime_workers;
+  for(const id of ["routingEnabled","routingWorkers","saveRouting"])$(id).disabled=!routingEditable;
+  $("routingReadiness").textContent=data.admission_enabled?"Rules apply to new calls on the number using CallPilot admission.":
+   "Saved rules take effect when the business number uses CallPilot admission. Set up admission in Usage & phone.";
+  $("routingStatus").textContent=routingEditable?"":"View only. The workspace owner can change routing.";
+  const events=$("routingEvents");events.replaceChildren();
+  for(const item of data.recent_routes){
+   const row=document.createElement("li");
+   row.textContent=new Date(item.created_at).toLocaleString()+" · "+item.route.replaceAll("_"," ")+(item.matched_rule?" · "+item.matched_rule:"");
+   events.append(row);
+  }
+  if(!events.children.length){const row=document.createElement("li");row.textContent="No decisions recorded yet.";events.append(row)}
+  renderRoutingRules();
+ }catch(e){if(oid===organization())$("routingStatus").textContent=e.message}
+}
+function renderRoutingRules(){
+ const list=$("routingRows");list.replaceChildren();
+ $("addRoutingRule").disabled=!routingEditable||routingDraft.length>=12;
+ routingDraft.forEach((rule,index)=>{
+  const group=document.createElement("fieldset"),legend=document.createElement("legend");
+  group.className="cp-section-box";legend.textContent=(index+1)+". "+(rule.label||"New rule");group.append(legend);
+  for(const [key,label,max] of [["label","Rule name",60],["caller_prefix","Caller number prefix (optional)",16]]){
+   const caption=document.createElement("label"),field=document.createElement("input");
+   field.id="routing-rule-"+index+"-"+key;caption.htmlFor=field.id;caption.textContent=label;
+   field.maxLength=max;field.value=rule[key];field.required=key==="label";field.disabled=!routingEditable;
+   if(key==="caller_prefix")field.placeholder="+1212";
+   field.addEventListener("input",()=>{
+    rule[key]=field.value;routingDirty=true;
+    if(key==="label")legend.textContent=(index+1)+". "+(field.value||"New rule");
+   });
+   group.append(caption,field);
+  }
+  for(const [key,title] of [["anonymous","Caller has no valid caller ID"],["outside_hours","Outside configured booking hours"]]){
+   const label=document.createElement("label"),field=document.createElement("input");
+   label.className="cp-studio-check";field.type="checkbox";field.checked=rule[key];field.disabled=!routingEditable;
+   field.addEventListener("change",()=>{rule[key]=field.checked;routingDirty=true});
+   label.append(field," "+title);group.append(label);
+  }
+  const action=document.createElement("select"),actionLabel=document.createElement("label");
+  action.id="routing-rule-"+index+"-action";actionLabel.htmlFor=action.id;actionLabel.textContent="Route";
+  for(const [value,label] of [["operator","Operator"],["reject","Decline call"],["fallback","Forward to configured fallback"],["worker","Runtime specialist"]]){
+   action.add(new Option(label,value));
+  }
+  action.value=rule.action;action.disabled=!routingEditable;group.append(actionLabel,action);
+  const worker=document.createElement("select"),workerLabel=document.createElement("label");
+  worker.id="routing-rule-"+index+"-worker";workerLabel.htmlFor=worker.id;workerLabel.textContent="Specialist";
+  worker.add(new Option("Choose a worker",""));
+  for(const name of routingWorkers)worker.add(new Option(name,name));
+  worker.value=rule.worker_name;worker.disabled=!routingEditable;
+  worker.hidden=workerLabel.hidden=rule.action!=="worker";
+  worker.addEventListener("change",()=>{rule.worker_name=worker.value;routingDirty=true});
+  action.addEventListener("change",()=>{rule.action=action.value;worker.hidden=workerLabel.hidden=rule.action!=="worker";routingDirty=true});
+  group.append(workerLabel,worker);
+  if(routingEditable){
+   const controls=document.createElement("div");controls.className="cp-inline-actions";
+   for(const [label,offset] of [["Move up",-1],["Move down",1],["Remove",0]]){
+    const button=document.createElement("button"),other=index+offset;
+    button.type="button";button.className="secondary";button.textContent=label;
+    button.disabled=other<0||other>=routingDraft.length;
+    button.addEventListener("click",()=>{
+     if(offset)[routingDraft[index],routingDraft[other]]=[routingDraft[other],routingDraft[index]];
+     else routingDraft.splice(index,1);
+     routingDirty=true;renderRoutingRules();
+    });
+    controls.append(button);
+   }
+   group.append(controls);
+  }
+  list.append(group);
+ });
+}
+for(const id of ["routingEnabled","routingWorkers"])$(id).addEventListener("change",()=>{routingDirty=true});
+$("addRoutingRule").addEventListener("click",()=>{
+ if(!routingEditable||routingDraft.length>=12)return;
+ routingDraft.push({label:"",caller_prefix:"",anonymous:false,outside_hours:false,action:"operator",worker_name:""});
+ routingDirty=true;renderRoutingRules();$("routing-rule-"+(routingDraft.length-1)+"-label").focus();
+});
+$("refreshRouting").addEventListener("click",()=>{
+ if(!routingDirty||window.confirm("Discard unsaved routing changes?"))void loadRouting(organization(),true);
+});
+$("routingForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,status=$("routingStatus");
+ if(!routingEditable||!routingSaved||button.disabled)return;
+ if(!window.confirm("Save these settings for new calls using CallPilot admission?"))return;
+ button.disabled=true;
+ try{
+  const settings={enabled:$("routingEnabled").checked,runtime_workers:$("routingWorkers").checked,rules:structuredClone(routingDraft)};
+  const {settings:saved}=await request(routingPath(oid),"PUT",{previous:routingSaved,settings});
+  if(oid!==organization())return;
+  routingSaved=saved;
+  routingDirty=JSON.stringify(settings.rules)!==JSON.stringify(routingDraft)||settings.enabled!==$("routingEnabled").checked||settings.runtime_workers!==$("routingWorkers").checked;
+  status.textContent=routingDirty?"Earlier rules saved. Save again to apply your latest edits.":"Routing settings saved.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{button.disabled=!routingEditable}
+});
 const transferPath=oid=>"/organizations/"+oid+"/transfer-directory";
 let transferWorkspace="",transferSaved=[],transferDraft=[],transferDirty=false;
 function resetTransfers(){

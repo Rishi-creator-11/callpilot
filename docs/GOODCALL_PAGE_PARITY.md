@@ -39,7 +39,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 ## Authenticated app
 
-`/app#workers` supports creating, editing, reordering and disabling named call playbooks. Separate runtime workers and deterministic conditional actions remain open.
+`/app#workers` supports creating, editing, reordering and disabling named call playbooks. Channels can enable separate runtime specialists and deterministic inbound rules. In-call branching and provider verification remain open.
 
 Order requests have a dedicated CallPilot review page at `/app#orders`. Provider order placement, fulfillment, and customer confirmation remain open.
 

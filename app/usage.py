@@ -8,6 +8,7 @@ import os, hmac, calendar, re
 from datetime import datetime,timezone,timedelta
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 from app.account import current_user, membership
 from app.cloud import api
 from app.billing import PLANS, account
@@ -224,13 +225,14 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
         raise HTTPException(400,"Invalid provider payload")
     if message.get("type")!="assistant-request":
         return {"error":"Unsupported call routing request"}
-    config=agent_config(oid)
+    config=agent_config(oid,include_routing=True)
+    routing=config.get("inbound_routing") or {}
     phone_id=config.get("provider_phone_id")
     provided=(message.get("phoneNumber") or {}).get("id") or (message.get("call") or {}).get("phoneNumberId")
     if not phone_id or provided!=phone_id:
         return {"error":"This number is not configured for this business."}
     assigned=api("phone_assignments",params={"provider_phone_id":"eq."+phone_id,
-        "organization_id":"eq."+oid,"select":"id","limit":1})
+        "organization_id":"eq."+oid,"select":"id,fallback_enabled,fallback_number","limit":1})
     if not assigned:return {"error":"This business line is unavailable."}
     agent_id=config.get("provider_agent_id")
     if not agent_id:return {"error":"This business line is not ready."}
@@ -249,15 +251,15 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
     if (usage["minutes_remaining"]<=0 or
         usage["seconds_used"]+usage["seconds_active"]>=usage["minutes_included"]*60 or
         usage["subscription_status"] not in ("active","trialing")):
-        fallback=api("phone_assignments",params={"organization_id":"eq."+oid,
-            "provider_phone_id":"eq."+phone_id,
-            "select":"fallback_enabled,fallback_number","limit":1})
-        config=fallback[0] if fallback else {}
+        config=assigned[0]
         # The owner must explicitly opt in to carrier-billed human forwarding.
         if config.get("fallback_enabled") and config.get("fallback_number"):
             return {"destination":{"type":"number","number":config["fallback_number"],
                     "message":"Connecting you to the business team."}}
         return {"error":"The AI receptionist is currently unavailable. Please contact the business directly or try again later."}
+    if routing.get("enabled"):
+        from app.runtime_routing import runtime_admission
+        return await run_in_threadpool(runtime_admission,oid,phone_id,agent_id,message,assigned[0])
     return {"assistantId":agent_id}
 
 class HumanFallback(BaseModel):

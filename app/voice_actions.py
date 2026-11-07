@@ -138,10 +138,12 @@ def _call_context(oid: str, message: dict) -> tuple[str, dict]:
     if not isinstance(call, dict):
         raise ValueError("Invalid call")
     call_id = _text(call.get("id", ""), maximum=150, minimum=4)
-    assistant_id = _text(call.get("assistantId", ""), maximum=150, minimum=4)
+    assistant_id = _text(call.get("assistantId") or "", maximum=150)
     flags = feature_flags(oid)
-    if assistant_id != flags.get("provider_agent_id"):
-        raise ValueError("Assistant does not belong to this workspace")
+    if not assistant_id or assistant_id != flags.get("provider_agent_id"):
+        from app.runtime_routing import is_routed_worker_call
+        if not is_routed_worker_call(oid,call):
+            raise ValueError("Assistant does not belong to this workspace")
     return call_id, call
 
 

@@ -37,9 +37,9 @@ def owns_assistant(assistant,oid:str)->bool:
     meta=assistant.get("metadata") if isinstance(assistant,dict) else None
     return isinstance(meta,dict) and meta.get("callpilot_org")==oid
 
-def agent_config(oid:str):
+def agent_config(oid:str, *, include_routing=False):
     records=api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,provider_phone_id"})
+        "select":"provider_agent_id,provider_phone_id"+(",inbound_routing" if include_routing else "")})
     return records[0] if records else {}
 
 def as_text(value, maximum=2000):

@@ -26,7 +26,9 @@ async def vapi_event(organization_id:str, request:Request, authorization:str|Non
         "select":"provider_agent_id,provider_phone_id","limit":1})
     config=configured[0] if configured else {}
     if config.get("provider_agent_id") and call.get("assistantId") and call["assistantId"]!=config["provider_agent_id"]:
-        raise HTTPException(403,"Assistant does not belong to this workspace")
+        from app.runtime_routing import is_routed_worker_call
+        if not is_routed_worker_call(organization_id,call):
+            raise HTTPException(403,"Assistant does not belong to this workspace")
     if event_type=="status-update":
         if msg.get("status")!="in-progress":
             return {"ok":True,"ignored":True}
@@ -87,12 +89,15 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
         raise HTTPException(400,"Invalid tool call list")
     # Fail closed on unknown workspaces and on calls handled by another workspace's assistant.
     org_or_404(organization_id)
-    claimed=(msg.get("call") or {}).get("assistantId") if isinstance(msg.get("call"),dict) else None
+    provider_call=msg.get("call") if isinstance(msg.get("call"),dict) else {}
+    claimed=provider_call.get("assistantId")
     if claimed is not None:
         rows=api("agent_configs",params={"organization_id":"eq."+organization_id,
             "select":"provider_agent_id","limit":1})
         if not rows or rows[0].get("provider_agent_id")!=claimed:
-            raise HTTPException(403,"Assistant does not belong to this workspace")
+            from app.runtime_routing import is_routed_worker_call
+            if not is_routed_worker_call(organization_id,provider_call):
+                raise HTTPException(403,"Assistant does not belong to this workspace")
     from app.semantic import retrieve
     from app.cloud import PRICE, MONEY, NO_PRICE, UNKNOWN
     results=[]

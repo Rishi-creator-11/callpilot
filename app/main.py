@@ -699,6 +699,9 @@ app.include_router(demo_links_router)
 from app.transfer_directory import router as transfer_directory_router
 app.include_router(transfer_directory_router)
 
+from app.runtime_routing import router as runtime_routing_router
+app.include_router(runtime_routing_router)
+
 from app.shopify_connection import router as shopify_connection_router
 app.include_router(shopify_connection_router)
 
