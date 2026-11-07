@@ -224,3 +224,26 @@ def test_webhook_secret_with_stray_whitespace_still_verifies(db,monkeypatch):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET",SECRET+"\n ")
     db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test"})
     assert hook(completed("evt_50")).json()=={"received":True}
+
+def test_events_from_an_extra_subscription_never_overwrite_the_tracked_one(db):
+    db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test",
+        "stripe_subscription_id":"sub_main","status":"active","selected_plan":"business"})
+    e=sub_event("evt_60","customer.subscription.updated"); e["data"]["object"]["id"]="sub_old"; e["data"]["object"]["metadata"]={"plan":"starter"}
+    hook(e)
+    row=db.t["billing_accounts"][0]
+    assert row["stripe_subscription_id"]=="sub_main" and row["selected_plan"]=="business"
+    assert "sub_old" in row["billing_review_note"]
+
+def test_a_new_subscription_is_adopted_once_the_tracked_one_has_ended(db):
+    db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test",
+        "stripe_subscription_id":"sub_main","status":"canceled","selected_plan":"starter"})
+    e=sub_event("evt_61","customer.subscription.created"); e["data"]["object"]["id"]="sub_new"
+    hook(e)
+    row=db.t["billing_accounts"][0]
+    assert row["stripe_subscription_id"]=="sub_new" and row["status"]=="active"
+
+def test_scheduled_cancellation_is_recorded_from_cancel_at(db):
+    db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test","stripe_subscription_id":"sub_1"})
+    e=sub_event("evt_62","customer.subscription.updated"); e["data"]["object"]["cancel_at"]=1896048000
+    hook(e)
+    assert db.t["billing_accounts"][0]["cancel_at_period_end"] is True

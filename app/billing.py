@@ -301,15 +301,26 @@ def handle_stripe_event(e_type,obj):
     if e_type in ("customer.subscription.created","customer.subscription.updated","customer.subscription.deleted"):
         customer=obj.get("customer")
         subscriptions=api("billing_accounts",params={"stripe_customer_id":"eq."+str(customer),
-            "stripe_mode":"eq."+billing_mode(),"select":"organization_id"})
+            "stripe_mode":"eq."+billing_mode(),
+            "select":"organization_id,stripe_subscription_id,status"})
         if subscriptions:
             oid=subscriptions[0]["organization_id"]
+            tracked=subscriptions[0].get("stripe_subscription_id")
+            if (tracked and tracked!=obj.get("id") and
+                    subscriptions[0].get("status") in ("active","trialing","past_due","incomplete","unpaid")):
+                # One workspace tracks one subscription. Events from an additional subscription
+                # must never overwrite the tracked plan, period or status.
+                api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},
+                    data={"billing_review_note":"Another Stripe subscription ("+str(obj.get("id"))
+                          +") exists for this workspace and was ignored; cancel duplicates in Stripe."},
+                    prefer="return=minimal")
+                return
             item=(obj.get("items",{}).get("data") or [{}])[0]
             p=item.get("price",{})
             info={"stripe_subscription_id":obj.get("id"),
                 "status":obj.get("status","unknown"),
                 "price_id":p.get("id"),
-                "cancel_at_period_end":bool(obj.get("cancel_at_period_end")),
+                "cancel_at_period_end":bool(obj.get("cancel_at_period_end") or obj.get("cancel_at")),
                 "updated_at":datetime.now(timezone.utc).isoformat()}
             plan=(obj.get("metadata") or {}).get("plan")
             # Stripe's customer portal can change the price without changing metadata.
