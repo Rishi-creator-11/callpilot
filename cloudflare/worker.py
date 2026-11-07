@@ -15,6 +15,39 @@ async def health():
             "backend_ready":False,"phone_routing_live":False,
             "payments_live":False}
 
+
+@app.get("/_spike/async-http")
+async def spike_async_http():
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r=await c.get("https://api.github.com/zen")
+        return {"ok":True,"status":r.status_code}
+    except Exception as e:
+        return {"ok":False,"error":type(e).__name__+": "+str(e)[:160]}
+
+@app.get("/_spike/fernet")
+async def spike_fernet():
+    try:
+        from cryptography.fernet import Fernet
+        k=Fernet.generate_key(); f=Fernet(k)
+        return {"ok":f.decrypt(f.encrypt(b"x"))==b"x"}
+    except Exception as e:
+        return {"ok":False,"error":type(e).__name__+": "+str(e)[:160]}
+
+@app.get("/_spike/sync-endpoint")
+def spike_sync_endpoint():
+    return {"ok":True}
+
+@app.get("/_spike/sqlite")
+async def spike_sqlite():
+    try:
+        import sqlite3
+        c=sqlite3.connect(":memory:"); c.execute("select 1")
+        return {"ok":True}
+    except Exception as e:
+        return {"ok":False,"error":type(e).__name__+": "+str(e)[:160]}
+
 @app.get("/api/{path:path}")
 async def api_unavailable(path:str):
     return Response(content='{"detail":"CallPilot production API is not migrated to this staging Worker"}',
