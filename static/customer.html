@@ -1693,6 +1693,24 @@ function organization(){return v("org")}
 async function request(url,method="GET",data){if(!current)throw Error("Please sign in");const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired");let r=await fetch("/api/account"+url,{method,headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:data?JSON.stringify(data):undefined});let j=await r.json().catch(()=>({}));if(!r.ok){let d=j.detail;let message=Array.isArray(d)?d.map(x=>{const field=Array.isArray(x.loc)?x.loc.filter(t=>t!=="body").join("."):"field";return (field||"Input")+": "+(x.msg||"Invalid value")}).join("; "):typeof d==="string"?d:d&&typeof d==="object"?(d.message||JSON.stringify(d)):"Request failed (HTTP "+r.status+")";throw Error(message)}return j}
 async function safe(fn){try{msg("");const result=await fn();if(typeof result==="string")msg(result)}catch(e){msg(e instanceof Error?e.message:String(e),true)}}
 let authView="signin",activePage="builder",recoveryMode=false;
+// When Google or Supabase sends the person back with an error, explain it instead of silently showing sign-in.
+let authReturnError="";
+function readAuthReturnError(){
+ try{
+  const sources=[new URLSearchParams(location.hash.replace(/^#/,"")),new URLSearchParams(location.search)];
+  for(const params of sources){
+   if(!params.get("error")&&!params.get("error_description"))continue;
+   const detail=(params.get("error_description")||params.get("error")||"").replace(/\+/g," ");
+   authReturnError=/exchange external code|invalid_client|client secret/i.test(detail)
+    ?"Google sign-in is not working yet because of a setup problem on our side. Please sign in with your email and password for now."
+    :"Sign-in did not finish. Please try again, or use your email and password.";
+   const clean=new URL(location.href);
+   for(const key of ["error","error_code","error_description"])clean.searchParams.delete(key);
+   history.replaceState(null,"",clean.pathname+clean.search);
+   return;
+  }
+ }catch{}
+}
 {
  const toggle=document.getElementById("navMoreToggle"),more=document.getElementById("navMore");
  toggle.addEventListener("click",()=>{
@@ -2110,6 +2128,7 @@ async function render(){
      document.body.dataset.appState="guest";
      $("topProfile").style.display="none";$("topHelp").style.display="none";$("logout").style.display="none";
      window.authMode(new URLSearchParams(location.search).get("mode")==="signup"?"signup":"signin");
+     if(authReturnError){$("authmsg").textContent=authReturnError;authReturnError=""}
      return;
    }
    const name=current.user_metadata?.full_name||current.email?.split("@")[0]||"Account";
@@ -5827,6 +5846,7 @@ async function boot(){
    $("businessLookupForm").hidden=!businessLookupEnabled;
    if(!config.supabase_url||!config.supabase_publishable_key)
      throw Error("Authentication service is not configured");
+   readAuthReturnError();
    sb=createClient(config.supabase_url,config.supabase_publishable_key);
    sb.auth.onAuthStateChange((event,session)=>{
      if(event==="PASSWORD_RECOVERY"){
