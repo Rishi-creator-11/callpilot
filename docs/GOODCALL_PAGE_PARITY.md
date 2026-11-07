@@ -63,7 +63,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Connections, Custom APIs tab and Add Custom API dialog | Observed | Build scoped endpoint definitions and validations. |
 | [ ] | Connections, custom MCP and tool-request forms | Custom MCP name, URL, and optional bearer token fields observed. Tool-request submission pending. | No equivalent yet. |
 | [ ] | `/agent/settings`, Profile and account security | Observed | `/app#account` partially covers account settings. Verify recovery and deletion lifecycle. |
-| [ ] | Settings, Team and Invite team member dialog | Observed, no invitation sent | Workspace team list exists. Add role/access selection, optional message, invitation and revocation. |
+| [ ] | Settings, Team and Invite team member dialog | Observed, no invitation sent | Workspace team list, link creation, role selection and revocation are implemented. Email delivery, optional message, role editing and recipient acceptance verification remain open. |
 | [ ] | Settings, Billing summary, payment method and invoices | Observed | `/app#billing` has plan entry points and Stripe portal. Verify setup, payments and invoice history in sandbox. |
 | [ ] | Account menu, agent switcher, new agent and sign-out | Menu observed, creation workflow pending | Workspace switcher and sign-out exist. Multi-agent management missing. |
 | [ ] | Support control and contextual help | Entry point observed | `/app#help` exists. Compare support dialogs and escalation. |

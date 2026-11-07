@@ -392,6 +392,9 @@ app.include_router(booking_hours_router)
 from app.voice_preview import router as voice_preview_router
 app.include_router(voice_preview_router)
 
+from app.team import router as team_router
+app.include_router(team_router)
+
 from app.catalog import router as catalog_router
 app.include_router(catalog_router)
 

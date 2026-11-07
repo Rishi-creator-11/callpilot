@@ -647,6 +647,13 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
   </div>
 </div>
 <div id="workspace" class="panel card">
+<div class="cp-section-box" id="acceptInvitePanel" hidden>
+ <h3>Workspace invitation</h3>
+ <p>Accept the invitation using the verified email address the sender invited.</p>
+ <button id="acceptInvite" type="button">Accept invitation</button>
+ <button id="dismissInvite" type="button" class="secondary">Dismiss</button>
+ <p id="acceptInviteStatus" class="muted" role="status"></p>
+</div>
 <div class="cp-panel-heading"><div><h2>Business settings</h2><p class="muted">Keep your workspace accurate and easy to manage.</p></div><span class="pill">Workspace</span></div>
 <div class="cp-section-box"><h3>Business profile</h3><p>These details identify the business this assistant represents.</p>
 <div class="cp-form-grid"><div><label for="wsName">Business name</label><input id="wsName" maxlength="120" autocomplete="organization" placeholder="Your company"></div>
@@ -670,7 +677,25 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
  <p id="bookingHoursStatus" class="muted" role="status"></p>
 </div>
 <div class="cp-section-box"><h3>Team access</h3><p>Your workspace is private. Access is limited to authorized team members.</p>
-<div id="wsTeam" class="muted">Loading team members...</div></div>
+<div id="wsTeam" class="muted">Loading team members...</div>
+<div id="workspaceInvitations" hidden>
+ <h4>Invite a team member</h4>
+ <p>Send the generated link to the person you’re inviting. It expires after seven days and only works for their verified email.</p>
+ <form id="workspaceInviteForm">
+  <label for="inviteEmail">Recipient email</label><input type="email" id="inviteEmail" required maxlength="254">
+  <label for="inviteRole">Role</label><select id="inviteRole">
+   <option value="viewer">Viewer · read-only access</option>
+   <option value="admin">Admin · manages the workspace</option>
+  </select>
+  <button type="submit">Create invitation link</button>
+ </form>
+ <div id="inviteLinkPanel" hidden>
+  <label for="inviteLink">Share this invitation link</label><input id="inviteLink" readonly>
+  <button type="button" class="secondary" id="copyInvite">Copy link</button>
+ </div>
+ <p id="inviteStatus" class="muted" role="status"></p>
+ <div id="pendingInvites"></div>
+</div></div>
 <div class="cp-section-box"><h3>Additional businesses</h3><p>Manage multiple business workspaces independently.</p>
 <div class="cp-form-grid"><div><label for="bname">Business name</label><input id="bname" placeholder="Example Auto Care"></div><div><label for="industry">Industry</label><input id="industry" placeholder="Auto repair"></div></div>
 <button class="secondary" onclick="window.createBusiness()">Create another workspace</button></div>
@@ -1024,7 +1049,7 @@ function loadActivePage(id){
  const load={
    studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
-   billing:()=>loadBilling(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours()])
+   billing:()=>loadBilling(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
 }
@@ -1048,6 +1073,39 @@ window.section=(x,options={})=>{
  if(x==="account")window.fillProfile();
  loadActivePage(x);
 };
+let pendingInvite="";
+try{
+ const fragment=new URLSearchParams(location.hash.slice(1));
+ const token=fragment.get("invite");
+ if(token&&/^[A-Za-z0-9_-]{43}$/.test(token)){
+  pendingInvite=token;
+  history.replaceState(null,"",location.pathname+location.search);
+  sessionStorage.setItem("callpilot.pendingInvite",token);
+ }else{
+  pendingInvite=sessionStorage.getItem("callpilot.pendingInvite")||"";
+ }
+}catch{}
+function clearPendingInvite(){
+ pendingInvite="";
+ try{sessionStorage.removeItem("callpilot.pendingInvite")}catch{}
+ $("acceptInvitePanel").hidden=true;
+}
+$("dismissInvite").addEventListener("click",clearPendingInvite);
+$("acceptInvite").addEventListener("click",async event=>{
+ const button=event.currentTarget,status=$("acceptInviteStatus");
+ if(!pendingInvite||button.disabled)return;
+ button.disabled=true;
+ status.textContent="Checking invitation…";
+ try{
+  const result=await request("/invitations/accept","POST",{token:pendingInvite});
+  await loadOrganizations();
+  $("org").value=result.organization_id;
+  await window.loadWorkspace();
+  clearPendingInvite();
+  msg("Workspace invitation accepted.");
+ }catch(e){status.textContent=e.message}
+ finally{button.disabled=false}
+});
 let renderInFlight=false;
 async function render(){
  if(renderInFlight)return;
@@ -1091,6 +1149,10 @@ async function render(){
    await loadOrganizations();
    document.body.classList.add("cp-signed-in");
    document.body.dataset.appState="ready";
+   if(pendingInvite){
+    window.section("workspace");
+    $("acceptInvitePanel").hidden=false;
+   }
  }catch(e){
    const problem=String(e?.message||"");
    if(/session invalid|session expired|jwt expired|unauthorized|invalid refresh|not authenticated|sign in/i.test(problem)){
@@ -1146,6 +1208,12 @@ window.loadWorkspace=async({preserve=false}={})=>{
    endVoicePractice();
    $("voicePracticeTranscript").replaceChildren();
    $("bookingHoursPanel").hidden=true;
+   $("workspaceInvitations").hidden=true;
+   $("inviteLink").value="";
+   $("inviteLinkPanel").hidden=true;
+   $("inviteStatus").textContent="";
+   $("workspaceInviteForm").reset();
+   $("pendingInvites").replaceChildren();
    pdfImportRun++;
    $("pdfImportFile").value="";
    $("pdfImportStatus").textContent="";
@@ -1289,6 +1357,57 @@ $("bookingHoursForm").addEventListener("submit",async event=>{
   }
   await request("/organizations/"+encodeURIComponent(oid)+"/booking-hours","PUT",{timezone:v("bookingTimeZone").trim(),hours});
   if(oid===organization())status.textContent="Booking hours saved.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{button.disabled=false}
+});
+
+const invitePath=oid=>"/organizations/"+encodeURIComponent(oid)+"/invitations";
+async function loadInvitations(){
+ const oid=organization(),panel=$("workspaceInvitations"),list=$("pendingInvites");
+ const role=orgs.find(org=>org.id===oid)?.role;
+ panel.hidden=true;
+ if(!["owner","admin"].includes(role))return;
+ const invitations=await request(invitePath(oid));
+ if(oid!==organization())return;
+ $("inviteRole").querySelector('option[value="admin"]').disabled=role!=="owner";
+ list.replaceChildren();
+ if(!invitations.length)list.textContent="No pending invitations.";
+ for(const invitation of invitations){
+  const row=document.createElement("div"),details=document.createElement("p");
+  row.className="item";
+  details.textContent=invitation.email+" · "+invitation.role+" · Expires "+new Date(invitation.expires_at).toLocaleDateString();
+  row.append(details);
+  if(role==="owner"||invitation.role==="viewer"){
+   row.append(scheduleButton("Revoke invitation",()=>safe(async()=>{
+    await request(invitePath(oid)+"/"+encodeURIComponent(invitation.id),"DELETE");
+    if(oid!==organization())return;
+    $("inviteLink").value="";$("inviteLinkPanel").hidden=true;
+    await loadInvitations();
+    $("inviteStatus").textContent="Invitation revoked.";
+   })));
+  }
+  list.append(row);
+ }
+ panel.hidden=false;
+}
+$("copyInvite").addEventListener("click",async()=>{
+ const input=$("inviteLink");
+ try{await navigator.clipboard.writeText(input.value);$("inviteStatus").textContent="Invitation link copied."}
+ catch{input.focus();input.select();$("inviteStatus").textContent="Copy the selected invitation link."}
+});
+$("workspaceInviteForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,status=$("inviteStatus");
+ if(!oid||button.disabled)return;
+ button.disabled=true;
+ try{
+  const result=await request(invitePath(oid),"POST",{email:v("inviteEmail").trim(),role:v("inviteRole")});
+  if(oid!==organization())return;
+  $("inviteLink").value=result.link;
+  $("inviteLinkPanel").hidden=false;
+  $("inviteEmail").value="";
+  status.textContent="Invitation link created.";
+  await loadInvitations();
  }catch(e){if(oid===organization())status.textContent=e.message}
  finally{button.disabled=false}
 });

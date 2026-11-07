@@ -95,3 +95,9 @@ def test_preview_webhook_is_tenant_bound_and_has_no_action_tools(preview_client,
     results = preview_client.post(f"/webhooks/vapi-preview/{OID}", json=payload, headers=header).json()["results"]
     assert results[0] == {"toolCallId": "read", "result": "Open Tuesday."}
     assert "Only approved knowledge" in results[1]["error"]
+
+
+def test_preview_can_be_limited_to_selected_workspaces(preview_client, monkeypatch):
+    monkeypatch.setenv("VOICE_PREVIEW_WORKSPACES", OTHER)
+    assert preview_client.get(START).json() == {"available": False}
+    assert preview_client.post(START).status_code == 503

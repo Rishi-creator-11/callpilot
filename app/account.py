@@ -568,4 +568,4 @@ def workspace_team(oid:str,user=Depends(current_user)):
     members=api("organization_members",params={"organization_id":"eq."+oid,
         "select":"role,user_id","limit":100})
     return {"members":[{"role":m["role"],"is_you":m["user_id"]==user["id"]} for m in members],
-            "note":"Team invitations are not available yet. Existing members are shown without exposing other users' private contact details."}
+            "note":"Existing members are shown without exposing other users' private contact details."}

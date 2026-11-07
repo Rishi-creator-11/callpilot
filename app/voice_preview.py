@@ -23,6 +23,11 @@ def enabled() -> bool:
             and bool(os.getenv("VAPI_WEBHOOK_TOKEN")))
 
 
+def workspace_enabled(oid: str) -> bool:
+    allowlist = {item.strip() for item in os.getenv("VOICE_PREVIEW_WORKSPACES", "").split(",") if item.strip()}
+    return enabled() and (not allowlist or oid in allowlist)
+
+
 def preview_token(oid: str) -> str:
     return hmac.new(os.environ["VAPI_WEBHOOK_TOKEN"].encode(),
                     ("callpilot-preview:" + oid).encode(), hashlib.sha256).hexdigest()
@@ -31,7 +36,7 @@ def preview_token(oid: str) -> str:
 @router.get("/api/account/organizations/{oid}/voice-preview")
 def status(oid: UUID, user=Depends(current_user)):
     role = membership(str(oid), user)
-    return {"available": enabled() and role in ("owner", "admin")}
+    return {"available": workspace_enabled(str(oid)) and role in ("owner", "admin")}
 
 
 def preview_assistant(oid: str) -> dict:
@@ -81,7 +86,7 @@ def preview_assistant(oid: str) -> dict:
 def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
     workspace = str(oid)
     membership(workspace, user, ("owner", "admin"))
-    if not enabled():
+    if not workspace_enabled(workspace):
         raise HTTPException(503, "Browser voice practice is not enabled.")
     assistant = preview_assistant(workspace)
     if rpc("reserve_voice_preview", {"p_organization_id": workspace, "p_user_id": user["id"]}) is not True:
@@ -111,7 +116,7 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
 @router.post("/webhooks/vapi-preview/{oid}")
 async def preview_knowledge(oid: UUID, request: Request, authorization: str | None = Header(default=None)):
     workspace = str(oid)
-    if not enabled() or not hmac.compare_digest(authorization or "", "Bearer " + preview_token(workspace)):
+    if not workspace_enabled(workspace) or not hmac.compare_digest(authorization or "", "Bearer " + preview_token(workspace)):
         raise HTTPException(401, "Invalid preview credential.")
     body = bytearray()
     async for chunk in request.stream():
