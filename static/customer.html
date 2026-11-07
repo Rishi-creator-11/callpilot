@@ -524,6 +524,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 <button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
 <button data-section="simulator" onclick="window.section('simulator')"><span class="cp-nav-icon">◇</span> Test assistant</button>
 <button data-section="appointments" onclick="window.section('appointments')"><span class="cp-nav-icon">▣</span> Appointments</button>
+<button data-section="connections" onclick="window.section('connections')"><span class="cp-nav-icon">↔</span> Connections</button>
 <div class="cp-nav-divider"></div><div class="cp-nav-group">MANAGEMENT</div>
 <button data-section="usage" onclick="window.section('usage')"><span class="cp-nav-icon">◷</span> Usage &amp; phone</button>
 <button data-section="billing" onclick="window.section('billing')"><span class="cp-nav-icon">▧</span> Billing &amp; plans</button>
@@ -561,6 +562,18 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
    <div class="cp-inline-actions"><button type="submit">Import and review</button><button id="skipSetupWebsite" type="button" class="secondary">Skip to Launch Studio</button></div>
   </form>
   <p id="businessSetupStatus" role="status" class="muted"></p>
+ </div>
+</section>
+
+<section id="connections" class="panel card" style="display:none">
+ <div class="cp-panel-heading"><div><h2>Connections</h2><p>Check what is linked to this business and open the setup for each service.</p></div></div>
+ <div class="cp-studio-connections">
+  <article class="cp-studio-connection"><h3>Google Calendar</h3><p>Check availability and create confirmed appointments.</p>
+   <p id="connectionCalendar" role="status"></p><button class="secondary" onclick="window.section('appointments')">Manage calendar</button></article>
+  <article class="cp-studio-connection"><h3>Vapi voice assistant</h3><p>Connect the assistant that answers your business calls.</p>
+   <p id="connectionVoice" role="status"></p><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage voice assistant</button></article>
+  <article class="cp-studio-connection"><h3>Business phone</h3><p>Link a managed number and review your call fallback.</p>
+   <p id="connectionPhone" role="status"></p><button class="secondary" onclick="window.section('usage')">Manage business phone</button></article>
  </div>
 </section>
 
@@ -1087,6 +1100,7 @@ const pageMeta={
  voice:["AI receptionist","Choose the identity, greeting and voice for your front desk."],
  simulator:["Test assistant","Test approved answers before customers hear them."],
  appointments:["Appointments","Manage appointment requests and calendar connections."],
+ connections:["Connections","Manage the services your receptionist uses."],
  billing:["Billing & plans","Subscription status, payment methods and invoices."],
  workspace:["Business settings","Profile, team and workspace management."],
  account:["My account","Your profile, security and sign-in settings."],
@@ -1097,7 +1111,7 @@ function loadActivePage(id){
  const load={
    studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
-   billing:()=>loadBilling(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
+   billing:()=>loadBilling(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
 }
@@ -1313,11 +1327,25 @@ $("setupWebsiteForm").addEventListener("submit",async event=>{
   if(workspace===setupOrganization&&activePage==="onboarding")status.textContent=e.message;
  }finally{button.disabled=skip.disabled=false}
 });
+let loadedWorkspace="";
 window.loadWorkspace=async({destination}={})=>{
  if(!organization())return;
  await safe(async()=>{
    const o=orgs.find(x=>x.id===organization());
    if(o)writeWorkspacePreference("workspace",o.id);
+   const workspaceKey=current.id+"/"+organization();
+   if(workspaceKey!==loadedWorkspace){
+    loadedWorkspace=workspaceKey;
+    for(const id of ["studioDescription","studioAgentName","studioGreeting","studioQuestion","studioSku","studioItemName",
+     "studioItemPrice","studioItemStock","studioItemDescription"])$(id).value="";
+    for(const id of ["studioApproveKnowledge","studioPricesVerified","studioAllowPrices","studioCaptureLeads",
+     "studioVoiceBookings","studioCatalogEnabled","studioOrdersEnabled"])$(id).checked=false;
+    $("studioEnableVoice").disabled=true;
+    $("studioActionStatus").textContent="Loading voice action settings…";
+    $("studioCatalogList").textContent="Loading products…";
+    $("studioOrderList").textContent="Loading order requests…";
+    $("studioTestResult").textContent="Ask a question to check the approved knowledge for this workspace.";
+   }
    $("headerWorkspace").textContent=o?.name||"Your business";
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
    $("wsName").value=o?.name||"";
@@ -1906,6 +1934,21 @@ async function loadCalendar(){
  }
 }
 window.connectCalendar=()=>safe(async()=>{let r=await request("/organizations/"+organization()+"/calendar/connect","POST");location.href=r.url});
+async function loadConnections(){
+ const oid=organization();
+ const services=[
+  ["connectionCalendar","/calendar",value=>value.connected?"Connected":value.configured?"Ready to connect":"Service unavailable"],
+  ["connectionVoice","/voice-capabilities",value=>value.assistant_connected?"Connected":"No assistant linked"],
+  ["connectionPhone","/phone",value=>value.connected?"Connected":"No number linked"]
+ ];
+ await Promise.all(services.map(async([id,path,describe])=>{
+  $(id).textContent="Checking connection…";
+  let status;
+  try{status=describe(await request("/organizations/"+oid+path))}
+  catch{status="Could not check this connection"}
+  if(oid===organization())$(id).textContent=status;
+ }));
+}
 const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Number(v("cduration"))});
 window.checkAvailability=()=>safe(async()=>{
  const result=await request("/organizations/"+organization()+"/calendar/availability","POST",slot());

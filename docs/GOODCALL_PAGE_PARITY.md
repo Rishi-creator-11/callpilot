@@ -60,7 +60,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Workers, Knowledge tab and source list | Observed | `/app#knowledge` has source attribution, editable drafts, approval, and search testing. |
 | [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link and PDF import verified in the authenticated sandbox. PDF extraction creates a reviewable draft. Scanned-document OCR remains open. |
 | [ ] | Knowledge source detail and lifecycle controls | Source detail, View content, Edit and History observed | CallPilot edits and approval available. Compare source detail and deletion behavior. |
-| [ ] | `/agent/connections`, Integrations tab | Observed | `/app#appointments` covers Google Calendar. Connector cards, status states and remaining providers missing. |
+| [ ] | `/agent/connections`, Integrations tab | Observed | `/app#connections` reports live Calendar, Vapi, and business phone status and links to management. Other providers remain. |
 | [ ] | Connections, Custom APIs tab and Add Custom API dialog | Observed | Build scoped endpoint definitions and validations. |
 | [ ] | Connections, custom MCP and tool-request forms | Custom MCP name, URL, and optional bearer token fields observed. Tool-request submission pending. | No equivalent yet. |
 | [ ] | `/agent/settings`, Profile and account security | Observed | `/app#account` partially covers account settings. Verify recovery and deletion lifecycle. |
