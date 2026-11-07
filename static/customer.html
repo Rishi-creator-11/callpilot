@@ -436,6 +436,11 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 .cp-studio-connection{padding:13px 15px;border-radius:11px;background:#f8f9fd;border:1px solid #e2e7f0;font-size:13px}
 .cp-studio-connection strong{display:block;color:#27334a;margin-bottom:3px}.cp-studio-connection span{color:#5b6980}
 .cp-studio-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+.cp-studio-activation{margin-top:18px;padding:17px;border:1px solid #dce2f3;background:#f8faff;border-radius:12px}
+.cp-studio-activation h3{margin:0 0 3px}.cp-studio-activation p{font-size:12px;margin:5px 0 9px}
+.cp-studio-activation .cp-studio-check{font-size:13px;margin:11px 0}
+.cp-studio-activation .cp-studio-actions{align-items:center}.cp-studio-activation .muted{font-size:12px}
+
 .cp-studio-warning{margin:15px 0 0;color:#695c3d;background:#fffbec;border:1px solid #f3e5b5;border-radius:10px;padding:12px;font-size:12px}
 @media(max-width:760px){.cp-studio-grid,.cp-studio-connections{grid-template-columns:1fr}.cp-studio-hero{padding:22px}.cp-studio-step{padding:17px}}
 </style></head><body data-app-state="loading">
@@ -544,6 +549,14 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
   </article>
   <article class="cp-studio-step cp-studio-wide"><div class="cp-studio-step-head"><span class="cp-studio-num">05</span><div><h3>Connect, verify, launch</h3><p>See what is connected—and what still needs a real-world test.</p></div></div>
    <div id="studioConnections" class="cp-studio-connections" role="status">Checking integrations…</div>
+   <div class="cp-studio-activation">
+    <h3>Activate real voice actions</h3>
+    <p>These tools perform real operations during calls. They are off until the business owner enables them and the managed assistant is synced.</p>
+    <label class="cp-studio-check"><input type="checkbox" id="studioCaptureLeads"> Save customer-approved callback requests to Calls &amp; Leads</label>
+    <label class="cp-studio-check"><input type="checkbox" id="studioVoiceBookings"> Check availability and book appointments in my connected Google Calendar</label>
+    <div class="cp-studio-actions"><button id="studioEnableVoice" onclick="window.studioSaveActions()">Save &amp; sync voice tools</button><span id="studioActionStatus" class="muted" role="status">Loading voice action settings…</span></div>
+    <p class="muted">For bookings, the agent must read the details back and get a clear yes. Confirm your services, calendar access and recording consent before testing on your real number.</p>
+   </div>
    <div class="cp-studio-actions"><button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button><button class="secondary" onclick="window.section('usage')">Phone setup</button><button class="secondary" onclick="window.section('calls')">Calls &amp; leads</button><button class="secondary" onclick="window.loadStudio()">Refresh checklist</button></div>
    <p class="cp-studio-warning">Before taking customer calls, verify live voice answers, caller contact capture, appointment booking, call transfers and recording consent. A connected calendar does not mean voice booking is enabled.</p>
   </article>
@@ -1575,11 +1588,18 @@ window.loadStudio=async()=>{
  const oid=organization();if(!oid)return;
  const o=orgs.find(x=>x.id===oid);
  $("studioBusiness").textContent=(o?.name||"Your business")+(o?.industry?" · "+o.industry:"");
- const paths=["/agent","/descriptions","/calendar","/phone"];
+ const paths=["/agent","/descriptions","/calendar","/phone","/voice-capabilities"];
  const settled=await Promise.allSettled(paths.map(p=>request("/organizations/"+oid+p)));
  if(oid!==organization())return;
  const values=settled.map(x=>x.status==="fulfilled"?x.value:null);
- const [agent,docs,calendar,phone]=values;
+ const [agent,docs,calendar,phone,capabilities]=values;
+ $("studioCaptureLeads").checked=Boolean(capabilities?.leads_enabled);
+ $("studioVoiceBookings").checked=Boolean(capabilities?.booking_enabled);
+ $("studioVoiceBookings").disabled=!Boolean(capabilities?.calendar_connected);
+ $("studioEnableVoice").disabled=!Boolean(capabilities?.assistant_connected);
+ $("studioActionStatus").textContent=capabilities?.assistant_connected?
+  "Tool settings loaded. Changes will be applied to your connected assistant.":
+  "Connect a managed Vapi assistant to activate these tools.";
  const approved=Array.isArray(docs)?docs.filter(d=>d.approved_at).length:0;
  const hasGreeting=Boolean(agent?.greeting?.trim());
  const hasCalendar=calendar?.connected===true,hasPhone=phone?.connected===true;
@@ -1626,6 +1646,23 @@ window.studioSaveAgent=()=>safe(async()=>{
  await request("/organizations/"+organization()+"/agent","PUT",{agent_name,greeting});
  await window.loadStudio();
  return "Greeting saved in your workspace. Existing live Vapi assistants require a separate sync.";
+});
+window.studioSaveActions=()=>safe(async()=>{
+ const leads=$("studioCaptureLeads").checked,booking=$("studioVoiceBookings").checked;
+ if(booking&&!confirm("Enable REAL Google Calendar bookings on this assistant? The AI must obtain explicit caller confirmation before creating any event."))return;
+ const btn=$("studioEnableVoice");btn.disabled=true;
+ $("studioActionStatus").textContent="Synchronizing approved voice actions with Vapi…";
+ try{
+  const result=await request("/organizations/"+organization()+"/voice-capabilities","PUT",{
+   leads_enabled:leads,booking_enabled:booking
+  });
+  $("studioActionStatus").textContent=result.provider_synced?
+   "Saved and verified with Vapi. Run controlled phone tests before customer launch.":
+   "Settings saved; provider confirmation is pending.";
+  await window.loadStudio();
+  return "Voice tools synchronized. Test with a real call before relying on them.";
+ }catch(e){$("studioActionStatus").textContent="Could not activate: "+e.message;throw e}
+ finally{btn.disabled=false}
 });
 window.studioTest=()=>safe(async()=>{
  const question=v("studioQuestion").trim(),target=$("studioTestResult");
