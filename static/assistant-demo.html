@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="robots" content="noindex,nofollow">
+ <title>Assistant demo · CallPilot</title>
+ <style>
+  *{box-sizing:border-box}body{margin:0;background:#f7f7f2;color:#14263d;font:16px/1.5 system-ui,sans-serif}
+  header{background:#10213a;color:#fff;padding:16px max(18px,calc((100% - 680px)/2));font-weight:750}
+  main{max-width:680px;margin:0 auto;padding:24px 18px 60px}h1{font-size:clamp(26px,6vw,42px);line-height:1.1;margin:12px 0}
+  p{color:#526777}.tag{color:#176958;font-size:13px;font-weight:700}.card{background:#fff;border:1px solid #dce4df;border-radius:14px;padding:16px;margin:16px 0}
+  textarea{width:100%;min-height:82px;resize:vertical;padding:10px;border:1px solid #93a9a1;border-radius:8px;font:inherit}
+  label{display:block;font-weight:700;margin-bottom:5px}button{background:#146b5a;color:white;border:0;padding:9px 14px;border-radius:8px;font:inherit;cursor:pointer}
+  button:disabled{opacity:.55;cursor:default}#conversation{list-style:none;padding:0}#conversation li{padding:10px 12px;border-radius:10px;background:#e9f2ed;margin:8px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+  #conversation .question{margin-left:12%;background:#e8edf4}#notice{min-height:24px}
+ </style>
+</head>
+<body>
+ <header>✦ CallPilot</header>
+ <main><p class="tag">Shared assistant demo</p><h1>{{business}}</h1>
+  <p>Explore approved answers in this text preview. The demo cannot place calls, orders, or appointments.</p>
+  <ol id="conversation" aria-label="Demo conversation" aria-live="polite"></ol>
+  <form class="card" id="questionForm">
+   <fieldset style="border:0;padding:0;margin:0" {{disabled}}>
+    <label for="question">Your question</label><textarea id="question" required minlength="3" maxlength="500"></textarea>
+    <p>Leave out passwords, payment details, and other personal information.</p>
+    <button type="submit">Ask assistant</button>
+   </fieldset>
+  </form>
+  <p id="notice" role="status">{{notice}}</p>
+ </main>
+ <script>
+  const form=document.getElementById("questionForm"),field=document.getElementById("question");
+  const notice=document.getElementById("notice"),conversation=document.getElementById("conversation");
+  function append(kind,label,text){
+   const row=document.createElement("li"),heading=document.createElement("strong");
+   row.className=kind;heading.textContent=label;row.append(heading,"\n"+text);conversation.append(row);
+  }
+  form.addEventListener("submit",async event=>{
+   event.preventDefault();
+   const question=field.value.trim(),button=event.submitter;
+   if(button.disabled||question.length<3)return;
+   button.disabled=true;notice.textContent="Finding an approved answer…";
+   try{
+    const response=await fetch(location.pathname.replace(/\/$/,"")+"/ask",{
+     method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question})
+    });
+    const result=await response.json();
+    if(!response.ok)throw Error(typeof result.detail==="string"?result.detail:"This demo could not answer. Try again later.");
+    append("question","You",question);append("answer","Assistant",result.answer);
+    field.value="";notice.textContent="";field.focus();
+   }catch(error){notice.textContent=error.message}
+   finally{button.disabled=false}
+  });
+ </script>
+</body>
+</html>

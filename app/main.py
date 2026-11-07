@@ -583,6 +583,9 @@ app.include_router(analytics_router)
 from app.identity import router as identity_router
 app.include_router(identity_router)
 
+from app.demo_links import router as demo_links_router
+app.include_router(demo_links_router)
+
 from app.shopify_connection import router as shopify_connection_router
 app.include_router(shopify_connection_router)
 

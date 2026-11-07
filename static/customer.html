@@ -911,6 +911,16 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <article class="cp-studio-connection"><h3>Browser practice</h3><p>Try the assistant from your workspace before routing calls.</p>
    <p id="channelPractice" role="status">Checking availability…</p><button class="secondary" onclick="window.section('simulator')">Open practice</button></article>
  </div>
+ <div class="cp-section-box" id="channelShare" hidden>
+  <div class="cp-panel-heading"><div><h3>Share a demo</h3><p>Create an expiring text preview and see how many questions each link receives.</p></div></div>
+  <form id="channelDemoForm">
+   <label for="channelDemoLabel">Link label</label><input id="channelDemoLabel" required minlength="2" maxlength="70" placeholder="Sales walkthrough">
+   <label class="cp-studio-check"><input id="channelDemoConsent" type="checkbox" required> Anyone with this link may ask questions and see approved answers.</label>
+   <button type="submit">Create demo link</button>
+  </form>
+  <p id="channelDemoStatus" class="muted" role="status"></p>
+  <div id="channelDemoLinks" aria-live="polite"></div>
+ </div>
 </section>
 <div id="calls" class="panel">
   <div class="ci-head">
@@ -1787,6 +1797,10 @@ window.loadWorkspace=async({destination}={})=>{
     $("analyticsMetricForm").reset();
     $("analyticsMetricForm").hidden=true;
     $("analyticsMetricStatus").textContent="";
+    $("channelShare").hidden=true;
+    $("channelDemoForm").reset();
+    $("channelDemoLinks").replaceChildren();
+    $("channelDemoStatus").textContent="";
     resetWorkers();
     orderReviewRows=[];
     $("orderQuery").value="";
@@ -3485,14 +3499,74 @@ async function loadChannels(){
   ["channelPhone","/phone",state=>state.connected?(state.phone_number||"Managed number linked"):"No number connected"],
   ["channelPractice","/voice-preview",state=>state.available?"Voice practice available":"Voice practice unavailable"]
  ];
- await Promise.all(items.map(async([id,path,describe])=>{
+ await Promise.all([...items.map(async([id,path,describe])=>{
   $(id).textContent="Checking availability…";
   try{
    const state=await request("/organizations/"+oid+path);
    if(oid===organization())$(id).textContent=describe(state);
   }catch(e){if(oid===organization())$(id).textContent=e.message}
- }));
+ }),loadDemoLinks(oid)]);
 }
+const demoLinksPath=oid=>"/organizations/"+oid+"/demo-links";
+async function loadDemoLinks(oid){
+ if(!["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role))return;
+ const list=$("channelDemoLinks");
+ $("channelShare").hidden=false;
+ list.textContent="Loading demo links…";
+ try{
+  const {links}=await request(demoLinksPath(oid));
+  if(oid!==organization())return;
+  list.replaceChildren();
+  if(!links.length){list.textContent="No demo links yet.";return}
+  for(const link of links){
+   const row=document.createElement("article"),name=document.createElement("strong"),details=document.createElement("p");
+   row.className="item";
+   name.textContent=link.label;
+   details.className="muted";
+   details.textContent=(link.revoked_at?"Revoked":link.url?"Expires "+new Date(link.expires_at).toLocaleDateString():"Expired")+" · "+link.question_count+" questions submitted";
+   row.append(name,details);
+   if(link.url){
+    const actions=document.createElement("div"),open=document.createElement("a"),copy=document.createElement("button"),revoke=document.createElement("button");
+    actions.className="cp-inline-actions";
+    open.href=link.url;open.target="_blank";open.rel="noopener noreferrer";open.textContent="Open demo";
+    copy.type="button";copy.className="secondary";copy.textContent="Copy link";
+    copy.addEventListener("click",async()=>{
+     try{await navigator.clipboard.writeText(link.url);$("channelDemoStatus").textContent="Demo link copied."}
+     catch{$("channelDemoStatus").textContent="Copy the address from the Open demo link."}
+    });
+    revoke.type="button";revoke.className="secondary";revoke.textContent="Revoke";
+    revoke.addEventListener("click",async()=>{
+     if(oid!==organization()||revoke.disabled||!window.confirm("Revoke this demo link? It will stop accepting questions."))return;
+     revoke.disabled=true;
+     try{
+      await request(demoLinksPath(oid)+"/"+encodeURIComponent(link.id),"DELETE");
+      if(oid!==organization())return;
+      $("channelDemoStatus").textContent="Demo link revoked.";
+      await loadDemoLinks(oid);
+     }catch(e){if(oid===organization())$("channelDemoStatus").textContent=e.message}
+     finally{revoke.disabled=false}
+    });
+    actions.append(open,copy,revoke);row.append(actions);
+   }
+   list.append(row);
+  }
+ }catch(e){if(oid===organization())list.textContent=e.message}
+}
+$("channelDemoForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),form=event.currentTarget,button=event.submitter,status=$("channelDemoStatus");
+ if(button.disabled)return;
+ button.disabled=true;
+ status.textContent="Creating link…";
+ try{
+  await request(demoLinksPath(oid),"POST",{label:v("channelDemoLabel").trim(),confirm_public_knowledge:$("channelDemoConsent").checked});
+  if(oid!==organization())return;
+  form.reset();
+  status.textContent="Demo link created.";
+  await loadDemoLinks(oid);
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{button.disabled=false}
+});
 const ciTag=(stage)=>'<span class="ci-tag '+(ciStageLabels[stage]?stage:"needs_review")+'">'+esc(ciStageLabels[stage]||"Needs review")+'</span>';
 const ciDate=(value)=>{if(!value)return "Unknown date";const d=new Date(value);return Number.isNaN(d.getTime())?"Unknown date":d.toLocaleString([], {dateStyle:"medium",timeStyle:"short"})};
 const ciDuration=(sec)=>sec==null?"—":Math.floor(sec/60)+"m "+String(sec%60).padStart(2,"0")+"s";
