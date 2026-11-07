@@ -59,3 +59,7 @@
 
 ## Actual next step for this account
 Do not begin unrestricted paying customer onboarding. Recruit 2–3 supervised pilots, collect setup requirements, verify merchant account and approve always-on hosting, then test the full live workflow before enabling paid calling limits.
+
+## Provider cost controls (2026-11-07)
+- Managed assistants cap each spoken reply at 300 model tokens and end calls after 20 seconds of silence (Vapi default is 30). Both apply to newly provisioned assistants and to existing managed assistants on the next explicit sync.
+- Model stack is unchanged: Vapi hosting ($0.05/min), Deepgram nova-3, OpenAI gpt-4o-mini, Vapi built-in voice. Verify live call quality and billed cost per minute on a controlled call before relying on these savings. Removing the Vapi hosting fee would require leaving Vapi.

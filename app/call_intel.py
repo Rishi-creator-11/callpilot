@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from app.account import current_user, membership
 from app.cloud import api, org_or_404
-from app.common import wrapup_hook, WRAPUP_HOOK_NAME, MAX_CALL_SECONDS
+from app.common import wrapup_hook, WRAPUP_HOOK_NAME, MAX_CALL_SECONDS, SPOKEN_REPLY_MAX_TOKENS, SILENCE_TIMEOUT_SECONDS
 
 router = APIRouter(prefix="/api/account/organizations/{oid}", tags=["call-intelligence"])
 VALID_STAGES = {"hot","warm","general","not_qualified","needs_review"}
@@ -517,15 +517,18 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
             and assistant.get("firstMessage")==greeting
             and assistant.get("endCallMessage")==goodbye
             and assistant.get("firstMessageMode")=="assistant-waits-for-user"
+            and model.get("maxTokens")==SPOKEN_REPLY_MAX_TOKENS
+            and assistant.get("silenceTimeoutSeconds")==SILENCE_TIMEOUT_SECONDS
             and next_hooks==prior_hooks
             and matches_transcriber(assistant.get("transcriber"))
             and matches_voice(prior_voice)):
         return {"updated":False,"reason":"already_current"}
-    new_model=dict(model,messages=next_messages,tools=next_tools)
+    new_model=dict(model,messages=next_messages,tools=next_tools,maxTokens=SPOKEN_REPLY_MAX_TOKENS)
     vapi("PATCH","/assistant/"+aid,body={
         "model":new_model,"endCallMessage":goodbye,
         "firstMessage":greeting,
         "firstMessageMode":"assistant-waits-for-user",
+        "silenceTimeoutSeconds":SILENCE_TIMEOUT_SECONDS,
         "transcriber":transcriber,"voice":desired_voice,
         "hooks":next_hooks})
     verified=vapi("GET","/assistant/"+aid)
@@ -541,6 +544,8 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
         or verified.get("endCallMessage")!=goodbye
         or verified.get("firstMessage")!=greeting
         or verified.get("firstMessageMode")!="assistant-waits-for-user"
+        or saved_model.get("maxTokens")!=SPOKEN_REPLY_MAX_TOKENS
+        or verified.get("silenceTimeoutSeconds")!=SILENCE_TIMEOUT_SECONDS
         or not matches_transcriber(verified.get("transcriber"))
         or not matches_voice(verified.get("voice"))
         or (transfer is None and bool(saved_transfers))

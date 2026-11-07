@@ -5,6 +5,9 @@ from fastapi import Header, HTTPException
 
 RENDER_BASE = "https://callpilot-internal.onrender.com"
 MAX_CALL_SECONDS = 240
+# Spoken replies stay short, and dead-air calls end early, so neither bills model tokens or minutes needlessly.
+SPOKEN_REPLY_MAX_TOKENS = 300
+SILENCE_TIMEOUT_SECONDS = 20
 WRAPUP_AT_SECONDS = 215
 WRAPUP_HOOK_NAME = "callpilot-four-minute-wrapup"
 
