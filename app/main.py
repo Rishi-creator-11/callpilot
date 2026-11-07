@@ -325,6 +325,70 @@ def check_integrations_on_boot():
         except Exception as e:
             log.warning("callpilot_vapi_probe failed error_type=%s",type(e).__name__)
 
+# Operator-initiated, one-time request: try to provision a FREE Vapi-managed
+# inbound number for Metro Print. No paid telephony purchase, no tenant transfer.
+@app.on_event("startup")
+def metroprint_free_phone_once():
+    import logging
+    log=logging.getLogger("uvicorn.error")
+    oid="0e7de94e-d12f-4a9a-96f9-5d3b91588a5a"
+    aid="7eb2a057-c5ff-4243-bed6-37f175cfb695"
+    try:
+        from app.cloud import api as db
+        from app.call_intel import vapi,owns_assistant
+        config=db("agent_configs",params={"organization_id":"eq."+oid,
+            "select":"provider_agent_id,provider_phone_id","limit":1})
+        if (len(config)!=1 or config[0].get("provider_agent_id")!=aid
+            or config[0].get("provider_phone_id")):
+            log.warning("metroprint_free_phone result=blocked_existing_or_changed_configuration")
+            return
+        if db("phone_assignments",params={"organization_id":"eq."+oid,"select":"id","limit":1}):
+            log.warning("metroprint_free_phone result=blocked_existing_number")
+            return
+        assistant=vapi("GET","/assistant/"+aid)
+        if not owns_assistant(assistant,oid):
+            log.warning("metroprint_free_phone result=blocked_assistant_ownership")
+            return
+        phones=vapi("GET","/phone-number",params={"limit":100})
+        listings=phones if isinstance(phones,list) else (phones.get("results") or [])
+        # Reuse a previously-created, not-yet-persisted phone to avoid accidental
+        # duplicates if the process restarted after provider provisioning.
+        candidates=[p for p in listings if p.get("assistantId")==aid]
+        if len(candidates)>1:
+            log.warning("metroprint_free_phone result=blocked_multiple_provider_numbers")
+            return
+        phone=(candidates[0] if candidates else None)
+        if phone is None:
+            # Vapi's free-telephony API, not its paid Twilio import/buy API.
+            phone=vapi("POST","/phone-number",body={
+                "provider":"vapi","assistantId":aid,"numberDesiredAreaCode":"201"})
+        if phone.get("assistantId")!=aid or not phone.get("id") or not phone.get("number"):
+            log.warning("metroprint_free_phone result=provider_response_unexpected")
+            return
+        pid=phone["id"]
+        claimed=db("phone_assignments",params={"provider_phone_id":"eq."+pid,
+            "select":"organization_id","limit":1})
+        if claimed and claimed[0]["organization_id"]!=oid:
+            log.warning("metroprint_free_phone result=blocked_number_in_use")
+            return
+        db("phone_assignments","POST",params={"on_conflict":"provider_phone_id"},
+           data={"organization_id":oid,"provider_phone_id":pid,
+                 "provider_number":phone["number"],"status":"linked"},
+           prefer="resolution=ignore-duplicates,return=minimal")
+        db("agent_configs","PATCH",params={"organization_id":"eq."+oid,
+           "provider_agent_id":"eq."+aid,"provider_phone_id":"is.null"},
+           data={"provider_phone_id":pid},prefer="return=minimal")
+        final=db("agent_configs",params={"organization_id":"eq."+oid,
+            "select":"provider_phone_id","limit":1})
+        log.info("metroprint_free_phone result=%s",
+                 "linked_number_"+phone["number"] if final and final[0].get("provider_phone_id")==pid
+                 else "database_link_unconfirmed")
+    except Exception as exc:
+        # Only log status/error types; never log provider credentials.
+        log.warning("metroprint_free_phone result=failed error_type=%s",
+                    type(exc).__name__)
+
+
 from app.account import router as account_router
 from app.billing import router as billing_router
 app.include_router(account_router)
