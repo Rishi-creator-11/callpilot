@@ -351,8 +351,9 @@ def voice_capabilities(oid:str,user=Depends(current_user)):
         "order_requests_enabled":bool(cfg.get("voice_order_requests_enabled")),
         "calendar_connected":bool(connection(oid)),
         "assistant_connected":bool(cfg.get("provider_agent_id")),
-        "voice_booking_is_live":bool(cfg.get("voice_booking_enabled") and connection(oid)
-                                  and cfg.get("provider_agent_id"))}
+        "voice_booking_configured":bool(cfg.get("voice_booking_enabled") and connection(oid)
+                                   and cfg.get("provider_agent_id")),
+        "live_call_tested":False}
 
 @router.put("/organizations/{oid}/voice-capabilities")
 def set_voice_capabilities(oid:str,body:VoiceCapabilities,user=Depends(current_user)):
