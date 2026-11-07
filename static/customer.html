@@ -547,6 +547,18 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
  <div class="cp-onboarding-wrap">
   <div class="cp-onboarding-intro"><span class="cp-studio-eyebrow">CALLPILOT / GET STARTED</span><h2>Build your front desk.</h2><p>Start with your business. You can review what the receptionist learns before it answers callers.</p></div>
   <ol class="cp-onboarding-steps" aria-label="Setup steps"><li id="setupStepOne" aria-current="step">1. Business details</li><li id="setupStepTwo">2. Website knowledge</li><li>3. Launch Studio</li></ol>
+  <form id="businessLookupForm" class="cp-section-box" hidden>
+   <h3>Find your business on Google Maps</h3>
+   <label for="businessLookupQuery">Business name and city or phone number</label>
+   <input id="businessLookupQuery" type="search" required minlength="3" maxlength="180" placeholder="Northline Heating, Brooklyn or +1 212 555 0100">
+   <div class="cp-inline-actions"><button type="submit" class="secondary">Find business</button></div>
+   <p id="businessLookupStatus" role="status" class="muted"></p>
+   <div id="businessLookupResults" class="cp-section-box" hidden>
+    <p translate="no" style="color:#5e5e5e;font-size:14px;font-weight:400;white-space:nowrap">Google Maps</p>
+    <ul id="businessLookupList"></ul>
+   </div>
+   <p class="muted">You can enter your own business details below. <a href="/legal#maps">How Google Maps search uses your query</a></p>
+  </form>
   <form id="businessSetupForm">
    <label for="setupBusinessName">Business name</label>
    <input id="setupBusinessName" autocomplete="organization" minlength="2" maxlength="120" required placeholder="Northline Heating">
@@ -1267,8 +1279,16 @@ async function loadOrganizations({select,destination}={}){
  }
 }
 let setupOrganization=null;
+let businessLookupEnabled=false;
+let businessLookupRun=0;
 function setupStage(workspace=null){
  setupOrganization=workspace;
+ businessLookupRun++;
+ $("businessLookupForm").reset();
+ $("businessLookupForm").hidden=!businessLookupEnabled||Boolean(workspace);
+ $("businessLookupResults").hidden=true;
+ $("businessLookupList").replaceChildren();
+ $("businessLookupStatus").textContent="";
  $("businessSetupForm").hidden=Boolean(workspace);
  $("setupWebsiteForm").hidden=!workspace;
  $("setupWorkspaceName").textContent=workspace?.name||"";
@@ -1277,6 +1297,51 @@ function setupStage(workspace=null){
  $(workspace?"setupStepTwo":"setupStepOne").setAttribute("aria-current","step");
  $("businessSetupStatus").textContent="";
 }
+$("businessLookupForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const button=event.submitter,status=$("businessLookupStatus"),results=$("businessLookupResults"),list=$("businessLookupList");
+ if(button.disabled)return;
+ const query=v("businessLookupQuery").trim(),run=++businessLookupRun;
+ button.disabled=true;
+ results.hidden=true;
+ list.replaceChildren();
+ status.textContent="Searching Google Maps…";
+ try{
+  const result=await request("/business-lookup","POST",{query});
+  if(run!==businessLookupRun||activePage!=="onboarding")return;
+  for(const place of result.places){
+   const row=document.createElement("li"),link=document.createElement("a");
+   const url=new URL("https://www.google.com/maps/search/");
+   url.search=new URLSearchParams({api:"1",query:place.name,query_place_id:place.id});
+   link.href=url.href;
+   link.target="_blank";
+   link.rel="noopener noreferrer";
+   link.textContent=place.name;
+   row.append(link);
+   if(place.address)row.append(" · "+place.address);
+   for(const credit of place.attributions||[]){
+    if(!credit.provider)continue;
+    const provider=document.createElement("small");
+    provider.textContent=" · "+credit.provider;
+    if(credit.providerUri?.startsWith("https://")){
+     const source=document.createElement("a");
+     source.href=credit.providerUri;
+     source.target="_blank";
+     source.rel="noopener noreferrer";
+     source.textContent=provider.textContent;
+     provider.replaceChildren(source);
+    }
+    row.append(provider);
+   }
+   list.append(row);
+  }
+  results.hidden=!list.children.length;
+  status.textContent=list.children.length?"Open a listing to confirm your business, then enter your details below.":
+   "No matching businesses. Try a different search or enter your details below.";
+ }catch(e){
+  if(run===businessLookupRun&&activePage==="onboarding")status.textContent=e.message;
+ }finally{button.disabled=false}
+});
 window.createBusiness=()=>{
  setupStage();
  $("businessSetupForm").reset();
@@ -2563,6 +2628,8 @@ async function boot(){
    finally{clearTimeout(id)}
    if(!response.ok)throw Error("Authentication service unavailable");
    const config=await response.json();
+   businessLookupEnabled=config.business_lookup_enabled===true;
+   $("businessLookupForm").hidden=!businessLookupEnabled;
    if(!config.supabase_url||!config.supabase_publishable_key)
      throw Error("Authentication service is not configured");
    sb=createClient(config.supabase_url,config.supabase_publishable_key);

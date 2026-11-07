@@ -1,12 +1,13 @@
 from app.semantic import index_fact, reindex_approved, retrieve, enabled
 """Customer self-service API: verified Supabase identity and tenant membership."""
 import hashlib, os, uuid, httpx
-from fastapi import APIRouter, Header, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Header, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 from app.cloud import api, PRICE, MONEY, NO_PRICE, UNKNOWN
 from app.website_import import fetch_page
 from app.pdf_import import extract_pdf, MAX_PDF_BYTES
+from app import places
 from starlette.concurrency import run_in_threadpool
 
 router=APIRouter(prefix="/api/account",tags=["customer"])
@@ -78,7 +79,20 @@ class AgentEdit(BaseModel):
 @router.get("/config")
 def config():
     return {"supabase_url":SUPA() if PUB() else None,"supabase_publishable_key":PUB() or None,
-            "billing_enabled":False,"signup_enabled":bool(PUB())}
+            "billing_enabled":False,"signup_enabled":bool(PUB()),"business_lookup_enabled":places.configured()}
+
+
+class BusinessLookup(BaseModel):
+    query: str = Field(min_length=3, max_length=180)
+
+
+@router.post("/business-lookup")
+def business_lookup(body: BusinessLookup, response: Response, user=Depends(current_user)):
+    query = " ".join(body.query.split())
+    if len(query) < 3:
+        raise HTTPException(422, "Enter a business name and city, or a business phone number.")
+    response.headers["Cache-Control"] = "no-store"
+    return {"places": places.search_businesses(query, user["id"])}
 
 @router.get("/me")
 def me(user=Depends(current_user)):
