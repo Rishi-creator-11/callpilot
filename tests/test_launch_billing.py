@@ -65,12 +65,12 @@ def post_checkout(monkeypatch,plan="starter"):
 def session_data(calls):
     return [d for p,d in calls if p=="checkout/sessions"][0]
 
-def test_first_checkout_includes_the_100_dollar_setup_fee(db,monkeypatch):
+def test_first_checkout_includes_the_25_dollar_setup_fee(db,monkeypatch):
     r,calls=post_checkout(monkeypatch)
     assert r.status_code==200
     d=session_data(calls)
     assert d["line_items[0][price_data][unit_amount]"]=="4900"
-    assert d["line_items[1][price_data][unit_amount]"]=="10000"
+    assert d["line_items[1][price_data][unit_amount]"]=="2500"
     assert d["metadata[setup_applied]"]=="true"
 
 def test_plan_prices_match_the_published_offer(db,monkeypatch):
