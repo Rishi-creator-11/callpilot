@@ -134,6 +134,38 @@ def voice_status():
             "webhook_credential_configured":bool(os.getenv("VAPI_CREDENTIAL_ID")),
             "outbound_enabled":False}
 
+def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
+    """Shared conversation rules for every new and previously provisioned assistant."""
+    from app.account import CALLPILOT_ORG
+    price_policy=(
+        "You may say only the verified CallPilot plan prices supplied by the knowledge tool. "
+        "Do not negotiate, discount, waive fees, imply a free trial, or make deals. "
+        if oid==CALLPILOT_ORG else
+        "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. "
+    )
+    return (
+        f"You are {agent_name}, an AI receptionist for {business_name}. "
+        "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
+        "For EVERY factual question about this business or its services, use "
+        "lookup_approved_knowledge with the caller's complete question. "
+        "Interpret conversational paraphrases, synonyms, speech-to-text mistakes and references "
+        "like 'you', 'your company', 'this business' using the current business context. "
+        "Use only factual information returned by the tool; never invent details. "
+        + price_policy +
+        "When knowledge is unknown, say briefly that you do not have confirmed information "
+        "and can arrange follow-up. Do NOT automatically start closing the call or request "
+        "contact details after an individual question. Continue taking questions. "
+        "Ask for the caller's name and whether the number they are calling from is the best "
+        "callback number only when the caller signals that they are finished or directly "
+        "requests a human follow-up. If a different callback number is preferred, ask for it. "
+        "Remember the name and callback preference once given within this conversation: "
+        "do not ask either question again. If already captured, thank them and end naturally. "
+        "Respect declines; never guess a person's name or number. Do not block hang-ups. "
+        "Never claim to have booked, changed or cancelled an appointment: no voice booking "
+        "tool is connected yet. When the tool fails, offer human follow-up instead of guessing. "
+        "Keep replies short, helpful and conversational."
+    )
+
 @router.post("/businesses/{oid}/vapi/provision")
 def provision_test_agent(oid:str):
     """Create a Vapi TEST assistant, not a number or enabled outbound caller."""
@@ -153,24 +185,7 @@ def provision_test_agent(oid:str):
     if not credential or not os.getenv("VAPI_WEBHOOK_TOKEN"):
         raise HTTPException(503,"Vapi private webhook credential must be configured before voice testing")
     base=public_base()
-    from app.account import CALLPILOT_ORG
-    price_policy=("You may state only the published CallPilot subscription prices returned by "
-                  "lookup_approved_knowledge. Never negotiate, discount, waive fees or close deals. "
-                  if oid==CALLPILOT_ORG else
-                  "Never provide prices, quotes, estimates, discounts, financial amounts or guarantees. ")
-    lead_policy=("Before ending a normal call, ask for the caller's name and ask whether the number "
-                 "they called from is the best callback number. If not, ask for a preferred number. "
-                 "Respect refusals; never invent contact details or prevent a caller hanging up. "
-                 if oid==CALLPILOT_ORG else "")
-    prompt=("You are "+a["agent_name"]+", an AI receptionist for "+business["name"]+". "
-        "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
-        "For EVERY business fact or customer question, call lookup_approved_knowledge with the caller's full question. "
-        "Use ONLY the exact answer returned by that tool, without inventing or adding any details. "
-        + price_policy +
-        "If the tool returns unknown information, tell the caller a team member can follow up. "
-        "Never claim an appointment has been booked, changed or cancelled: you have NO booking tool. "
-        "If the tool fails, offer a human follow-up instead of guessing. "
-        "Speak briefly, clearly and professionally. " + lead_policy)
+    prompt=receptionist_prompt(oid,business["name"],a["agent_name"])
     voice=({"provider":"11labs","model":"eleven_flash_v2_5","voiceId":a["voice_id"]}
         if a["voice_provider"]=="elevenlabs" else {"provider":"vapi","voiceId":"Elliot","version":2})
     tool={"type":"function","async":False,
