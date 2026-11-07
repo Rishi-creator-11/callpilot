@@ -197,3 +197,25 @@ def test_payment_failure_marks_past_due_and_recovery_reactivates(db):
     assert db.t["billing_accounts"][0]["status"]=="past_due"
     hook(sub_event("evt_31","customer.subscription.updated",status="active"))
     assert db.t["billing_accounts"][0]["status"]=="active"
+
+def test_fixed_prices_are_used_in_test_mode_when_configured(db,monkeypatch):
+    monkeypatch.setenv("STRIPE_PRICE_GROWTH","price_growth_1"); monkeypatch.setenv("STRIPE_PRICE_SETUP","price_setup_1")
+    r,calls=post_checkout(monkeypatch,"growth")
+    d=session_data(calls)
+    assert d["line_items[0][price]"]=="price_growth_1" and d["line_items[1][price]"]=="price_setup_1"
+    assert not any("price_data" in k for k in d)
+
+def test_portal_plan_switch_is_recognised_from_the_fixed_price_id(db,monkeypatch):
+    monkeypatch.setenv("STRIPE_PRICE_BUSINESS","price_business_1")
+    db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test","selected_plan":"starter"})
+    e=sub_event("evt_40","customer.subscription.updated",price="price_business_1"); e["data"]["object"]["metadata"]={}
+    hook(e)
+    assert db.t["billing_accounts"][0]["selected_plan"]=="business"
+
+def test_billing_portal_uses_the_callpilot_configuration(db,monkeypatch):
+    monkeypatch.setenv("STRIPE_PORTAL_CONFIG_ID","bpc_callpilot_1")
+    db.t["billing_accounts"].append({"organization_id":OID,"stripe_customer_id":"cus_1","stripe_mode":"test"})
+    seen={}
+    monkeypatch.setattr(billing,"stripe_call",lambda path,method="POST",data=None:seen.update(path=path,data=data) or {"url":"https://portal.test"})
+    assert client.post(f"/api/account/organizations/{OID}/billing-portal").status_code==200
+    assert seen["path"]=="billing_portal/sessions" and seen["data"]["configuration"]=="bpc_callpilot_1"

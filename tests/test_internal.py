@@ -43,8 +43,10 @@ def test_webhook_denied_without_configured_token(monkeypatch):
 def test_legal_page_states_launch_policies():
     r=client.get("/legal")
     assert r.status_code==200
-    for text in ("$49","$99","$179","100","300","600","$100","four minutes","No automatic overage","recorded"):
-        assert text in r.text
-    assert "to be confirmed" in r.text  # open decisions are flagged, never invented
+    for text in ("$49","$99","$179","100","300","600","$100","four minutes","automatic overage","recorded"):
+        assert text.lower() in r.text.lower()
+    assert "to be completed" in r.text  # owner-specific facts are flagged, never invented
+    for text in ("Limitation of liability","Acceptable use","Indemnity","not for emergency services","non-refundable"):
+        assert text.lower() in r.text.lower()
 def test_customer_app_links_to_policies():
     assert "/legal" in client.get("/app").text

@@ -35,6 +35,11 @@ def billing_ready():
             and os.getenv("STRIPE_PRICE_SETUP","").startswith("price_"))
     return True
 
+def fixed_price(name):
+    """Fixed Stripe Price ID for a plan or the setup fee, when configured."""
+    value=os.getenv("STRIPE_PRICE_"+name.upper(),"")
+    return value if value.startswith("price_") else None
+
 def stripe_call(path,method="POST",data=None):
     mode=billing_mode()
     key=os.getenv("STRIPE_SECRET_KEY","")
@@ -120,16 +125,17 @@ def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
         "subscription_data[metadata][plan]":selection.plan,
         "success_url":base+"/app?billing=success#billing",
         "cancel_url":base+"/app?billing=cancelled#billing"}
-    if billing_mode()=="live":
-        data["line_items[0][price]"]=os.environ["STRIPE_PRICE_"+selection.plan.upper()]
+    if fixed_price(selection.plan):
+        # Real Price objects let the customer portal offer plan switching.
+        data["line_items[0][price]"]=fixed_price(selection.plan)
     else:
         data.update({"line_items[0][price_data][currency]":"usd",
           "line_items[0][price_data][unit_amount]":str(plan["monthly_cents"]),
           "line_items[0][price_data][recurring][interval]":"month",
           "line_items[0][price_data][product_data][name]":"CallPilot "+plan["name"]+" subscription"})
     if not (a or {}).get("setup_paid_at"):
-        if billing_mode()=="live":
-            data.update({"line_items[1][price]":os.environ["STRIPE_PRICE_SETUP"],
+        if fixed_price("setup"):
+            data.update({"line_items[1][price]":fixed_price("setup"),
                          "line_items[1][quantity]":"1",
                          "metadata[setup_applied]":"true"})
         else:
@@ -197,9 +203,11 @@ def billing_portal(oid:str,user=Depends(current_user)):
     if not a or not a.get("stripe_customer_id"):raise HTTPException(404,"No billing account")
     if not billing_ready() or a.get("stripe_mode","test")!=billing_mode():
         raise HTTPException(503,"The configured billing environment does not match this account")
-    session=stripe_call("billing_portal/sessions",data={
-        "customer":a["stripe_customer_id"],
-        "return_url":public_base()+"/app"})
+    portal={"customer":a["stripe_customer_id"],"return_url":public_base()+"/app"}
+    if os.getenv("STRIPE_PORTAL_CONFIG_ID","").startswith("bpc_"):
+        # CallPilot's own portal setup (plan switching + cancel at period end), not the account default.
+        portal["configuration"]=os.environ["STRIPE_PORTAL_CONFIG_ID"]
+    session=stripe_call("billing_portal/sessions",data=portal)
     return {"url":session["url"]}
 
 def check_signature(payload:bytes,header:str,secret:str)->bool:
@@ -306,11 +314,10 @@ def handle_stripe_event(e_type,obj):
             plan=(obj.get("metadata") or {}).get("plan")
             # Stripe's customer portal can change the price without changing metadata.
             # The actual fixed live Price ID is authoritative when present.
-            if billing_mode()=="live":
-                for name in PLANS:
-                    if p.get("id")==os.getenv("STRIPE_PRICE_"+name.upper()):
-                        plan=name
-                        break
+            for name in PLANS:
+                if fixed_price(name) and p.get("id")==fixed_price(name):
+                    plan=name
+                    break
             if plan in PLANS:info["selected_plan"]=plan
             # Stripe API versions may store the billing cycle on the item.
             for field in ("current_period_start","current_period_end"):
