@@ -124,12 +124,22 @@ def persist(oid:str,call:dict):
     data=sanitize(call,oid)
     existing=api("call_insights",params={"organization_id":"eq."+oid,
         "provider_call_id":"eq."+data["provider_call_id"],
-        "select":"id,lead_source,lead_stage,lead_reason,follow_up_needed,follow_up_status,follow_up_note,follow_up_due_at,last_reviewed_by"})
+        "select":"id,lead_source,lead_stage,lead_reason,follow_up_needed,follow_up_status,follow_up_note,follow_up_due_at,last_reviewed_by,caller_phone,caller_name,product_interest"})
     if existing:
         previous=existing[0]
         if previous["lead_source"]=="human_reviewed":
             for k in ("lead_source","lead_stage","lead_reason","follow_up_needed"):
                 data[k]=previous[k]
+        # Keep caller-confirmed details captured by live voice tools even
+        # when post-call AI analysis omits them.
+        for k in ("caller_phone","caller_name","product_interest"):
+            if previous.get(k) and not data.get(k):
+                data[k]=previous[k]
+        if previous.get("follow_up_needed") is True:
+            data["follow_up_needed"]=True
+        if previous.get("lead_source")=="ai_suggested" and data.get("lead_source")=="unreviewed":
+            data["lead_source"]="ai_suggested"
+            data["lead_reason"]=previous.get("lead_reason")
         for k in ("follow_up_status","follow_up_note","follow_up_due_at","last_reviewed_by"):
             if previous.get(k) is not None:data[k]=previous[k]
     return api("call_insights","POST",params={"on_conflict":"organization_id,provider_call_id"},
@@ -411,7 +421,7 @@ def refresh_receptionist_prompt(oid:str):
     """
     from app.cloud import org_or_404,api as cloud_api,receptionist_prompt
     cfg=cloud_api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,agent_name","limit":1})
+        "select":"provider_agent_id,agent_name,voice_leads_enabled,voice_booking_enabled","limit":1})
     if not cfg or not cfg[0].get("provider_agent_id"):
         return {"updated":False,"reason":"no_assistant"}
     aid=cfg[0]["provider_agent_id"]
@@ -441,9 +451,22 @@ def refresh_receptionist_prompt(oid:str):
     existing_tools=model.get("tools") or []
     if not isinstance(existing_tools,list):
         return {"updated":False,"reason":"invalid_tool_configuration"}
-    next_tools=list(existing_tools)
-    if not any(isinstance(t,dict) and t.get("type")=="endCall" for t in next_tools):
-        next_tools.append({"type":"endCall"})
+    from app.voice_actions import MANAGED_TOOLS,voice_tool_definitions
+    flags=cfg[0]
+    credential=os.getenv("VAPI_CREDENTIAL_ID","")
+    if (flags.get("voice_leads_enabled") or flags.get("voice_booking_enabled")) and not credential:
+        raise HTTPException(503,"Vapi private tool credential is not configured")
+    base_tools=[t for t in existing_tools if not (isinstance(t,dict) and
+                (t.get("function") or {}).get("name") in MANAGED_TOOLS)]
+    end_tool=next((t for t in base_tools if isinstance(t,dict) and t.get("type")=="endCall"),
+                  {"type":"endCall"})
+    next_tools=[t for t in base_tools if not (isinstance(t,dict) and t.get("type")=="endCall")]
+    next_tools.extend(voice_tool_definitions(oid,credential,flags))
+    next_tools.append(end_tool)
+    transcriber={"provider":"deepgram","model":"nova-3","language":"multi"}
+    prior_voice=assistant.get("voice") or {}
+    desired_voice=(dict(prior_voice,language="auto") if prior_voice.get("provider")=="vapi"
+                   and prior_voice.get("version")==2 else prior_voice)
     goodbye="Thanks for calling. Goodbye."
     # Defer only the opening greeting, not ordinary conversational responses.
     # The scheduled hook uses the exact existing business-specific greeting.
@@ -460,12 +483,15 @@ def refresh_receptionist_prompt(oid:str):
     if (next_messages==messages and next_tools==existing_tools
             and assistant.get("endCallMessage")==goodbye
             and assistant.get("firstMessageMode")=="assistant-waits-for-user"
-            and next_hooks==prior_hooks):
+            and next_hooks==prior_hooks
+            and assistant.get("transcriber")==transcriber
+            and desired_voice==prior_voice):
         return {"updated":False,"reason":"already_current"}
     new_model=dict(model,messages=next_messages,tools=next_tools)
     vapi("PATCH","/assistant/"+aid,body={
         "model":new_model,"endCallMessage":goodbye,
         "firstMessageMode":"assistant-waits-for-user",
+        "transcriber":transcriber,"voice":desired_voice,
         "hooks":next_hooks})
     verified=vapi("GET","/assistant/"+aid)
     saved_model=verified.get("model") or {}
@@ -476,6 +502,12 @@ def refresh_receptionist_prompt(oid:str):
         or not any(t.get("type")=="endCall" for t in saved_tools if isinstance(t,dict))
         or verified.get("endCallMessage")!=goodbye
         or verified.get("firstMessageMode")!="assistant-waits-for-user"
+        or (verified.get("transcriber") or {}).get("language")!="multi"
+        or (desired_voice.get("provider")=="vapi" and desired_voice.get("version")==2
+            and (verified.get("voice") or {}).get("language")!="auto")
+        or any((t.get("function") or {}).get("name") not in [
+            (z.get("function") or {}).get("name") for z in saved_tools if isinstance(z,dict)]
+            for t in next_tools if isinstance(t,dict) and (t.get("function") or {}).get("name") in MANAGED_TOOLS)
         or not any(isinstance(h,dict) and h.get("name")==OPENING_HOOK_NAME
                    and h.get("options",{}).get("seconds")==1
                    and any(a.get("exact")==greeting for a in h.get("do",[]) if isinstance(a,dict))
