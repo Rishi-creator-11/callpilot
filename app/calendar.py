@@ -1,7 +1,8 @@
 """Google Calendar OAuth and appointment validation (requires client credentials)."""
 from __future__ import annotations
-import os,secrets,urllib.parse,httpx
+import os,re,secrets,urllib.parse,httpx
 from datetime import datetime,timedelta,timezone
+from uuid import UUID
 from fastapi import APIRouter,Depends,HTTPException,Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel,Field
@@ -28,10 +29,20 @@ def connection(oid):
 
 @router.get("/api/account/organizations/{oid}/calendar")
 def calendar_status(oid:str,user=Depends(current_user)):
-    membership(oid,user)
+    role=membership(oid,user)
     c=connection(oid)
     return {"connected":bool(c),"provider":"google","configured":configured(),
-            "connected_at":c["connected_at"] if c else None}
+            "connected_at":c["connected_at"] if c else None,"can_manage":role in ("owner","admin")}
+
+
+@router.delete("/api/account/organizations/{oid}/calendar")
+def disconnect_calendar(oid:UUID,user=Depends(current_user)):
+    workspace=str(oid)
+    membership(workspace,user,("owner","admin"))
+    filter_={"organization_id":"eq."+workspace}
+    api("oauth_states","DELETE",params=filter_,prefer="return=minimal")
+    api("calendar_connections","DELETE",params=filter_,prefer="return=minimal")
+    return {"connected":False}
 
 @router.post("/api/account/organizations/{oid}/calendar/connect")
 def authorize(oid:str,user=Depends(current_user)):
@@ -132,6 +143,78 @@ class BookSlot(Slot):
     caller_name:str=Field(min_length=1,max_length=100)
     caller_contact:str=Field(min_length=3,max_length=100)
     service:str=Field(min_length=1,max_length=150)
+
+
+class StaffBooking(BookSlot):
+    request_id:UUID
+
+
+@router.post("/api/account/organizations/{oid}/calendar/book")
+def book_from_dashboard(oid:UUID,body:StaffBooking,user=Depends(current_user)):
+    from app.voice_actions import confirm_calendar_booking
+
+    workspace=str(oid)
+    membership(workspace,user,("owner","admin"))
+    start,end=check_slot(body)
+    name,contact,service=(body.caller_name.strip(),body.caller_contact.strip(),body.service.strip())
+    if len(name)<2 or len(service)<2:
+        raise HTTPException(422,"Enter a customer name and an appointment type.")
+    if not (re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+",contact) or
+            (re.fullmatch(r"[+() .0-9-]+",contact) and 7<=len(re.sub(r"\D","",contact))<=15)):
+        raise HTTPException(422,"Enter a valid contact email or phone number.")
+    if not connection(workspace):
+        raise HTTPException(409,"Connect Google Calendar first.")
+    try:
+        result=confirm_calendar_booking(workspace,"dashboard-"+str(body.request_id),start,end,
+                                       body.duration_minutes,name,contact,service)
+    except ValueError as exc:
+        raise HTTPException(409,str(exc)) from exc
+    if not result["confirmed"]:
+        raise HTTPException(409,result["message"])
+    return {"confirmed":True,"appointment_id":result["appointment_id"],"start":start.isoformat()}
+
+
+@router.post("/api/account/organizations/{oid}/calendar/appointments/{aid}/cancel")
+def cancel_appointment(oid:UUID,aid:UUID,user=Depends(current_user)):
+    workspace=str(oid)
+    membership(workspace,user,("owner","admin"))
+    filter_={"organization_id":"eq."+workspace,"id":"eq."+str(aid)}
+    rows=api("appointment_requests",params={**filter_,"select":"status,calendar_event_id"})
+    if not rows:
+        raise HTTPException(404,"Appointment not found.")
+    row=rows[0]
+    if row["status"]=="cancelled":
+        return {"status":"cancelled"}
+    event_id=row.get("calendar_event_id")
+    if row["status"]!="confirmed" or not event_id:
+        raise HTTPException(409,"Only confirmed Google Calendar appointments can be cancelled here.")
+    headers={"Authorization":"Bearer "+google_token(workspace)}
+    url="https://www.googleapis.com/calendar/v3/calendars/primary/events/"+urllib.parse.quote(event_id,safe="")
+    try:
+        with httpx.Client(timeout=12) as client:
+            response=client.get(url,headers=headers)
+            if response.status_code in (404,410):
+                raise HTTPException(409,"The event could not be verified in the connected calendar.")
+            response.raise_for_status()
+            event=response.json()
+            marker=(event.get("extendedProperties") or {}).get("private") or {}
+            if marker.get("callpilot_org")!=workspace or marker.get("callpilot_reservation_id")!=str(aid):
+                raise HTTPException(409,"Manage this older appointment directly in Google Calendar.")
+            if event.get("status")!="cancelled":
+                etag=event.get("etag")
+                if not etag:
+                    raise HTTPException(502,"Google Calendar did not provide an event version.")
+                deleted=client.delete(url,headers={**headers,"If-Match":etag},params={"sendUpdates":"all"})
+                if deleted.status_code==412:
+                    raise HTTPException(409,"The calendar event changed. Try again.")
+                if deleted.status_code!=204:
+                    raise HTTPException(502,"Google Calendar did not confirm cancellation.")
+    except (httpx.HTTPError,ValueError) as exc:
+        raise HTTPException(502,"Google Calendar did not confirm cancellation.") from exc
+    api("appointment_requests","PATCH",params={**filter_,"status":"eq.confirmed"},
+        data={"status":"cancelled"},prefer="return=minimal")
+    return {"status":"cancelled"}
+
 
 @router.post("/api/account/organizations/{oid}/calendar/book-test")
 def book_test(oid:str,body:BookSlot,user=Depends(current_user)):

@@ -518,7 +518,14 @@ def set_voice_capabilities(oid:str,body:VoiceCapabilities,user=Depends(current_u
 @router.get("/organizations/{oid}/bookings")
 def bookings(oid:str,user=Depends(current_user)):
     membership(oid,user)
-    return api("appointment_requests",params={"organization_id":"eq."+oid,"select":"id,caller_name,service,requested_time,status,created_at","order":"created_at.desc","limit":50})
+    rows=api("appointment_requests",params={"organization_id":"eq."+oid,
+        "select":"id,caller_name,service,requested_time,duration_minutes,status,created_at,calendar_event_id,idempotency_key",
+        "order":"created_at.desc","limit":50})
+    for row in rows:
+        event=row.pop("calendar_event_id",None)
+        reservation=row.pop("idempotency_key",None)
+        row["calendar_managed"]=bool(event and reservation)
+    return rows
 
 @router.post("/organizations/{oid}/test-assistant")
 def create_test_assistant(oid:str,user=Depends(current_user)):

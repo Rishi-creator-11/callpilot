@@ -869,19 +869,27 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
  <p id="knowledgeCheckStatus" role="status" class="muted"></p>
  <div id="knowledgeChecks"></div>
 </div></div>
-<div id="appointments" class="panel card">
-<div class="cp-panel-heading"><div><h2>Appointments</h2><p class="muted">Connect your calendar and test scheduling before relying on live appointment bookings.</p></div></div>
-<div class="cp-section-box"><h3>Calendar connection</h3><p id="calendarStatus" class="muted">Checking Google Calendar configuration...</p>
-<button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button></div>
-<div class="cp-section-box"><h3>Create a test appointment</h3><p>CallPilot checks calendar availability before adding an internal test event. This is not a public customer booking form.</p>
-<div class="cp-form-grid"><div><label for="cname">Customer name</label><input id="cname" placeholder="Test customer"></div>
-<div><label for="cservice">Appointment type</label><input id="cservice" placeholder="Consultation"></div>
-<div><label for="ccontact">Contact</label><input id="ccontact" placeholder="test@example.com"></div>
-<div><label for="cstart">Date and time in your device’s time zone</label><input type="datetime-local" id="cstart"></div></div>
-<label for="cduration">Duration</label><select id="cduration"><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select>
-<div class="cp-inline-actions" style="margin-top:12px"><button class="secondary" onclick="window.checkAvailability()">Check availability</button>
-<button onclick="window.bookTest()">Create test booking</button></div><pre id="calendarResult" role="status">No calendar tests yet.</pre></div>
-<div class="cp-section-box"><h3>Appointment requests</h3><p>Legacy requests are not confirmed calendar bookings.</p><pre id="bookings">No requests loaded.</pre></div></div>
+<section id="appointments" class="panel card">
+<div class="cp-panel-heading"><div><h2>Appointments</h2><p>Manage your bookings and keep your receptionist’s calendar connected.</p></div>
+<button id="openBookingForm" type="button" hidden>New appointment</button></div>
+<div class="cp-section-box"><h3>Google Calendar</h3><p id="calendarStatus" role="status" class="muted">Checking connection…</p>
+<div class="cp-inline-actions">
+<button id="connectAppointmentCalendar" class="secondary" onclick="window.connectCalendar()" hidden>Connect Google Calendar</button>
+<button id="disconnectAppointmentCalendar" class="secondary" type="button" hidden>Disconnect</button>
+</div></div>
+<form id="appointmentForm" class="cp-section-box" hidden><h3>New appointment</h3>
+<p>Choose a time in your device’s time zone. CallPilot checks business hours and the connected calendar before creating the event.</p>
+<div class="cp-form-grid"><div><label for="cname">Customer name</label><input id="cname" minlength="2" maxlength="100" required></div>
+<div><label for="cservice">Appointment type</label><input id="cservice" minlength="2" maxlength="150" required placeholder="Consultation"></div>
+<div><label for="ccontact">Contact email or phone</label><input id="ccontact" minlength="3" maxlength="100" required></div>
+<div><label for="cstart">Date and time</label><input type="datetime-local" id="cstart" required></div></div>
+<label for="cduration">Duration</label><select id="cduration"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option><option value="120">120 minutes</option></select>
+<div class="cp-inline-actions" style="margin-top:12px"><button type="button" class="secondary" onclick="window.checkAvailability()">Check availability</button>
+<button type="submit">Create appointment</button><button id="closeBookingForm" type="button" class="secondary">Close</button></div></form>
+<p id="calendarResult" role="status" class="muted"></p>
+<div class="cp-section-box"><div class="cp-panel-heading"><div><h3>Booking history</h3><p>See bookings made by your receptionist and your team.</p></div>
+<div><label for="bookingFilter">Status</label><select id="bookingFilter"><option value="">All appointments</option><option value="confirmed">Confirmed</option><option value="requested">Requested</option><option value="cancelled">Cancelled</option><option value="rejected">Rejected</option></select></div></div>
+<div id="bookings" aria-live="polite">Loading appointments…</div></div></section>
 <div id="usage" class="panel card" style="display:none">
 <div class="cp-panel-heading"><div><h2>Usage &amp; business phone</h2><p class="muted">See exactly how many AI minutes your business uses, and connect its phone number.</p></div><span class="pill">Monthly allowance</span></div>
 <div class="cp-section-box">
@@ -1410,6 +1418,15 @@ window.loadWorkspace=async({destination}={})=>{
     $("studioCatalogList").textContent="Loading products…";
     $("studioOrderList").textContent="Loading order requests…";
     $("studioTestResult").textContent="Ask a question to check the approved knowledge for this workspace.";
+    calendarCanManage=false;appointmentRows=[];appointmentRequestId=null;
+    $("appointmentForm").reset();
+    $("appointmentForm").hidden=true;
+    $("openBookingForm").hidden=true;
+    $("disconnectAppointmentCalendar").hidden=true;
+    $("connectAppointmentCalendar").hidden=true;
+    $("calendarStatus").textContent="Checking connection…";
+    $("calendarResult").textContent="";
+    $("bookings").textContent="Loading appointments…";
    }
    $("headerWorkspace").textContent=o?.name||"Your business";
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
@@ -1979,7 +1996,15 @@ $("knowledgeCheckForm").addEventListener("submit",async event=>{
 });
 window.ask=()=>safe(async()=>{const question=v("question").trim();if(!question)throw Error("Please enter a question.");const result=await request("/organizations/"+organization()+"/simulate","POST",{question});$("reply").textContent=result.answer+(result.matched_question?"\n\nMatched approved knowledge: "+result.matched_question:"");});
 async function loadCalendar(){
- let c=await request("/organizations/"+organization()+"/calendar");
+ const oid=organization();
+ const c=await request("/organizations/"+oid+"/calendar");
+ if(oid!==organization())return;
+ calendarCanManage=c.connected&&c.can_manage;
+ $("openBookingForm").hidden=!calendarCanManage;
+ $("connectAppointmentCalendar").hidden=!c.configured||!c.can_manage||c.connected;
+ $("disconnectAppointmentCalendar").hidden=!calendarCanManage;
+ if(!calendarCanManage)$("appointmentForm").hidden=true;
+ renderBookings();
  const statuses={
   connected:"Google Calendar connected successfully.",
   not_connected:"Google declined or cancelled the connection. Please authorize access to continue.",
@@ -2014,13 +2039,97 @@ async function loadConnections(){
   if(oid===organization())$(id).textContent=status;
  }));
 }
-const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Number(v("cduration"))});
-window.checkAvailability=()=>safe(async()=>{
- const result=await request("/organizations/"+organization()+"/calendar/availability","POST",slot());
- $("calendarResult").textContent=result.available?"This time is available.":result.reason||"The connected calendar is busy at this time.";
+let calendarCanManage=false,appointmentRows=[],appointmentRequestId=null;
+function appointmentSlot(){
+ const start=new Date(v("cstart"));
+ if(Number.isNaN(start.getTime()))throw Error("Choose a date and time.");
+ return {start:start.toISOString(),duration_minutes:Number(v("cduration"))};
+}
+$("openBookingForm").addEventListener("click",()=>{
+ $("appointmentForm").hidden=false;
+ $("cname").focus();
 });
-window.bookTest=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/book-test","POST",{...slot(),caller_name:v("cname"),caller_contact:v("ccontact"),service:v("cservice")}),null,2);await loadBookings()});
-async function loadBookings(){$("bookings").textContent=JSON.stringify(await request("/organizations/"+organization()+"/bookings"),null,2)}
+$("closeBookingForm").addEventListener("click",()=>{$("appointmentForm").hidden=true});
+$("appointmentForm").addEventListener("input",()=>{appointmentRequestId=null});
+$("disconnectAppointmentCalendar").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled||!window.confirm("Disconnect Google Calendar? Existing events will stay in Google Calendar. CallPilot will stop booking through this connection."))return;
+ button.disabled=true;
+ try{
+  await request("/organizations/"+oid+"/calendar","DELETE");
+  if(oid!==organization())return;
+  await loadCalendar();
+  $("calendarResult").textContent="Google Calendar disconnected. Existing events are still in Google Calendar.";
+ }catch(e){if(oid===organization())$("calendarResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+window.checkAvailability=async()=>{
+ const oid=organization();
+ try{
+  const result=await request("/organizations/"+oid+"/calendar/availability","POST",appointmentSlot());
+  if(oid===organization())$("calendarResult").textContent=result.available?"This time is available.":result.reason||"The connected calendar is busy at this time.";
+ }catch(e){if(oid===organization())$("calendarResult").textContent=e.message}
+};
+$("appointmentForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),form=event.currentTarget,button=event.submitter;
+ if(!calendarCanManage||button.disabled)return;
+ button.disabled=true;
+ $("calendarResult").textContent="Saving appointment…";
+ try{
+  appointmentRequestId??=crypto.randomUUID();
+  const result=await request("/organizations/"+oid+"/calendar/book","POST",{
+   ...appointmentSlot(),request_id:appointmentRequestId,caller_name:v("cname"),caller_contact:v("ccontact"),service:v("cservice")
+  });
+  if(oid!==organization())return;
+  form.reset();form.hidden=true;appointmentRequestId=null;
+  $("calendarResult").textContent="Appointment confirmed for "+new Date(result.start).toLocaleString()+".";
+  await loadBookings();
+ }catch(e){if(oid===organization())$("calendarResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("bookingFilter").addEventListener("change",renderBookings);
+function renderBookings(){
+ const filter=v("bookingFilter"),list=$("bookings");
+ const rows=appointmentRows.filter(row=>!filter||row.status===filter);
+ list.replaceChildren();
+ if(!rows.length){list.textContent="No appointments match this view.";return}
+ for(const row of rows){
+  const item=document.createElement("article"),details=document.createElement("div");
+  item.className="item row";
+  const title=document.createElement("strong"),description=document.createElement("p");
+  title.textContent=row.service+" · "+row.caller_name;
+  description.textContent=new Date(row.requested_time).toLocaleString()+" · "+row.duration_minutes+" min · "+row.status;
+  description.className="muted";
+  details.append(title,description);item.append(details);
+  if(calendarCanManage&&row.status==="confirmed"&&row.calendar_managed){
+   const button=document.createElement("button");
+   button.type="button";button.className="secondary";button.textContent="Cancel appointment";
+   button.addEventListener("click",async()=>{
+    if(button.disabled||!window.confirm("Cancel this appointment in Google Calendar?"))return;
+    const oid=organization();
+    button.disabled=true;
+    try{
+     await request("/organizations/"+oid+"/calendar/appointments/"+encodeURIComponent(row.id)+"/cancel","POST");
+     if(oid!==organization())return;
+     $("calendarResult").textContent="Appointment cancelled.";
+     await loadBookings();
+    }catch(e){if(oid===organization())$("calendarResult").textContent=e.message}
+    finally{button.disabled=false}
+   });
+   item.append(button);
+  }
+  list.append(item);
+ }
+}
+async function loadBookings(){
+ const oid=organization();
+ try{
+  const rows=await request("/organizations/"+oid+"/bookings");
+  if(oid!==organization())return;
+  appointmentRows=rows;renderBookings();
+ }catch(e){if(oid===organization())$("bookings").textContent=e.message}
+}
 
 window.loadUsage=async()=>{
  if(!organization())return;

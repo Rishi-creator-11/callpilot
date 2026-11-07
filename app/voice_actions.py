@@ -246,8 +246,6 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
         raise ValueError("Voice booking has not been enabled by this business")
     if args.get("confirmed") is not True:
         raise ValueError("Read the details aloud and obtain explicit caller agreement before booking")
-    from app.calendar import google_token, free_busy, within_booking_hours, OUTSIDE_HOURS
-    from app.account import rpc
     start, end, duration = _slot(args)
     name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
     contact = _text(args.get("caller_contact", ""), maximum=100, minimum=3)
@@ -257,8 +255,15 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
             raise ValueError("Invalid contact email")
     else:
         _phone(contact)
+    return confirm_calendar_booking(oid, call_id, start, end, duration, name, contact, service)["message"]
+
+
+def confirm_calendar_booking(oid, call_id, start, end, duration, name, contact, service):
     key = hashlib.sha256((oid + "|" + call_id + "|" + start.astimezone(timezone.utc).isoformat()
                            + "|" + str(duration) + "|" + name.casefold() + "|" + service.casefold()).encode()).hexdigest()
+    from app.account import rpc
+    from app.calendar import google_token, free_busy, within_booking_hours, OUTSIDE_HOURS
+
     reserved = rpc("reserve_voice_appointment", {
         "p_organization_id": oid, "p_idempotency_key": key,
         "p_caller_name": name, "p_caller_contact": contact, "p_service": service,
@@ -270,7 +275,7 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
     row = reserved[0]
     status, rid = row.get("reservation_status"), row.get("reservation_id")
     if status == "conflict":
-        return "That time has just been requested by another customer. Please ask for another time."
+        return {"confirmed": False, "message": "That time has just been requested by another customer. Please ask for another time."}
     if status == "rejected":
         raise ValueError("That booking attempt previously failed; ask for another time")
     if status == "confirmed":
@@ -279,7 +284,7 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
             "select": "calendar_event_id", "limit": 1,
         })
         if prior and prior[0].get("calendar_event_id"):
-            return "Already confirmed: appointment " + str(rid) + " on " + start.isoformat()
+            return {"confirmed": True, "appointment_id": str(rid), "message": "Already confirmed: appointment " + str(rid) + " on " + start.isoformat()}
         raise ValueError("Appointment is marked confirmed but its event reference is missing")
     if status not in ("reserved", "requested") or not rid:
         raise ValueError("Unexpected booking reservation status")
@@ -305,11 +310,11 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
                         "status": "eq.requested",
                     }, data={"status": "rejected"}, prefer="return=minimal")
                     if not inside_hours:
-                        return OUTSIDE_HOURS + " No booking was made; offer another time."
-                    return "The calendar is busy at that time. No booking was made; offer another time."
+                        return {"confirmed": False, "message": OUTSIDE_HOURS + " No booking was made; offer another time."}
+                    return {"confirmed": False, "message": "The calendar is busy at that time. No booking was made; offer another time."}
                 event = {
                     "id": eid, "summary": service,
-                    "description": "CallPilot voice booking; callback: " + contact + "; customer: " + name,
+                    "description": "CallPilot booking; callback: " + contact + "; customer: " + name,
                     "start": {"dateTime": start.isoformat()},
                     "end": {"dateTime": end.isoformat()},
                     "extendedProperties": {"private": {
@@ -332,8 +337,11 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
         "organization_id": "eq." + oid, "id": "eq." + str(rid),
         "status": "eq.requested",
     }, data={"status": "confirmed", "calendar_event_id": eid}, prefer="return=minimal")
-    return ("Confirmed Google Calendar appointment " + str(rid) + " on " + start.isoformat()
-            + " for " + service + ". Caller contact: " + contact + ".")
+    return {
+        "confirmed": True, "appointment_id": str(rid),
+        "message": ("Confirmed Google Calendar appointment " + str(rid) + " on " + start.isoformat()
+                    + " for " + service + ". Caller contact: " + contact + "."),
+    }
 
 
 def _catalog_match(oid: str, item: str) -> dict | None:
