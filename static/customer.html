@@ -536,7 +536,12 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 </div>
 <div id="knowledge" class="panel card">
 <div class="cp-panel-heading"><div><h2>Verified business knowledge</h2><p class="muted">Teach your AI the facts it can safely share. Nothing is used until you approve it.</p></div><span class="pill" id="knowledgeCount">Approved facts</span></div>
-<div class="cp-section-box"><h3>Add a new answer</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
+<div class="cp-section-box"><h3>Tell your assistant about your business</h3><p>Describe your business naturally: what you do, products, services, shipping, policies, and anything customers should know. CallPilot indexes approved passages by meaning—no customer questions required.</p>
+<label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
+<label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
+<div class="cp-inline-actions"><button onclick="window.saveDescription()">Save description</button><span class="muted">Review and approve it below before callers can use the information. Leave out prices and private details.</span></div>
+<h3 style="margin-top:20px">Business descriptions</h3><div id="descriptions" role="region" aria-label="Business descriptions"></div></div>
+<div class="cp-section-box"><h3>Optional: Add a specific Q&amp;A</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
 <label for="faqQ">Customer question</label><input id="faqQ" placeholder="Can I order less than a full container?">
 <label for="faqA">Verified answer</label><textarea id="faqA" placeholder="Write the exact information your team has approved..."></textarea>
 <div class="cp-inline-actions"><button onclick="window.addFact()">Submit for approval</button><span class="muted">Pricing and estimates are never shared by the agent.</span></div></div>
@@ -990,9 +995,60 @@ window.saveWorkspace=()=>safe(async()=>{
 });
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
+let descriptionItems=[];
+async function loadDescriptions(){
+ const oid=organization();if(!oid)return;
+ const docs=await request("/organizations/"+encodeURIComponent(oid)+"/descriptions");
+ if(oid!==organization())return;
+ descriptionItems=docs;
+ $("descriptions").innerHTML=docs.map(d=>
+  '<div class="item"><strong>'+esc(d.title)+'</strong><p style="white-space:pre-wrap">'+esc(d.content)+'</p>'+
+  '<span class="muted">'+(d.approved_at?'Approved and searchable':'Draft — not shared with callers')+'</span> '+
+  (!d.approved_at?'<button class="secondary" data-approve-desc="'+esc(d.id)+'">Approve &amp; index</button>':'')+
+  '<button class="secondary" data-edit-desc="'+esc(d.id)+'">Edit</button> '+
+  '<button class="secondary" data-delete-desc="'+esc(d.id)+'">Delete</button></div>'
+ ).join("")||'<p class="muted">No descriptions yet. Tell your assistant about your business above.</p>';
+ $("descriptions").querySelectorAll("[data-approve-desc]").forEach(b=>b.addEventListener("click",()=>window.approveDescription(b.dataset.approveDesc)));
+ $("descriptions").querySelectorAll("[data-edit-desc]").forEach(b=>b.addEventListener("click",()=>window.editDescription(b.dataset.editDesc)));
+ $("descriptions").querySelectorAll("[data-delete-desc]").forEach(b=>b.addEventListener("click",()=>window.deleteDescription(b.dataset.deleteDesc)));
+}
+window.saveDescription=()=>safe(async()=>{
+ const title=v("descriptionTitle").trim(),content=v("descriptionBody").trim();
+ if(title.length<3||content.length<20)throw Error("Enter a title and at least 20 characters describing your business.");
+ await request("/organizations/"+organization()+"/descriptions","POST",{title,content});
+ $("descriptionTitle").value="";$("descriptionBody").value="";
+ await loadDescriptions();return "Description saved as a draft. Approve and index it below.";
+});
+window.approveDescription=id=>safe(async()=>{
+ const r=await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
+ await loadDescriptions();await loadSemanticStatus();
+ return "Approved and indexed "+r.indexed_passages+" searchable passages.";
+});
+window.editDescription=id=>{
+ const doc=descriptionItems.find(d=>d.id===id);if(!doc)return;
+ const title=prompt("Edit description title",doc.title);if(title===null)return;
+ const content=prompt("Edit business description",doc.content);if(content===null)return;
+ if(title.trim().length<3||content.trim().length<20){msg("Enter a title and at least 20 characters.",true);return}
+ return safe(async()=>{
+  await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id),"PUT",
+   {title:title.trim(),content:content.trim()});
+  await loadDescriptions();await loadSemanticStatus();
+  return "Description saved as draft. Approve again to use updated information.";
+ });
+};
+window.deleteDescription=id=>{
+ const doc=descriptionItems.find(d=>d.id===id);if(!doc)return;
+ if(!confirm("Delete this business description and remove its knowledge from the AI?"))return;
+ return safe(async()=>{
+  await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id),"DELETE");
+  await loadDescriptions();await loadSemanticStatus();
+  return "Description and searchable passages deleted.";
+ });
+};
 let knowledgeItems=[];
 async function loadFacts(){
  const oid=organization();if(!oid)return;
+ await loadDescriptions();
  const facts=await request("/organizations/"+oid+"/knowledge");
  if(oid!==organization())return;
  knowledgeItems=facts;
