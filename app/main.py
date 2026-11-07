@@ -577,6 +577,9 @@ app.include_router(highlevel_router)
 from app.agent_builder import router as agent_builder_router
 app.include_router(agent_builder_router)
 
+from app.analytics import router as analytics_router
+app.include_router(analytics_router)
+
 from app.shopify_connection import router as shopify_connection_router
 app.include_router(shopify_connection_router)
 

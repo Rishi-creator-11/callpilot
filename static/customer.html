@@ -489,6 +489,79 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 #bookings .item:last-child,#orderReviewList .item:last-child{border-bottom:0}
 #bookings .item p,#orderReviewList .item p{margin:4px 0 0}
 @media(max-width:760px){#builder .cp-studio-grid{grid-template-columns:1fr}}
+</style><style id="assistant-workspace-design">
+.cp-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+body.cp-signed-in{--cp-dock-width:clamp(330px,30vw,460px);background:#f8f7f3}
+body.cp-signed-in #dashboard>.row{padding:24px clamp(16px,2.4vw,36px) 18px;min-height:102px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+body.cp-signed-in #dashboard>.row>div{width:auto;margin:0}
+body.cp-signed-in #dashboard .cp-main-content{padding:0 clamp(16px,2.4vw,36px) 28px}
+body.cp-signed-in #dashboard>.row h1{font-size:25px;line-height:1.12;margin:4px 0}
+body.cp-signed-in #dashboard>.row>div>p{margin:4px 0 0}
+body.cp-signed-in #dashboard .cols>aside.sidebar{background:#10213a;border-color:#21354e}
+body.cp-signed-in .sidebar .cp-side-scroll>button.cp-active{background:#294762;color:white}
+body.cp-signed-in .sidebar .cp-side-scroll>button .cp-nav-icon{color:#d8e4ef}
+body.cp-signed-in .sidebar button.cp-collapse-button{background:#acebd9;color:#10213a}
+body.cp-signed-in .sidebar button.cp-collapse-button:hover{background:#d0f4e8;color:#10213a}
+.cp-workspace-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cp-workspace-tools select{width:auto;max-width:min(100%,260px);min-height:40px;margin:0;background:#fff;color:#10213a}
+#dashboard [hidden]{display:none!important}
+@media(min-width:851px){
+ body.cp-signed-in.cp-rail{--cp-sidebar-w:62px}
+ body.cp-signed-in.cp-rail #dashboard .cols>aside.sidebar{padding:13px 7px 8px!important}
+ body.cp-signed-in.cp-rail .sidebar .cp-side-brand{justify-content:center;padding:0;margin-bottom:8px}
+ body.cp-signed-in.cp-rail .sidebar .cp-brand-name,body.cp-signed-in.cp-rail .cp-account-info,body.cp-signed-in.cp-rail .cp-account-chevron,body.cp-signed-in.cp-rail .cp-nav-group{display:none}
+ body.cp-signed-in.cp-rail .sidebar .cp-side-scroll>button[data-section]{justify-content:center;font-size:0;padding:8px!important;min-height:36px;gap:0}
+ body.cp-signed-in.cp-rail .sidebar .cp-side-scroll>button .cp-nav-icon{font-size:17px}
+ body.cp-signed-in.cp-rail .sidebar .cp-side-scroll>.cp-nav-divider{margin:8px 4px}
+ body.cp-signed-in.cp-rail .sidebar .cp-account-trigger{justify-content:center;padding:5px}
+ body.cp-signed-in.cp-rail .sidebar .cp-account-menu{left:51px;right:auto;width:210px;bottom:0}
+}
+@media(max-width:850px){body.cp-signed-in #dashboard>.row{padding-top:78px!important}}
+#builder.panel{padding:0;border:0;box-shadow:none;background:#f8f7f3;max-width:none;margin-bottom:0}
+.assistant-head{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid #dce4df;padding:11px 0}
+.assistant-head h2{margin:0;color:#132740;font-size:18px}
+.assistant-head p{margin:3px 0 0}
+.assistant-head button,.assistant-composer .secondary{font-size:12px;min-height:34px;padding:6px 10px}
+.assistant-work{display:flex;min-width:0;min-height:310px;gap:16px}
+.assistant-thread{min-width:0;flex:1;max-width:950px;margin:0 auto;padding:14px 0 8px}
+.assistant-empty{display:grid;justify-items:center;text-align:center;padding:clamp(24px,6vh,70px) 10px}
+.assistant-empty>span{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:#d5f4e8;color:#145a4a;margin-bottom:10px;font-size:24px}
+.assistant-empty h3{font-size:24px;margin:0 0 8px}
+.assistant-empty .cp-inline-actions{justify-content:center}
+#builderConversation{max-height:none;margin:0;overflow:visible;padding:0}
+#builderConversation li{max-width:88%;padding:10px 13px;margin:0 0 10px;background:#eef1ef}
+#builderConversation li.assistant-user{margin-left:auto;background:#18354f;color:white;border-color:#18354f}
+#builderConversation li.assistant-user p{color:white}
+#builderConversation li button{margin-top:8px;padding:5px 8px;min-height:30px;font-size:12px}
+.assistant-review{flex:0 1 360px;min-width:260px;border:1px solid #dce4df;background:white;border-radius:12px;padding:13px;margin:12px 0}
+.assistant-composer{max-width:950px;margin:auto;padding:8px 0 12px}
+.assistant-composer p{margin:4px 0 8px}
+.assistant-input{display:flex;gap:8px;align-items:end;background:white;border:1px solid #a9bdb7;border-radius:13px;padding:7px 8px}
+.assistant-input textarea{border:0;min-height:40px;resize:vertical;background:white;padding:7px 9px}
+.assistant-input textarea:focus{outline:2px solid #147665;outline-offset:-2px}
+.assistant-input button{min-height:40px}
+#builderHistory{max-width:950px;margin:0 auto}
+body.cp-assistant-full #builder{display:flex!important;flex-direction:column;min-height:calc(100dvh - 140px)}
+body.cp-assistant-full .assistant-work{flex:1}
+body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sticky;bottom:0;background:#f8f7f3}
+@media(min-width:1080px){
+ body.cp-assistant-docked #dashboard>.row{margin-right:var(--cp-dock-width)!important}
+ body.cp-assistant-docked #dashboard .cp-main-content{padding-right:calc(var(--cp-dock-width) + 20px)}
+ body.cp-assistant-docked #builder{position:fixed;inset:0 0 0 auto;width:var(--cp-dock-width);height:100dvh;z-index:31;display:flex!important;flex-direction:column;padding:0 12px;border-left:1px solid #dce4df;border-radius:0;overflow:auto}
+ body.cp-assistant-docked .assistant-head{align-items:start;flex-wrap:wrap}
+ body.cp-assistant-docked .assistant-work{display:block;min-height:100px;flex:1 0 auto}
+ body.cp-assistant-docked .assistant-composer{position:sticky;bottom:0;width:100%;margin:0;background:#f8f7f3}
+}
+@media(max-width:720px){.assistant-work{display:block;min-height:260px}.assistant-head{flex-wrap:wrap}.assistant-review{min-width:0}}
+.cp-analytics-filter{display:flex;flex-wrap:wrap;align-items:end;gap:10px;padding:14px!important}
+.cp-analytics-filter>label{align-self:center;margin:0}.cp-analytics-filter select,.cp-analytics-filter input{width:auto;margin:0}.cp-analytics-filter label{margin:0 0 2px}
+.cp-analytics-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px}
+.cp-analytics-metrics .card{padding:14px}.cp-analytics-metrics strong{display:block;font-size:25px;color:#132740}
+.cp-analytics-card{margin-top:14px;padding:16px!important}.cp-analytics-card h2{margin:0 0 8px}
+.cp-analytics-card details{margin-top:13px}
+#analyticsChart{display:flex;align-items:end;gap:3px;height:160px;padding:8px 4px 0;border-bottom:1px solid #d4e4dc;background:#f1f6f2}
+#analyticsChart span{flex:1;background:#228171;border-radius:3px 3px 0 0;min-width:0}
+#analyticsDaily,#analyticsOutcomes{max-height:260px;overflow:auto}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
@@ -526,32 +599,31 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 <div class="cp-divider"></div><p class="muted" style="font-size:12px;margin:0">Protected sign-in powered by Supabase Auth. Your business information stays within your workspace.</p>
 </div></div></section>
 <section id="dashboard"><div class="cp-mobile-appbar"><button class="cp-mobile-menu" onclick="window.toggleSidebar()" aria-label="Open navigation">☰</button><div class="cp-mobile-brand">✦ Call<span>Pilot</span></div><button class="cp-mobile-account" onclick="window.section('account')" aria-label="My account">●</button></div><button id="cpSidebarBackdrop" class="cp-sidebar-backdrop" onclick="window.closeSidebar()" tabindex="-1" aria-label="Close navigation"></button><div class="row"><div><div class="cp-overline">WORKSPACE / <strong id="headerWorkspace">Your business</strong></div>
-<h1 id="pageTitle">Overview</h1><p id="welcome" class="muted">Everything you need to run your front desk.</p></div>
-<span class="pill" id="headerStatus"><span class="cp-stat-dot"></span> Business console</span></div>
+<h1 id="pageTitle">Assistant</h1><p id="welcome" class="muted"></p></div>
+<div class="cp-workspace-tools"><label for="org" class="cp-visually-hidden">Current business</label><select id="org" aria-label="Current business" onchange="window.loadWorkspace()"></select><button id="assistantDockToggle" type="button" class="secondary" hidden>Show assistant</button></div></div>
 <button class="cp-sidebar-collapse-open" onclick="window.toggleSidebar()" title="Expand navigation" aria-label="Expand sidebar">☰</button><div class="cols"><aside id="appSidebar" class="card sidebar" aria-label="Main navigation">
-<div class="cp-side-brand"><div class="cp-brand-lockup"><span class="cp-brand-glyph" aria-hidden="true">✦</span><span class="cp-brand-name">Call<span>Pilot</span></span></div><button class="cp-collapse-button" onclick="window.toggleSidebar()" aria-label="Collapse sidebar" title="Collapse sidebar">☰</button></div>
-<div class="cp-side-workspace"><label for="org">WORKSPACE</label><select id="org" aria-label="Current business" onchange="window.loadWorkspace()"></select></div>
-
+<div class="cp-side-brand"><button class="cp-collapse-button" onclick="window.toggleSidebar()" aria-label="Toggle navigation labels" title="Toggle navigation labels">✦</button><span class="cp-brand-name">Call<span>Pilot</span></span></div>
 <div class="cp-side-scroll">
 <div class="cp-nav-group">WORKSPACE</div>
-<button data-section="studio" onclick="window.section('studio')"><span class="cp-nav-icon">✦</span> Launch studio</button>
-<button data-section="builder" onclick="window.section('builder')"><span class="cp-nav-icon">✧</span> Agent builder</button>
-<button data-section="workers" onclick="window.section('workers')"><span class="cp-nav-icon">⋮</span> Workers</button>
-<button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
-<button data-section="knowledge" onclick="window.section('knowledge')"><span class="cp-nav-icon">▤</span> Knowledge base</button>
-<button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
-<button data-section="simulator" onclick="window.section('simulator')"><span class="cp-nav-icon">◇</span> Test assistant</button>
-<button data-section="appointments" onclick="window.section('appointments')"><span class="cp-nav-icon">▣</span> Appointments</button>
-<button data-section="orders" onclick="window.section('orders')"><span class="cp-nav-icon">▧</span> Order requests</button>
-<button data-section="connections" onclick="window.section('connections')"><span class="cp-nav-icon">↔</span> Connections</button>
-<div class="cp-nav-divider"></div><div class="cp-nav-group">MANAGEMENT</div>
-<button data-section="usage" onclick="window.section('usage')"><span class="cp-nav-icon">◷</span> Usage &amp; phone</button>
-<button data-section="billing" onclick="window.section('billing')"><span class="cp-nav-icon">▧</span> Billing &amp; plans</button>
-<button data-section="workspace" onclick="window.section('workspace')"><span class="cp-nav-icon">⚙</span> Business settings</button>
-<button data-section="help" onclick="window.section('help')"><span class="cp-nav-icon">ⓘ</span> Help &amp; support</button>
+<button data-section="builder" title="Assistant" onclick="window.section('builder',{push:true})"><span aria-hidden="true" class="cp-nav-icon">✧</span> Assistant</button>
+<button data-section="analytics" title="Analytics" onclick="window.section('analytics',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▥</span> Analytics</button>
+<button data-section="calls" title="Sessions" onclick="window.section('calls',{push:true})"><span aria-hidden="true" class="cp-nav-icon">☎</span> Sessions</button>
+<button data-section="channels" title="Channels" onclick="window.section('channels',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◉</span> Channels</button>
+<div class="cp-nav-divider"></div><div class="cp-nav-group">AGENT</div>
+<button data-section="voice" title="Identity" onclick="window.section('voice',{push:true})"><span aria-hidden="true" class="cp-nav-icon">♙</span> Identity</button>
+<button data-section="workers" title="Workers" onclick="window.section('workers',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⋮</span> Workers</button>
+<button data-section="knowledge" title="Knowledge" onclick="window.section('knowledge',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▤</span> Knowledge</button>
+<button data-section="connections" title="Connections" onclick="window.section('connections',{push:true})"><span aria-hidden="true" class="cp-nav-icon">↔</span> Connections</button>
+<div class="cp-nav-divider"></div><div class="cp-nav-group">OPERATIONS</div>
+<button data-section="appointments" title="Appointments" onclick="window.section('appointments',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▣</span> Appointments</button>
+<button data-section="orders" title="Order requests" onclick="window.section('orders',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▧</span> Order requests</button>
+<button data-section="studio" title="Setup" onclick="window.section('studio',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚑</span> Setup</button>
+<button data-section="simulator" title="Test assistant" onclick="window.section('simulator',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◇</span> Test assistant</button>
+<button data-section="workspace" title="Business settings" onclick="window.section('workspace',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚙</span> Business settings</button>
 </div>
 <div class="cp-sidebar-bottom"><div id="cpAccountMenu" class="cp-account-menu" hidden>
 <button onclick="window.openAccountSettings()"><span aria-hidden="true">♙</span> Account settings</button>
+<button onclick="window.section('usage');window.closeAccountMenu()"><span aria-hidden="true">◷</span> Usage &amp; phone</button>
 <button onclick="window.section('billing');window.closeAccountMenu()"><span aria-hidden="true">▤</span> Billing &amp; plans</button>
 <button onclick="window.section('help');window.closeAccountMenu()"><span aria-hidden="true">ⓘ</span> Help &amp; support</button>
 <div class="cp-menu-divider"></div>
@@ -645,31 +717,49 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
  </div>
 </section>
 
-<section id="builder" class="panel card" style="display:none">
- <div class="cp-panel-heading"><div><h2>Agent builder</h2><p>Describe how your receptionist should sound and handle a conversation.</p></div></div>
- <div class="cp-studio-grid">
-  <article class="cp-studio-step">
-   <h3>Tell us what to change</h3>
+<section id="builder" class="panel card" style="display:none" aria-label="Assistant workspace">
+ <header class="assistant-head">
+  <div><h2 id="assistantAgentName">Your assistant</h2><p id="assistantAgentState" class="muted">Loading saved configuration…</p></div>
+  <div class="cp-inline-actions">
+   <button id="builderReset" type="button" class="secondary" hidden>New conversation</button>
+   <button id="builderReviewToggle" type="button" class="secondary" aria-expanded="false" aria-controls="builderReview">Configuration</button>
+   <button id="builderOpenFull" type="button" class="secondary" hidden>Open full view</button>
+   <button id="builderCloseDock" type="button" class="secondary" hidden>Hide assistant</button>
+  </div>
+ </header>
+ <div class="assistant-work">
+  <div class="assistant-thread">
+   <div id="builderWelcome" class="assistant-empty">
+    <span aria-hidden="true">✦</span><h3>What should your receptionist do?</h3>
+    <p>Describe a change and review the configuration before saving it.</p>
+    <div id="builderSuggestions" class="cp-inline-actions">
+     <button type="button" class="secondary" data-builder-suggestion="Make the greeting brief and welcoming.">Shorten the greeting</button>
+     <button type="button" class="secondary" data-builder-suggestion="Ask one clarifying question at a time when a caller asks for help.">Refine caller questions</button>
+     <button type="button" class="secondary" onclick="window.section('studio')">Review setup</button>
+    </div>
+   </div>
    <ol id="builderConversation" aria-label="Builder conversation" aria-live="polite"></ol>
-   <form id="builderRequest">
-    <label for="builderPrompt">Message to the builder</label>
-    <textarea id="builderPrompt" minlength="5" maxlength="1200" required placeholder="Make the greeting shorter and ask one question at a time."></textarea>
-    <p class="muted">Draft requests use our AI provider. Leave out passwords and customer information.</p>
-    <button type="submit">Draft changes</button>
-   </form>
-  </article>
-  <article class="cp-studio-step"><h3>Review your configuration</h3>
+  </div>
+  <aside id="builderReview" class="assistant-review" hidden>
+   <h3>Review your configuration</h3>
    <form id="builderSettings">
     <label for="builderName">Receptionist name</label><input id="builderName" required maxlength="80">
     <label for="builderGreeting">Opening greeting</label><textarea id="builderGreeting" required minlength="10" maxlength="500"></textarea>
     <label for="builderInstructions">Conversation instructions</label><textarea id="builderInstructions" maxlength="2400" rows="5"></textarea>
-    <p class="muted">Save your edits to the workspace. The next sync applies them to the connected managed assistant.</p>
+    <p class="muted">Save your edits to the workspace. Sync when you want to apply saved settings to the managed assistant.</p>
     <div class="cp-inline-actions"><button type="submit">Save configuration</button><button id="builderSync" type="button" class="secondary" disabled>Sync live assistant</button></div>
    </form>
-   <p id="builderStatus" role="status" class="muted"></p>
    <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Manage approved knowledge →</button>
-   <button class="cp-studio-textbtn" onclick="window.section('simulator')">Open assistant practice →</button>
-  </article>
+  </aside>
+ </div>
+ <div class="assistant-composer">
+  <p id="builderStatus" role="status" class="muted"></p>
+  <form id="builderRequest">
+   <label for="builderPrompt" class="cp-visually-hidden">Message the assistant</label>
+   <div class="assistant-input"><textarea id="builderPrompt" minlength="5" maxlength="1200" required rows="2" placeholder="Ask CallPilot to change something…"></textarea><button type="submit">Send</button></div>
+   <p class="muted">Drafts use our AI provider. Keep passwords and customer information out of messages.</p>
+  </form>
+  <div class="cp-inline-actions"><button class="secondary" onclick="window.section('simulator')">Practice as a caller</button><button class="secondary" onclick="window.section('channels')">Open channels</button></div>
  </div>
  <details id="builderHistory" class="cp-section-box" hidden>
   <summary>Configuration history</summary>
@@ -775,6 +865,35 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
   </article>
  </div>
 </div>
+<section id="analytics" class="panel" style="display:none">
+ <form id="analyticsFilter" class="card cp-analytics-filter">
+  <label for="analyticsRange">Date range</label>
+  <select id="analyticsRange"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="custom">Custom range</option></select>
+  <div id="analyticsDates" class="cp-inline-actions" hidden><div><label for="analyticsFrom">From</label><input id="analyticsFrom" type="date"></div><div><label for="analyticsTo">To</label><input id="analyticsTo" type="date"></div></div>
+  <button type="submit" class="secondary">Apply range</button>
+ </form>
+ <p id="analyticsStatus" role="status" class="muted">Loading analytics…</p>
+ <div class="cp-analytics-metrics">
+  <article class="card"><span>Calls</span><strong id="analyticsCalls">—</strong></article>
+  <article class="card"><span>Unique callers</span><strong id="analyticsCallers">—</strong></article>
+  <article class="card"><span>Average duration</span><strong id="analyticsDuration">—</strong></article>
+  <article class="card"><span>Open follow-ups</span><strong id="analyticsFollowUps">—</strong></article>
+ </div>
+ <article class="card cp-analytics-card"><div class="row"><h2>Call volume</h2><button type="button" class="secondary" onclick="window.section('calls')">Open sessions</button></div>
+  <p id="analyticsChartLabel" class="muted"></p><div id="analyticsChart" aria-hidden="true"></div>
+  <details><summary>Daily totals</summary><div id="analyticsDaily"></div></details>
+ </article>
+ <article class="card cp-analytics-card"><h2>Lead outcomes</h2><div id="analyticsOutcomes"></div></article>
+</section>
+<section id="channels" class="panel card" style="display:none">
+ <div class="cp-panel-heading"><div><h2>Channels</h2><p>Choose how people reach your receptionist.</p></div></div>
+ <div class="cp-studio-connections">
+  <article class="cp-studio-connection"><h3>Phone</h3><p>Link your managed number, set forwarding and review your fallback.</p>
+   <p id="channelPhone" role="status">Checking connection…</p><button class="secondary" onclick="window.section('usage')">Manage phone</button></article>
+  <article class="cp-studio-connection"><h3>Browser practice</h3><p>Try the assistant from your workspace before routing calls.</p>
+   <p id="channelPractice" role="status">Checking availability…</p><button class="secondary" onclick="window.section('simulator')">Open practice</button></article>
+ </div>
+</section>
 <div id="calls" class="panel">
   <div class="ci-head">
     <div><h2 style="font-size:24px;margin:0">Your conversations</h2><p class="muted">Review calls, identify genuine interest and follow up with confidence.</p></div>
@@ -1108,7 +1227,7 @@ let toastTimeout;const msg=(t,fail=false)=>{clearTimeout(toastTimeout);$("messag
 function organization(){return v("org")}
 async function request(url,method="GET",data){if(!current)throw Error("Please sign in");const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired");let r=await fetch("/api/account"+url,{method,headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:data?JSON.stringify(data):undefined});let j=await r.json().catch(()=>({}));if(!r.ok){let d=j.detail;let message=Array.isArray(d)?d.map(x=>{const field=Array.isArray(x.loc)?x.loc.filter(t=>t!=="body").join("."):"field";return (field||"Input")+": "+(x.msg||"Invalid value")}).join("; "):typeof d==="string"?d:d&&typeof d==="object"?(d.message||JSON.stringify(d)):"Request failed (HTTP "+r.status+")";throw Error(message)}return j}
 async function safe(fn){try{msg("");const result=await fn();if(typeof result==="string")msg(result)}catch(e){msg(e instanceof Error?e.message:String(e),true)}}
-let authView="signin",activePage="calls",recoveryMode=false;
+let authView="signin",activePage="builder",recoveryMode=false;
 window.authMode=mode=>{
  authView=mode;
  const isSignUp=mode==="signup",isReset=mode==="reset";
@@ -1194,7 +1313,7 @@ window.signOut=async()=>{
  window.closeAccountMenu();
  try{await sb.auth.signOut()}catch(e){ /* Local sign-out still clears the visible account. */ }
  current=null;
- activePage="calls";
+ activePage="builder";
  history.replaceState(null,"",location.pathname);
  await render();
 };
@@ -1209,7 +1328,8 @@ window.toggleSidebar=()=>{
   if(opening)setTimeout(()=>document.querySelector("#appSidebar .cp-collapse-button")?.focus(),20);
   else if(cpMobileReturnFocus?.isConnected)cpMobileReturnFocus.focus();
  }else{
-  document.body.classList.toggle("cp-collapsed");
+  const compact=document.body.classList.toggle("cp-rail");
+  writeWorkspacePreference("navExpanded",compact?"":"yes");
   window.closeAccountMenu();
  }
 };
@@ -1238,12 +1358,14 @@ document.addEventListener("click",e=>{
 const pageMeta={
  onboarding:["Business setup","Create a workspace and get your receptionist ready to learn."],
  studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
- builder:["Agent builder","Draft, review and sync your receptionist’s configuration."],
+ builder:["Assistant","Draft, review and sync your receptionist’s configuration."],
+ analytics:["Analytics","Track call volume, caller activity and lead outcomes."],
+ channels:["Channels","Manage the ways people reach your receptionist."],
  workers:["Workers","Organize the playbooks your receptionist follows on calls."],
- calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
+ calls:["Sessions","Review calls, transcripts and follow-up activity."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
- voice:["AI receptionist","Choose the identity, greeting and voice for your front desk."],
+ voice:["Identity","Manage the identity, greeting and voice for your receptionist."],
  simulator:["Test assistant","Test approved answers before customers hear them."],
  appointments:["Appointments","Manage appointment requests and calendar connections."],
  orders:["Order requests","Review and resolve customer order requests."],
@@ -1256,14 +1378,41 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   studio:()=>window.loadStudio(),builder:()=>loadBuilder(),workers:()=>loadWorkers(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics(),channels:()=>loadChannels(),
+   workers:()=>loadWorkers(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
 }
+let assistantDockOpen=true;
+const dockViewport=window.matchMedia("(min-width:1080px)");
+function updateAssistantDock(){
+ const available=Boolean(organization())&&!["builder","onboarding"].includes(activePage);
+ const docked=available&&dockViewport.matches&&assistantDockOpen;
+ document.body.classList.toggle("cp-assistant-docked",docked);
+ document.body.classList.toggle("cp-assistant-full",activePage==="builder");
+ $("builder").style.display=activePage==="builder"||docked?"block":"none";
+ $("assistantDockToggle").hidden=!available||docked;
+ $("builderOpenFull").hidden=!docked;
+ $("builderCloseDock").hidden=!docked;
+ if(docked)loadActivePage("builder");
+}
+dockViewport.addEventListener("change",updateAssistantDock);
+$("assistantDockToggle").addEventListener("click",()=>{
+ if(!dockViewport.matches){window.section("builder",{push:true});return}
+ assistantDockOpen=true;
+ updateAssistantDock();
+ $("builderReviewToggle").focus();
+});
+$("builderCloseDock").addEventListener("click",()=>{
+ assistantDockOpen=false;updateAssistantDock();$("assistantDockToggle").focus();
+});
+$("builderOpenFull").addEventListener("click",()=>{
+ window.section("builder",{push:true});$("builderReviewToggle").focus();
+});
 window.section=(x,options={})=>{
- if(!pageMeta[x])x="calls";
+ if(!Object.hasOwn(pageMeta,x))x="builder";
  if(x!=="simulator"&&activePage==="simulator")endVoicePractice();
  activePage=x;
  window.closeSidebar();window.closeAccountMenu();
@@ -1277,11 +1426,18 @@ window.section=(x,options={})=>{
  });
  $("pageTitle").textContent=pageMeta[x][0];
  $("welcome").textContent=pageMeta[x][1];
- if(!options.noHash)history.replaceState(null,"","#"+x);
+ if(!options.noHash&&location.hash!=="#"+x){
+  if(options.push)history.pushState(null,"","#"+x);
+  else history.replaceState(null,"","#"+x);
+ }
  window.scrollTo({top:0,behavior:"instant"});
  if(x==="account")window.fillProfile();
+ updateAssistantDock();
  loadActivePage(x);
 };
+window.addEventListener("popstate",()=>{
+ if(current&&organization())window.section(location.hash.slice(1)||"builder",{noHash:true});
+});
 let pendingInvite="";
 try{
  const fragment=new URLSearchParams(location.hash.slice(1));
@@ -1355,6 +1511,7 @@ async function render(){
    $("topUserName").textContent=name;
    window.fillProfile();
    document.body.classList.remove("cp-collapsed","cp-mobile-open");
+   document.body.classList.toggle("cp-rail",readWorkspacePreference("navExpanded")!=="yes");
    await loadOrganizations();
    document.body.classList.add("cp-signed-in");
    document.body.dataset.appState="ready";
@@ -1557,6 +1714,11 @@ window.loadWorkspace=async({destination}={})=>{
     clearHighLevel();
     clearShopify();
     resetBuilder();
+    clearAnalytics();
+    $("analyticsFilter").reset();
+    $("analyticsDates").hidden=true;
+    $("analyticsFrom").required=$("analyticsTo").required=false;
+    $("analyticsStatus").textContent="Loading analytics…";
     resetWorkers();
     orderReviewRows=[];
     $("orderQuery").value="";
@@ -1593,7 +1755,7 @@ window.loadWorkspace=async({destination}={})=>{
    clearCallWorkspace();
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
    const hash=location.hash.slice(1);
-   const page=destination||(pageMeta[hash]&&hash!=="onboarding"?hash:"studio");
+   const page=destination||(Object.hasOwn(pageMeta,hash)&&hash!=="onboarding"?hash:"builder");
    window.section(page);
    window.refreshAccountPlan();
  });
@@ -2419,11 +2581,19 @@ $("syncWorkers").addEventListener("click",async event=>{
  finally{if(oid===organization())button.disabled=workersDirty}
 });
 const builderPath=oid=>"/organizations/"+oid+"/agent";
-let builderLoaded="",builderCanEdit=false,builderDirty=false;
+let builderLoaded="",builderCanEdit=false,builderDirty=false,builderConversationId=null,builderLoad=null;
 function resetBuilder(){
  builderLoaded="";
+ builderLoad=null;
+ builderConversationId=null;
  builderCanEdit=builderDirty=false;
  $("builderConversation").replaceChildren();
+ $("builderWelcome").hidden=false;
+ $("builderReset").hidden=true;
+ $("builderReview").hidden=true;
+ $("builderReviewToggle").setAttribute("aria-expanded","false");
+ $("assistantAgentName").textContent="Your assistant";
+ $("assistantAgentState").textContent="Loading saved configuration…";
  $("builderRequest").reset();
  $("builderSettings").reset();
  $("builderSync").disabled=true;
@@ -2443,32 +2613,103 @@ function builderFields(){
 }
 async function loadBuilder(){
  const oid=organization();
- if(builderLoaded===oid)return;
+ if(builderLoaded===oid||builderLoad===oid)return;
+ builderLoad=oid;
  builderCanEdit=false;
  $("builderRequest").hidden=true;
  try{
-  const agent=await request(builderPath(oid));
+  const canEdit=["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role);
+  const [agent,thread]=await Promise.allSettled([
+   request(builderPath(oid)),
+   canEdit?request(builderPath(oid)+"/conversation"):Promise.resolve({id:null,turns:[]})
+  ]);
   if(oid!==organization())return;
-  setBuilderFields(agent);
+  if(agent.status==="rejected")throw agent.reason;
+  setBuilderFields(agent.value);
+  if(thread.status==="fulfilled"){
+   builderConversationId=thread.value.id;
+   renderBuilderTurns(thread.value.turns);
+  }
   builderLoaded=oid;
-  builderCanEdit=["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role);
+  builderCanEdit=canEdit;
   $("builderRequest").hidden=!builderCanEdit;
+  $("builderReset").hidden=!builderCanEdit;
   $("builderHistory").hidden=!builderCanEdit;
   for(const field of $("builderSettings").elements)field.disabled=!builderCanEdit;
-  $("builderStatus").textContent=builderCanEdit?"Your saved configuration is loaded.":"Only workspace owners and admins can edit this configuration.";
+  $("assistantAgentName").textContent=(agent.value.agent_name||"Your")+" assistant";
+  $("assistantAgentState").textContent=orgs.find(workspace=>workspace.id===oid)?.name||"Workspace";
+  $("builderStatus").textContent=thread.status==="rejected"?"Conversation history could not be loaded. Refresh before sending a message.":
+   builderCanEdit?"":"Only workspace owners and admins can edit this configuration.";
+  if(thread.status==="rejected")$("builderRequest").hidden=true;
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+ finally{if(builderLoad===oid)builderLoad=null}
 }
 $("builderSettings").addEventListener("input",()=>{
  builderDirty=true;
  $("builderSync").disabled=true;
 });
-function addBuilderMessage(label,text){
+function showBuilderReview(open){
+ $("builderReview").hidden=!open;
+ $("builderReviewToggle").setAttribute("aria-expanded",String(open));
+}
+$("builderReviewToggle").addEventListener("click",()=>showBuilderReview($("builderReview").hidden));
+document.querySelectorAll("[data-builder-suggestion]").forEach(button=>button.addEventListener("click",()=>{
+ if(!builderCanEdit||$("builderRequest").hidden)return;
+ $("builderPrompt").value=button.dataset.builderSuggestion;
+ $("builderPrompt").focus();
+}));
+$("builderPrompt").addEventListener("keydown",event=>{
+ if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){
+  event.preventDefault();
+  $("builderRequest").requestSubmit($("builderRequest").querySelector("button[type='submit']"));
+ }
+});
+function addBuilderMessage(label,text,proposal=null){
  const row=document.createElement("li"),heading=document.createElement("strong"),body=document.createElement("p");
+ if(label==="You")row.className="assistant-user";
  heading.textContent=label;
  body.textContent=text;
  row.append(heading,body);
+ if(proposal){
+  const review=document.createElement("button");
+  review.type="button";review.className="secondary";review.textContent="Review this draft";
+  review.addEventListener("click",()=>{
+   if(builderDirty&&!window.confirm("Replace the unsaved configuration with this draft?"))return;
+   setBuilderFields(proposal);
+   builderDirty=true;
+   $("builderSync").disabled=true;
+   showBuilderReview(true);
+  });
+  row.append(review);
+ }
+ $("builderWelcome").hidden=true;
  $("builderConversation").append(row);
 }
+function renderBuilderTurns(turns){
+ $("builderConversation").replaceChildren();
+ $("builderWelcome").hidden=Boolean(turns.length);
+ for(const turn of turns){
+  addBuilderMessage("You",turn.request);
+  addBuilderMessage("CallPilot",turn.proposal.explanation,turn.proposal);
+ }
+}
+$("builderReset").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ const send=$("builderRequest").querySelector("button[type='submit']");
+ if(!builderCanEdit||button.disabled||send.disabled)return;
+ if($("builderConversation").childElementCount&&!window.confirm("Start a new conversation and clear this conversation history?"))return;
+ button.disabled=send.disabled=true;
+ try{
+  const thread=await request(builderPath(oid)+"/conversation/reset","POST");
+  if(oid!==organization())return;
+  builderConversationId=thread.id;
+  renderBuilderTurns(thread.turns);
+  $("builderPrompt").value="";
+  $("builderStatus").textContent="New conversation started.";
+  $("builderPrompt").focus();
+ }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+ finally{button.disabled=send.disabled=false}
+});
 $("builderRequest").addEventListener("submit",async event=>{
  event.preventDefault();
  const oid=organization(),button=event.submitter,prompt=v("builderPrompt").trim(),fields=builderFields();
@@ -2476,16 +2717,22 @@ $("builderRequest").addEventListener("submit",async event=>{
  button.disabled=true;
  $("builderStatus").textContent="Drafting changes…";
  try{
-  const proposal=await request(builderPath(oid)+"/draft","POST",{...fields,request:prompt});
+  if(!builderConversationId){
+   const thread=await request(builderPath(oid)+"/conversation/reset","POST");
+   if(oid!==organization())return;
+   builderConversationId=thread.id;
+  }
+  const proposal=await request(builderPath(oid)+"/draft","POST",{...fields,request:prompt,conversation_id:builderConversationId});
   if(oid!==organization())return;
+  addBuilderMessage("You",prompt);
+  addBuilderMessage("CallPilot",proposal.explanation,proposal);
+  $("builderPrompt").value="";
   if(JSON.stringify(fields)!==JSON.stringify(builderFields())){
-   $("builderStatus").textContent="Your edits changed during generation. Submit again to use the latest configuration.";
+   $("builderStatus").textContent="Your edits changed during generation. The proposal is available in the conversation.";
    return;
   }
-  addBuilderMessage("You",prompt);
-  addBuilderMessage("CallPilot",proposal.explanation);
   setBuilderFields(proposal);
-  $("builderPrompt").value="";
+  showBuilderReview(true);
   builderDirty=true;
   $("builderSync").disabled=true;
   $("builderStatus").textContent="Draft ready. Review the fields and save if you want to use them.";
@@ -2504,6 +2751,7 @@ $("builderSettings").addEventListener("submit",async event=>{
   $("builderSync").disabled=builderDirty;
   $("studioAgentName").value=fields.agent_name;
   $("studioGreeting").value=fields.greeting;
+  $("assistantAgentName").textContent=fields.agent_name+" assistant";
   $("builderStatus").textContent=builderDirty?"Saved the previous version. Save again to include your latest edits.":"Configuration saved. Sync when you are ready to update the live assistant.";
   if($("builderHistory").open)await loadBuilderHistory();
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
@@ -2871,6 +3119,80 @@ window.billingPortal=()=>safe(async()=>{const r=await request("/organizations/"+
 /* Call intelligence — real authenticated per-workspace records. */
 let ciCalls=[],ciSelected=null;
 const ciStageLabels={hot:"Hot lead",warm:"Warm lead",general:"General inquiry",not_qualified:"Not qualified",needs_review:"Needs review"};
+let analyticsRun=0;
+function clearAnalytics(){
+ analyticsRun++;
+ for(const id of ["analyticsCalls","analyticsCallers","analyticsDuration","analyticsFollowUps"])$(id).textContent="—";
+ for(const id of ["analyticsChart","analyticsDaily","analyticsOutcomes"])$(id).replaceChildren();
+ $("analyticsChartLabel").textContent="";
+}
+function analyticsList(target,rows){
+ const table=document.createElement("table"),body=document.createElement("tbody");
+ for(const [label,count] of rows){
+  const row=document.createElement("tr"),heading=document.createElement("th"),value=document.createElement("td");
+  heading.scope="row";heading.textContent=label;value.textContent=String(count);
+  row.append(heading,value);body.append(row);
+ }
+ table.append(body);
+ $(target).replaceChildren(table);
+}
+async function loadAnalytics(){
+ const oid=organization(),status=$("analyticsStatus");
+ clearAnalytics();
+ const run=analyticsRun;
+ status.textContent="Loading analytics…";
+ const selection=v("analyticsRange");
+ const dates={start:v("analyticsFrom"),end:v("analyticsTo")};
+ if(selection==="custom"&&(!dates.start||!dates.end)){
+  status.textContent="Choose a start and end date.";
+  return;
+ }
+ const query=new URLSearchParams(selection==="custom"?dates:{days:selection});
+ try{
+  const data=await request("/organizations/"+oid+"/analytics?"+query);
+  if(oid!==organization()||run!==analyticsRun)return;
+  $("analyticsCalls").textContent=data.total.toLocaleString();
+  $("analyticsCallers").textContent=data.unique_callers.toLocaleString();
+  $("analyticsDuration").textContent=ciDuration(data.average_duration_seconds);
+  $("analyticsFollowUps").textContent=data.follow_ups.toLocaleString();
+  status.textContent=data.start+" to "+data.end+" · "+data.time_zone;
+  if(selection!=="custom"){$("analyticsFrom").value=data.start;$("analyticsTo").value=data.end}
+  $("analyticsChartLabel").textContent=data.total?data.inbound+" inbound calls in this period.":"No calls in this date range.";
+  const chart=$("analyticsChart");
+  chart.style.gap=data.daily.length>120?"0":"3px";
+  const max=Math.max(1,...data.daily.map(day=>day.calls));
+  for(const day of data.daily){
+   const bar=document.createElement("span");
+   bar.style.height=(day.calls/max*100)+"%";
+   bar.title=day.day+" · "+day.calls+" calls";
+   chart.append(bar);
+  }
+  analyticsList("analyticsDaily",data.daily.map(day=>[day.day,day.calls]));
+  if(data.stages.length)analyticsList("analyticsOutcomes",data.stages.map(row=>[ciStageLabels[row.stage]||row.stage,row.calls]));
+  else $("analyticsOutcomes").textContent="No lead outcomes in this date range.";
+ }catch(e){if(oid===organization()&&run===analyticsRun)status.textContent=e.message}
+}
+$("analyticsRange").addEventListener("change",()=>{
+ const custom=v("analyticsRange")==="custom";
+ $("analyticsDates").hidden=!custom;
+ $("analyticsFrom").required=$("analyticsTo").required=custom;
+ if(!custom)void loadAnalytics();
+});
+$("analyticsFilter").addEventListener("submit",event=>{event.preventDefault();void loadAnalytics()});
+async function loadChannels(){
+ const oid=organization();
+ const items=[
+  ["channelPhone","/phone",state=>state.connected?(state.phone_number||"Managed number linked"):"No number connected"],
+  ["channelPractice","/voice-preview",state=>state.available?"Voice practice available":"Voice practice unavailable"]
+ ];
+ await Promise.all(items.map(async([id,path,describe])=>{
+  $(id).textContent="Checking availability…";
+  try{
+   const state=await request("/organizations/"+oid+path);
+   if(oid===organization())$(id).textContent=describe(state);
+  }catch(e){if(oid===organization())$(id).textContent=e.message}
+ }));
+}
 const ciTag=(stage)=>'<span class="ci-tag '+(ciStageLabels[stage]?stage:"needs_review")+'">'+esc(ciStageLabels[stage]||"Needs review")+'</span>';
 const ciDate=(value)=>{if(!value)return "Unknown date";const d=new Date(value);return Number.isNaN(d.getTime())?"Unknown date":d.toLocaleString([], {dateStyle:"medium",timeStyle:"short"})};
 const ciDuration=(sec)=>sec==null?"—":Math.floor(sec/60)+"m "+String(sec%60).padStart(2,"0")+"s";

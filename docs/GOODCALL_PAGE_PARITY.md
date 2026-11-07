@@ -45,11 +45,11 @@ Order requests have a dedicated CallPilot review page at `/app#orders`. Provider
 
 | Done | Goodcall page, tab, or dialog | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
-| [ ] | `/agent/dashboard` and persistent Gabi composer | Observed | `/app#builder` includes a text composer, suggested edits, review, save, history, restore and managed assistant sync. Persistent builder, voice input and worker generation remain. |
-| [ ] | `/agent/performance`, date presets/custom range and empty results | Observed | `/app#calls` has summary metrics and dates. Separate reporting, custom metrics and populated chart verification remain. |
+| [ ] | `/agent/dashboard` and persistent Gabi composer | Observed | CallPilot opens at `/app#builder` with private persistent conversation, new-conversation control, review panel, and a desktop assistant dock. Voice input, feedback, and worker generation remain. |
+| [ ] | `/agent/performance`, date presets/custom range and empty results | Observed | `/app#analytics` shows date filters, call totals, a daily volume chart, and lead outcomes. Configurable metrics, worker attribution, and runtime verification remain. |
 | [ ] | `/agent/calls`, search and session list | Observed | `/app#calls` search and date controls verified. Goodcall populated session-detail screens remain uninspected in the empty reference account. |
 | [ ] | Session detail, transcript, recording, and tags | Documented, populated Goodcall detail pending | CallPilot detail panel exists. Verify playback, edits and error states. |
-| [ ] | `/agent/channels`, shareable demo and link tracking | Observed | `/app#usage` covers phone configuration. Shareable browser demo and link tracking missing. |
+| [ ] | `/agent/channels`, shareable demo and link tracking | Observed | `/app#channels` shows actual linked phone and browser practice availability. Shareable demo and link tracking remain. |
 | [ ] | Channels phone connection and number acquisition dialogs | Entry point observed, provisioning flow blocked | CallPilot phone configuration exists. Automatic review blocked opening Goodcall Connect because it may initiate provisioning or a paid setup. Inspect only after a non-committing path is confirmed or the user opens it directly. |
 | [ ] | `/agent/identity` overview | Observed | `/app#voice` partially maps to identity. Overview cards and navigation missing. |
 | [ ] | Identity configuration, Persona tab | Observed | Agent and voice configuration partial. Stock voices, samples, and avatar editing need a counterpart. |
