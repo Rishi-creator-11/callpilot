@@ -186,7 +186,10 @@ def _slot(args: dict) -> tuple[datetime, datetime, int]:
         obj = Slot(start=start, duration_minutes=duration)
     except (ValueError, TypeError) as exc:
         raise ValueError("Provide an exact future date and time with timezone offset") from exc
-    first, last = check_slot(obj)
+    try:
+        first, last = check_slot(obj)
+    except HTTPException as exc:
+        raise ValueError(str(exc.detail)) from exc
     return first, last, duration
 
 
