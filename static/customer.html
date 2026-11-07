@@ -990,7 +990,47 @@ window.saveWorkspace=()=>safe(async()=>{
 });
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
-async function loadFacts(){let facts=await request("/organizations/"+organization()+"/knowledge");$("knowledgeCount").textContent=facts.filter(f=>f.approved_at).length+" approved facts";$("facts").innerHTML=facts.map(f=>'<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p><span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+(!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+'</div>').join("")||'<p>No approved knowledge yet.</p>';$("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)))}
+let knowledgeItems=[];
+async function loadFacts(){
+ const oid=organization();if(!oid)return;
+ const facts=await request("/organizations/"+oid+"/knowledge");
+ if(oid!==organization())return;
+ knowledgeItems=facts;
+ $("knowledgeCount").textContent=facts.filter(f=>f.approved_at).length+" approved facts";
+ $("facts").innerHTML=facts.map(f=>
+  '<div class="item"><strong>'+esc(f.question)+'</strong><p>'+esc(f.answer)+'</p>'+
+  '<span class="muted">'+(f.approved_at?'Approved':'Pending approval')+'</span> '+
+  (!f.approved_at?'<button class="secondary" data-fact="'+esc(f.id)+'">Approve</button>':"")+
+  '<button type="button" class="secondary" data-edit-fact="'+esc(f.id)+'">Edit</button> '+
+  '<button type="button" class="secondary" data-delete-fact="'+esc(f.id)+'">Delete</button></div>'
+ ).join("")||'<p>No approved knowledge yet.</p>';
+ $("facts").querySelectorAll("[data-fact]").forEach(b=>b.addEventListener("click",()=>window.approveFact(b.dataset.fact)));
+ $("facts").querySelectorAll("[data-edit-fact]").forEach(b=>b.addEventListener("click",()=>window.editFact(b.dataset.editFact)));
+ $("facts").querySelectorAll("[data-delete-fact]").forEach(b=>b.addEventListener("click",()=>window.deleteFact(b.dataset.deleteFact)));
+}
+window.editFact=id=>{
+ const fact=knowledgeItems.find(x=>x.id===id);if(!fact)return;
+ const question=prompt("Edit customer question",fact.question);
+ if(question===null)return;
+ const answer=prompt("Edit verified answer",fact.answer);
+ if(answer===null)return;
+ if(question.trim().length<3||answer.trim().length<2){msg("Question or answer is too short.",true);return}
+ return safe(async()=>{
+  await request("/organizations/"+organization()+"/knowledge/"+encodeURIComponent(id),"PUT",
+   {question:question.trim(),answer:answer.trim()});
+  await loadFacts();
+  return "Knowledge updated and reindexed.";
+ });
+};
+window.deleteFact=id=>{
+ const fact=knowledgeItems.find(x=>x.id===id);if(!fact)return;
+ if(!confirm("Delete this knowledge entry? This immediately removes it from the AI knowledge base.\n\n"+fact.question))return;
+ return safe(async()=>{
+  await request("/organizations/"+organization()+"/knowledge/"+encodeURIComponent(id),"DELETE");
+  await loadFacts();
+  return "Knowledge entry deleted.";
+ });
+};
 window.addFact=()=>safe(async()=>{const question=v("faqQ").trim(),answer=v("faqA").trim();if(question.length<3){$("faqQ").focus();throw Error("Enter a customer question (at least 3 characters). The grey example text is only a placeholder.")}if(answer.length<2){$("faqA").focus();throw Error("Enter the verified answer (at least 2 characters).")}await request("/organizations/"+organization()+"/knowledge","POST",{question,answer});$("faqQ").value="";$("faqA").value="";await loadFacts();return "Fact saved. Review and approve it below before the AI can use it."});
 window.approveFact=id=>safe(async()=>{await request("/organizations/"+organization()+"/knowledge/"+id+"/approve","POST");await loadFacts();msg("Fact approved.")});
 async function loadSemanticStatus(){const result=await request("/organizations/"+organization()+"/semantic-status");$("semanticStatus").textContent=result.configured?
