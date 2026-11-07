@@ -36,7 +36,7 @@ def test_order_request_does_not_accept_implicit_yes(monkeypatch):
 
 def test_order_request_respects_recorded_stock(monkeypatch):
     monkeypatch.setattr(voice_actions,"feature_flags",lambda oid:capabilities())
-    monkeypatch.setattr(voice_actions,"api",lambda *a,**kw:[PRODUCT])
+    monkeypatch.setattr(voice_actions,"api",lambda table,*a,**kw:[PRODUCT] if table=="catalog_items" else [])
     reply=voice_actions.submit_order_request(OID,CALL,{"sku":"CARDS-1000","quantity":200,
        "caller_name":"Alex Johnson","caller_contact":"+15555550901","confirmed":True})
     assert "No order request was submitted" in reply
@@ -59,7 +59,7 @@ def test_order_request_is_pending_and_idempotent(monkeypatch):
     first=voice_actions.submit_order_request(OID,CALL,args)
     second=voice_actions.submit_order_request(OID,CALL,args)
     assert "No payment" in first
-    assert "already saved" in second
+    assert "already submitted" in second
     assert len(writes)==1 and writes[0]["status"]=="requested"
     assert writes[0]["quantity"]==2 and writes[0]["sku"]=="CARDS-1000"
 

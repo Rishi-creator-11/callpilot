@@ -47,7 +47,10 @@ def extract_pdf(data: bytes) -> str:
 def _worker() -> int:
     # Apply limits in the child before loading the parser or opening untrusted data.
     import resource
-    resource.setrlimit(resource.RLIMIT_AS, (128 * 1024**2, 128 * 1024**2))
+    try:  # Enforced on Linux (production). Some platforms, such as macOS, refuse a lower address-space limit.
+        resource.setrlimit(resource.RLIMIT_AS, (128 * 1024**2, 128 * 1024**2))
+    except (ValueError, OSError):
+        pass
     resource.setrlimit(resource.RLIMIT_CPU, (5, 6))
     from pypdf import PdfReader
 
