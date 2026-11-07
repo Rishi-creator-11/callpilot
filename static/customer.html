@@ -54,6 +54,16 @@
 #workerIntake fieldset,#workerMenu fieldset{border:1px solid #dce5de;border-radius:12px;padding:14px;margin:16px 0}
 #workerIntake legend,#workerMenu legend{padding:0 6px;font-weight:750}
 @media(max-width:540px){.cp-worker-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cp-worker-nav button{width:100%;padding-inline:8px}}
+/* Goodcall-style navigation */
+body.cp-signed-in #dashboard .cols>aside.sidebar{background:#07104f!important;border-right:0!important}
+body.cp-signed-in .sidebar .cp-side-scroll>button[data-section],body.cp-signed-in .sidebar .cp-more-toggle,body.cp-signed-in .sidebar .cp-side-support{display:flex;align-items:center;gap:12px;width:100%!important;min-height:41px;padding:10px 12px!important;margin:2px 0!important;border-radius:8px!important;color:#c9d1f0;font-size:14px;background:transparent;text-align:left;box-shadow:none}
+body.cp-signed-in .sidebar #navMore>button[data-section]{display:flex;align-items:center;gap:12px;width:100%!important;min-height:38px;padding:9px 12px 9px 22px!important;margin:1px 0!important;border-radius:8px!important;color:#aab4dc;font-size:13px;background:transparent;text-align:left;box-shadow:none}
+body.cp-signed-in .sidebar #navMore[hidden]{display:none!important}
+body.cp-signed-in .sidebar #navMore>button:hover,body.cp-signed-in .sidebar .cp-more-toggle:hover,body.cp-signed-in .sidebar .cp-side-support:hover{background:rgba(255,255,255,.08);color:#fff}
+body.cp-signed-in .sidebar .cp-side-scroll>button.cp-active,body.cp-signed-in .sidebar #navMore>button.cp-active{background:rgba(255,255,255,.12)!important;color:#fff!important;box-shadow:inset 3px 0 0 #fff!important}
+body.cp-signed-in .sidebar .cp-side-scroll>.cp-nav-divider{background:rgba(255,255,255,.14)}
+body.cp-signed-in .sidebar .cp-sidebar-bottom{border-top:1px solid rgba(255,255,255,.14)}
+body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -689,22 +699,24 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <button class="cp-sidebar-collapse-open" onclick="window.toggleSidebar()" title="Expand navigation" aria-label="Expand sidebar">☰</button><div class="cols"><aside id="appSidebar" class="card sidebar" aria-label="Main navigation">
 <div class="cp-side-brand"><button class="cp-collapse-button" onclick="window.toggleSidebar()" aria-label="Toggle navigation labels" title="Toggle navigation labels">✦</button><span class="cp-brand-name">Call<span>Pilot</span></span></div>
 <div class="cp-side-scroll">
-<div class="cp-nav-group">WORKSPACE</div>
 <button data-section="builder" title="Assistant" onclick="window.section('builder',{push:true})"><span aria-hidden="true" class="cp-nav-icon">✧</span> Assistant</button>
 <button data-section="analytics" title="Analytics" onclick="window.section('analytics',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▥</span> Analytics</button>
 <button data-section="calls" title="Sessions" onclick="window.section('calls',{push:true})"><span aria-hidden="true" class="cp-nav-icon">☎</span> Sessions</button>
 <button data-section="channels" title="Channels" onclick="window.section('channels',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◉</span> Channels</button>
-<div class="cp-nav-divider"></div><div class="cp-nav-group">AGENT</div>
+<div class="cp-nav-divider"></div>
 <button data-section="voice" title="Identity" onclick="window.section('voice',{push:true})"><span aria-hidden="true" class="cp-nav-icon">♙</span> Identity</button>
 <button data-section="workers" title="Workers" onclick="window.section('workers',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⋮</span> Workers</button>
-<button data-section="knowledge" title="Knowledge" onclick="window.section('knowledge',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▤</span> Knowledge</button>
 <button data-section="connections" title="Connections" onclick="window.section('connections',{push:true})"><span aria-hidden="true" class="cp-nav-icon">↔</span> Connections</button>
-<div class="cp-nav-divider"></div><div class="cp-nav-group">OPERATIONS</div>
+<div class="cp-nav-divider"></div>
+<button type="button" id="navMoreToggle" class="cp-more-toggle" aria-expanded="false" aria-controls="navMore"><span aria-hidden="true" class="cp-nav-icon">⋯</span> More</button>
+<div id="navMore" hidden>
+<button data-section="knowledge" title="Knowledge" onclick="window.section('knowledge',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▤</span> Knowledge</button>
 <button data-section="appointments" title="Appointments" onclick="window.section('appointments',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▣</span> Appointments</button>
 <button data-section="orders" title="Order requests" onclick="window.section('orders',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▧</span> Order requests</button>
 <button data-section="studio" title="Setup" onclick="window.section('studio',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚑</span> Setup</button>
 <button data-section="simulator" title="Test assistant" onclick="window.section('simulator',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◇</span> Test assistant</button>
 <button data-section="workspace" title="Settings" onclick="window.section('workspace',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚙</span> Settings</button>
+</div>
 </div>
 <div class="cp-sidebar-bottom"><div id="cpAccountMenu" class="cp-account-menu" hidden>
 <button onclick="window.openAccountSettings()"><span aria-hidden="true">♙</span> Account settings</button>
@@ -716,7 +728,8 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 </div>
 <button id="cpAccountTrigger" class="cp-account-trigger" onclick="window.toggleAccountMenu()" aria-expanded="false" aria-controls="cpAccountMenu" aria-label="Account menu">
 <span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small><span id="sideAccountPlan" class="cp-account-plan" role="status">Checking plan…</span></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
-</button></div></aside>
+</button>
+<button type="button" class="cp-side-support" onclick="window.section('help',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◎</span> Support</button></div></aside>
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
 <div id="settingsTabs" class="settings-subnav" role="navigation" aria-label="Settings pages" hidden>
  <button type="button" data-settings-page="account">Profile</button>
@@ -850,6 +863,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </aside>
  </div>
  <div class="assistant-composer">
+  <p id="builderLive" class="muted" role="status"></p>
   <p id="builderStatus" role="status" class="muted"></p>
   <form id="builderRequest">
    <label for="builderPrompt" class="cp-visually-hidden">Message the assistant</label>
@@ -1521,6 +1535,16 @@ function organization(){return v("org")}
 async function request(url,method="GET",data){if(!current)throw Error("Please sign in");const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired");let r=await fetch("/api/account"+url,{method,headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:data?JSON.stringify(data):undefined});let j=await r.json().catch(()=>({}));if(!r.ok){let d=j.detail;let message=Array.isArray(d)?d.map(x=>{const field=Array.isArray(x.loc)?x.loc.filter(t=>t!=="body").join("."):"field";return (field||"Input")+": "+(x.msg||"Invalid value")}).join("; "):typeof d==="string"?d:d&&typeof d==="object"?(d.message||JSON.stringify(d)):"Request failed (HTTP "+r.status+")";throw Error(message)}return j}
 async function safe(fn){try{msg("");const result=await fn();if(typeof result==="string")msg(result)}catch(e){msg(e instanceof Error?e.message:String(e),true)}}
 let authView="signin",activePage="builder",recoveryMode=false;
+{
+ const toggle=document.getElementById("navMoreToggle"),more=document.getElementById("navMore");
+ toggle.addEventListener("click",()=>{
+  more.hidden=!more.hidden;
+  toggle.setAttribute("aria-expanded",String(!more.hidden));
+ });
+ new MutationObserver(()=>{
+  if(more.querySelector(".cp-active")&&more.hidden){more.hidden=false;toggle.setAttribute("aria-expanded","true")}
+ }).observe(more,{subtree:true,attributes:true,attributeFilter:["class"]});
+}
 window.authMode=mode=>{
  authView=mode;
  const isSignUp=mode==="signup",isReset=mode==="reset";
@@ -3565,6 +3589,7 @@ function resetBuilder(){
  $("builderPublications").replaceChildren();
  $("builderPublish").disabled=true;
  $("builderPublishState").textContent="";
+ $("builderLive").textContent="";
  $("builderStatus").textContent="Loading receptionist configuration…";
 }
 function setBuilderFields(agent){
@@ -3743,6 +3768,7 @@ async function loadPublication(oid){
   const info=await request(builderPath(oid)+"/publication");
   if(oid!==organization())return;
   publish.disabled=!builderCanEdit||!info.unpublished_changes;
+  $("builderLive").textContent=(orgs.find(w=>w.id===oid)?.name||"Workspace")+" · "+(info.current_version===null?"Not published":"v"+info.current_version+" live")+" · "+(info.unpublished_changes?"Unpublished changes":"All changes published");
   state.textContent=info.current_version===null?"Not published yet. Publish to apply this configuration to your live assistant.":
    info.unpublished_changes?"Live version "+info.current_version+" has unpublished changes.":"Live version "+info.current_version+" is up to date.";
   list.replaceChildren();

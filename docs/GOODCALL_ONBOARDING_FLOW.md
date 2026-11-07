@@ -23,3 +23,7 @@ Progress is shown as a six-dot stepper with a small mascot above the heading and
 - Implemented but untested live: `/app?mode=signup` is a three-step get-started wizard (business, website, account) with progress dots and back links. Account step has first and last name, work email, live password rules, product-updates checkbox, Google sign-up, terms link and a duplicate-email message with a Log in instead link.
 - Business and website answers are saved as a non-sensitive draft in the browser for seven days. After the first sign-in with no workspace, the draft creates the workspace and imports the website as an unapproved draft in Knowledge.
 - Not built: business lookup by phone before the account exists (the Maps search needs a signed-in user to protect paid API usage), the scanning welcome screen, and the 4-digit SMS verification (needs an approved SMS provider and consent text).
+
+## Dashboard and navigation (observed, mobile-width pane)
+- Dashboard `/agent/dashboard`: header with business name, new-conversation button and a status line (version live, all changes published). Chat with the builder assistant, composer with voice-mode button, thumbs up/down feedback per reply, bottom switcher between the builder assistant and a test of the agent, mute toggle.
+- Sidebar: logo and close; builder assistant, Analytics, Sessions, Channels; divider; Identity, Workers, Connections; footer with account switcher and Support. Not recorded: feedback persistence and the voice-mode flow.
