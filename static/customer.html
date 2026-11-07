@@ -74,6 +74,13 @@ body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
 .ch-card{text-align:center;padding:30px 22px}
 .ch-card .ch-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:#eef1f4;font-size:24px;margin:0 auto 12px;color:#344e65}
 .ch-card h3{margin:0 0 6px}
+.settings-subnav{gap:22px!important;border-bottom:1px solid var(--cp-border)!important;padding-bottom:0!important}
+.settings-subnav button{border-radius:0!important;padding:10px 2px!important;border-bottom:3px solid transparent;font-weight:700;color:#667085!important;background:transparent!important}
+.settings-subnav button[aria-current="page"]{color:#101629!important;border-bottom-color:#07104f}
+.cp-danger{border-color:#f0c4c4}
+.cp-danger h3{color:#a32121}
+.cp-danger-button{background:#b42318;color:#fff;margin-top:12px}
+.cp-danger-button:disabled{opacity:.45;cursor:not-allowed}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -743,8 +750,8 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
 <div id="settingsTabs" class="settings-subnav" role="navigation" aria-label="Settings pages" hidden>
  <button type="button" data-settings-page="account">Profile</button>
- <button type="button" data-settings-page="workspace">Team &amp; workspace</button>
- <button type="button" data-settings-page="billing">Plan &amp; billing</button>
+ <button type="button" data-settings-page="workspace">Team</button>
+ <button type="button" data-settings-page="billing">Billing</button>
 </div>
 
 <section id="onboarding" class="panel card" style="display:none">
@@ -1534,8 +1541,10 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-panel-heading"><div><h2>My account</h2><p class="muted">Manage your profile, email, password and sign-in security.</p></div>
 <span class="pill">Personal settings</span></div>
 <div class="cp-section-box"><h3>Profile information</h3><p>Your profile is separate from your business workspace.</p>
-<div class="cp-form-grid"><div><label for="profileName">Display name</label><input id="profileName" autocomplete="name" maxlength="80" placeholder="Your name"></div>
-<div><label for="profileEmailRead">Email address</label><input id="profileEmailRead" disabled></div></div>
+<div class="cp-form-grid"><div><label for="profileFirst">First name</label><input id="profileFirst" autocomplete="given-name" maxlength="60"></div>
+<div><label for="profileLast">Last name</label><input id="profileLast" autocomplete="family-name" maxlength="60"></div>
+<div><label for="profileEmailRead">Email address</label><input id="profileEmailRead" disabled></div>
+<div><label for="profileOrg">Organization</label><input id="profileOrg" disabled></div></div>
 <div class="cp-inline-actions"><button onclick="window.saveProfile()">Save profile</button><span class="muted" id="profileStatus"></span></div></div>
 <div class="cp-section-box"><h3>Account email</h3><p>Changing your email can require confirmation from both your current and new addresses.</p>
 <label for="profileEmail">New email address</label><input id="profileEmail" type="email" autocomplete="email" placeholder="name@company.com">
@@ -1547,6 +1556,9 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <button class="secondary" onclick="window.sendReset(true)">Email me a reset link</button></div></div>
 <div class="cp-section-box"><h3>Account access</h3><p>Sign out of this device when you are done. Your profile can be used with multiple business workspaces.</p>
 <button class="secondary" onclick="window.signOut()">Sign out</button></div>
+<div class="cp-section-box cp-danger"><h3>Delete account</h3><p>Permanently delete your account, workspaces and settings. This cannot be undone. You must first cancel any subscription, release your business phone number and remove other team members.</p>
+<label for="deleteConfirm">Type DELETE to confirm</label><input id="deleteConfirm" autocomplete="off" placeholder="DELETE">
+<button id="deleteAccountButton" class="cp-danger-button" type="button" disabled>Delete account</button><p id="deleteStatus" role="status" class="muted"></p></div>
 </div>
 <div id="help" class="panel card" style="display:none">
 <div class="cp-panel-heading"><div><h2>Help &amp; support</h2><p class="muted">Quick answers for managing your CallPilot business.</p></div></div>
@@ -1844,7 +1856,7 @@ const pageMeta={
  connections:["Connections","External services your agent can use."],
  billing:["Settings","Manage your plan, payment methods and invoices."],
  workspace:["Settings","Manage your team and business workspace."],
- account:["Settings","Manage your account profile and sign-in."],
+ account:["Settings","Manage your profile and organization"],
  help:["Help & support","Answers for using CallPilot with confidence."]
 };
 function loadActivePage(id){
@@ -2266,16 +2278,34 @@ window.loadWorkspace=async({destination}={})=>{
    window.refreshAccountPlan();
  });
 };
+$("deleteConfirm").addEventListener("input",()=>{$("deleteAccountButton").disabled=v("deleteConfirm")!=="DELETE"});
+$("deleteAccountButton").addEventListener("click",async event=>{
+ const button=event.currentTarget;
+ if(button.disabled||!window.confirm("Permanently delete your account and workspaces? This cannot be undone."))return;
+ button.disabled=true;
+ $("deleteStatus").textContent="Deleting your account…";
+ try{
+  await request("/me","DELETE",{confirm:v("deleteConfirm")});
+  await sb.auth.signOut();
+  location.href="/";
+ }catch(e){$("deleteStatus").textContent=e.message;button.disabled=v("deleteConfirm")!=="DELETE"}
+});
 window.fillProfile=()=>{
  if(!current)return;
- $("profileName").value=current.user_metadata?.full_name||"";
+ {
+  const meta=current.user_metadata||{},parts=(meta.full_name||"").trim().split(/\s+/);
+  $("profileFirst").value=meta.first_name||parts[0]||"";
+  $("profileLast").value=meta.last_name||parts.slice(1).join(" ")||"";
+  $("profileOrg").value=orgs.find(w=>w.id===organization())?.name||"";
+ }
  $("profileEmailRead").value=current.email||"";
  $("profileEmail").value="";
 };
 window.saveProfile=()=>safe(async()=>{
- const full_name=v("profileName").trim();
- if(full_name.length<2||full_name.length>80)throw Error("Enter a name between 2 and 80 characters.");
- const {data,error}=await sb.auth.updateUser({data:{full_name}});
+ const first_name=v("profileFirst").trim(),last_name=v("profileLast").trim();
+ const full_name=(first_name+" "+last_name).trim();
+ if(!first_name||full_name.length>80)throw Error("Enter your first name (and last name if you like), up to 80 characters in total.");
+ const {data,error}=await sb.auth.updateUser({data:{full_name,first_name,last_name}});
  if(error)throw error;
  current=data.user||current;
  $("topUserName").textContent=full_name;
