@@ -86,6 +86,22 @@ body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
 .bs-summary strong{font-size:20px}
 .bs-table [role=row]{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr;gap:10px;padding:8px 0;align-items:center}
 .bs-table .bs-head{font-size:12px;color:var(--cp-muted);border-bottom:1px solid var(--cp-border)}
+.qs-steps{display:flex;gap:8px;flex-wrap:wrap;list-style:none;padding:0;margin:0 0 16px}
+.qs-steps li{padding:5px 12px;border:1px solid var(--cp-border);border-radius:999px;font-size:12px;font-weight:700;color:#405768}
+.qs-steps li[aria-current="step"]{background:#07104f;color:#fff;border-color:#07104f}
+.qs-preview{white-space:pre-wrap;background:#f6f8fa;border:1px solid var(--cp-border);border-radius:12px;padding:14px;max-height:220px;overflow:auto;font:inherit;font-size:14px}
+.qs-goals{display:grid;gap:10px;margin:8px 0 16px}
+.qs-goal{display:flex;align-items:center;gap:12px;border:1px solid var(--cp-border);border-radius:14px;padding:14px 16px;cursor:pointer;background:#fff;font-weight:600}
+.qs-goal.on{border-color:#07104f;background:#f1f3ff}
+.qs-goal input{width:20px;height:20px;flex:none}
+.qs-quote{margin:0 0 16px;padding:14px 16px;border-left:4px solid #07104f;background:#f6f8fa;border-radius:8px;font-size:16px}
+.qs-list{padding-left:0;list-style:none;display:grid;gap:8px}
+.qs-chat{display:grid;gap:8px;max-height:320px;overflow:auto;margin:10px 0}
+.qs-msg{margin:0;padding:10px 14px;border-radius:14px;max-width:85%}
+.qs-msg.you{justify-self:end;background:#07104f;color:#fff}
+.qs-msg.agent{justify-self:start;background:#eef1f4}
+.qs-chatform{display:flex;gap:10px;margin-bottom:12px}
+.qs-chatform input{flex:1}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -732,6 +748,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-nav-divider"></div>
 <button type="button" id="navMoreToggle" class="cp-more-toggle" aria-expanded="false" aria-controls="navMore"><span aria-hidden="true" class="cp-nav-icon">⋯</span> More</button>
 <div id="navMore" hidden>
+<button data-section="quicksetup" title="Quick setup" onclick="window.section('quicksetup',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚡</span> Quick setup</button>
 <button data-section="knowledge" title="Knowledge" onclick="window.section('knowledge',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▤</span> Knowledge</button>
 <button data-section="appointments" title="Appointments" onclick="window.section('appointments',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▣</span> Appointments</button>
 <button data-section="orders" title="Order requests" onclick="window.section('orders',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▧</span> Order requests</button>
@@ -758,6 +775,59 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  <button type="button" data-settings-page="workspace">Team</button>
  <button type="button" data-settings-page="billing">Billing</button>
 </div>
+
+
+<section id="quicksetup" class="panel card" style="display:none">
+ <div class="cp-panel-heading"><div><h2>Quick setup</h2><p>Share your website, tick what you want your agent to do, and we build it for you. Then talk to it.</p></div></div>
+ <ol class="qs-steps" aria-label="Setup steps"><li id="qsDot1" aria-current="step">1. Website</li><li id="qsDot2">2. What it should do</li><li id="qsDot3">3. Your agent</li><li id="qsDot4">4. Test it</li></ol>
+ <div id="qsStep1" class="cp-section-box">
+  <h3>Teach your agent about your business</h3>
+  <p>We read one page of your website and use it to answer callers. You review it before it is used.</p>
+  <form id="qsWebsiteForm">
+   <label for="qsUrl">Website address</label><input id="qsUrl" type="text" inputmode="url" maxlength="2048" placeholder="example.com">
+   <div class="cp-inline-actions"><button type="submit" id="qsImport">Import my website</button><button type="button" id="qsSkip" class="secondary">I don’t have a website</button></div>
+  </form>
+  <div id="qsPreview" hidden>
+   <h4>What we found</h4>
+   <pre id="qsPreviewText" class="qs-preview"></pre>
+   <label class="cp-studio-check"><input id="qsApprove" type="checkbox" checked> This looks right. Use it to answer callers.</label>
+   <p class="muted">Prices are never read out unless you approve exact prices separately. You can edit this later in Knowledge.</p>
+   <div class="cp-inline-actions"><button type="button" id="qsToGoals">Continue</button></div>
+  </div>
+  <p id="qsStatus1" role="status" class="muted"></p>
+ </div>
+ <div id="qsStep2" class="cp-section-box" hidden>
+  <h3>What should your agent do?</h3>
+  <p>Pick everything that applies. You can change this any time.</p>
+  <div id="qsGoals" class="qs-goals" role="group" aria-label="Agent abilities"></div>
+  <label for="qsOther">Anything else? <span class="muted">(optional, one line)</span></label>
+  <input id="qsOther" maxlength="200" placeholder="For example: always ask about the deadline first">
+  <div id="qsTransferBox" hidden>
+   <label for="qsTransferNumber">Phone number to connect callers to</label>
+   <input id="qsTransferNumber" inputmode="tel" maxlength="16" placeholder="+12125550100">
+   <p class="muted">Use international format with the plus sign.</p>
+  </div>
+  <div class="cp-inline-actions"><button type="button" id="qsBack2" class="secondary">Back</button><button type="button" id="qsBuild">Build my agent</button></div>
+  <p id="qsStatus2" role="status" class="muted"></p>
+ </div>
+ <div id="qsStep3" class="cp-section-box" hidden>
+  <h3 id="qsDoneTitle">Your agent is ready</h3>
+  <p class="muted">The opening line your callers will hear:</p>
+  <blockquote id="qsGreeting" class="qs-quote"></blockquote>
+  <h4>What it can do now</h4><ul id="qsEnabled" class="qs-list"></ul>
+  <div id="qsNeedsBox" hidden><h4>Still needed</h4><ul id="qsNeeds" class="qs-list"></ul></div>
+  <div class="cp-inline-actions"><button type="button" id="qsToTest">Test your agent</button><button type="button" id="qsRedo" class="secondary">Change my choices</button></div>
+ </div>
+ <div id="qsStep4" class="cp-section-box" hidden>
+  <h3>Test your agent</h3>
+  <p>Ask what a real caller would ask. The agent answers from the information you approved.</p>
+  <div id="qsChat" class="qs-chat" aria-live="polite"></div>
+  <form id="qsChatForm" class="qs-chatform"><label for="qsQuestion" class="cp-visually-hidden">Your question</label>
+   <input id="qsQuestion" required maxlength="500" placeholder="What are your hours?" autocomplete="off"><button type="submit">Ask</button></form>
+  <div class="cp-inline-actions"><button type="button" id="qsVoice" class="secondary">Talk to it by voice</button><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button></div>
+  <p class="muted">Voice practice needs the microphone and is limited per day. Text testing is always available.</p>
+ </div>
+</section>
 
 <section id="onboarding" class="panel card" style="display:none">
  <div class="cp-onboarding-wrap">
@@ -900,6 +970,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <div class="assistant-thread">
    <div id="builderWelcome" class="assistant-empty">
     <span aria-hidden="true">✦</span><h3>What should your receptionist do?</h3>
+    <p><button type="button" onclick="window.section('quicksetup',{push:true})">Set up my agent in a minute</button></p>
     <p>Describe a change and review the configuration before saving it.</p>
     <div id="builderSuggestions" class="cp-inline-actions">
      <button type="button" class="secondary" data-builder-suggestion="Make the greeting brief and welcoming.">Shorten the greeting</button>
@@ -1758,8 +1829,8 @@ async function applyOnboardingDraft(){
   if(draft.website){
    try{
     await request("/organizations/"+encodeURIComponent(workspace.id)+"/descriptions/import-website","POST",{url:draft.website});
-    window.section("knowledge");
-    msg("Website draft saved. Review the imported text before approving it.");
+    window.section("quicksetup");
+    msg("Website imported. Choose what your agent should do.");
    }catch(e){msg("Your business was created, but the website could not be imported: "+e.message,true)}
   }
   return true;
@@ -1887,6 +1958,7 @@ const pageMeta={
  builder:["Assistant","Draft, review and sync your receptionist’s configuration."],
  analytics:["Analytics","Track call volume, caller activity and lead outcomes."],
  channels:["Channels","Manage how callers connect with your agent."],
+ quicksetup:["Quick setup","Build your agent in a few clicks."],
  workers:["Workers","Organize the playbooks your receptionist follows on calls."],
  calls:["Sessions","Review calls, transcripts and follow-up activity."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
@@ -1904,7 +1976,7 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics(),channels:()=>loadChannels(),
+   quicksetup:()=>loadQuickSetup(),studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics(),channels:()=>loadChannels(),
    workers:()=>Promise.all([loadWorkers(),loadCallMenu(organization())]),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
@@ -2207,7 +2279,7 @@ function completeBusinessSetup(destination){
  $("setupWebsiteForm").reset();
  window.section(destination);
 }
-$("skipSetupWebsite").addEventListener("click",()=>completeBusinessSetup("studio"));
+$("skipSetupWebsite").addEventListener("click",()=>completeBusinessSetup("quicksetup"));
 $("setupWebsiteForm").addEventListener("submit",async event=>{
  event.preventDefault();
  const button=event.submitter,skip=$("skipSetupWebsite"),status=$("businessSetupStatus"),workspace=setupOrganization;
@@ -2217,8 +2289,8 @@ $("setupWebsiteForm").addEventListener("submit",async event=>{
  try{
   await request("/organizations/"+encodeURIComponent(workspace.id)+"/descriptions/import-website","POST",{url:v("setupWebsiteUrl").trim()});
   if(workspace!==setupOrganization||workspace.id!==organization()||activePage!=="onboarding")return;
-  completeBusinessSetup("knowledge");
-  msg("Website draft saved. Review the imported text before approving it.");
+  completeBusinessSetup("quicksetup");
+  msg("Website imported. Choose what your agent should do.");
  }catch(e){
   if(workspace===setupOrganization&&activePage==="onboarding")status.textContent=e.message;
  }finally{button.disabled=skip.disabled=false}
@@ -3274,6 +3346,119 @@ $("capiSync").addEventListener("click",async event=>{
  try{await request("/organizations/"+organization()+"/agent/sync","POST");$("capiStatus").textContent="The live assistant now has your custom APIs."}
  catch(e){$("capiStatus").textContent=e.message}
  finally{button.disabled=false}
+});
+
+const QS_ICONS={info:"💬",messages:"📝",quotes:"🧾",orders:"📦",booking:"📅",transfer:"📞"};
+const QS_HELP={info:"Answer questions about your business",messages:"Take messages and capture leads",quotes:"Collect the details for a quote",
+ orders:"Take order requests for your team to review",booking:"Book appointments on your calendar",transfer:"Connect callers to a person"};
+let qsGoals=new Set(["info","messages"]),qsDoc=null;
+function qsShow(step){
+ for(let n=1;n<=4;n++){
+  $("qsStep"+n).hidden=n!==step;
+  if(n===step)$("qsDot"+n).setAttribute("aria-current","step");else $("qsDot"+n).removeAttribute("aria-current");
+ }
+}
+function qsRenderGoals(){
+ const box=$("qsGoals");box.replaceChildren();
+ for(const key of Object.keys(QS_HELP)){
+  const label=document.createElement("label"),input=document.createElement("input"),text=document.createElement("span");
+  label.className="qs-goal";input.type="checkbox";input.checked=qsGoals.has(key);
+  text.textContent=QS_ICONS[key]+" "+QS_HELP[key];
+  input.addEventListener("change",()=>{
+   if(input.checked)qsGoals.add(key);else qsGoals.delete(key);
+   label.classList.toggle("on",input.checked);
+   $("qsTransferBox").hidden=!qsGoals.has("transfer");
+  });
+  label.classList.toggle("on",input.checked);
+  label.append(input,text);box.append(label);
+ }
+ $("qsTransferBox").hidden=!qsGoals.has("transfer");
+}
+async function loadQuickSetup(){
+ const oid=organization();
+ qsShow(1);qsRenderGoals();
+ $("qsPreview").hidden=true;$("qsStatus1").textContent="";
+ try{
+  const status=await request("/organizations/"+oid+"/quick-setup");
+  if(oid!==organization())return;
+  if(status.knowledge_approved)$("qsStatus1").textContent="You already have "+status.knowledge_approved+" approved source"+(status.knowledge_approved===1?"":"s")+". You can add another website or continue.";
+  if(status.enabled.messages||status.enabled.booking||status.enabled.orders)for(const [k,on] of Object.entries(status.enabled))if(on)qsGoals.add(k);
+  qsRenderGoals();
+ }catch(e){$("qsStatus1").textContent=e.message}
+}
+$("qsSkip").addEventListener("click",()=>{qsDoc=null;qsShow(2)});
+$("qsWebsiteForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=$("qsImport"),url=v("qsUrl").trim();
+ if(button.disabled)return;
+ if(!url){$("qsStatus1").textContent="Enter your website address, or choose I don’t have a website.";return}
+ button.disabled=true;$("qsStatus1").textContent="Reading your website…";$("qsPreview").hidden=true;
+ try{
+  const result=await request("/organizations/"+oid+"/descriptions/import-website","POST",{url});
+  const docs=await request("/organizations/"+oid+"/descriptions");
+  if(oid!==organization())return;
+  qsDoc=docs.find(d=>d.source_url===result.source_url)||null;
+  if(!qsDoc)throw Error("We could not read that page. Check the address, or choose I don’t have a website.");
+  const text=(qsDoc.content||"").trim();
+  $("qsPreviewText").textContent=text.length>700?text.slice(0,700)+"…":text;
+  $("qsApprove").checked=!qsDoc.approved_at;$("qsApprove").disabled=Boolean(qsDoc.approved_at);
+  $("qsPreview").hidden=false;
+  $("qsStatus1").textContent=result.created?"Imported. Please check what we found.":"This page was already imported.";
+ }catch(e){$("qsStatus1").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("qsToGoals").addEventListener("click",async event=>{
+ const button=event.currentTarget,oid=organization();
+ if(button.disabled)return;
+ if(qsDoc&&$("qsApprove").checked&&!qsDoc.approved_at){
+  button.disabled=true;$("qsStatus1").textContent="Saving what your agent will know…";
+  try{await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(qsDoc.id)+"/approve","POST");qsDoc.approved_at="now"}
+  catch(e){
+   $("qsStatus1").textContent=e.message+" You can fix this in Knowledge, or continue without it.";
+   $("qsApprove").checked=false;button.disabled=false;return;
+  }
+  button.disabled=false;
+ }
+ $("qsStatus1").textContent="";qsShow(2);
+});
+$("qsBack2").addEventListener("click",()=>qsShow(1));
+$("qsBuild").addEventListener("click",async event=>{
+ const button=event.currentTarget,oid=organization();
+ if(button.disabled)return;
+ if(!qsGoals.size){$("qsStatus2").textContent="Pick at least one thing your agent should do.";return}
+ const body={goals:[...qsGoals],other:v("qsOther").trim()||null};
+ if(qsGoals.has("transfer")&&v("qsTransferNumber").trim())body.transfer_number=v("qsTransferNumber").trim();
+ button.disabled=true;$("qsStatus2").textContent="Building your agent… this takes a few seconds.";
+ try{
+  const r=await request("/organizations/"+oid+"/quick-setup","POST",body);
+  if(oid!==organization())return;
+  $("qsGreeting").textContent="“"+r.greeting+"”";
+  $("qsEnabled").replaceChildren(...r.enabled.map(t=>{const li=document.createElement("li");li.textContent="✓ "+t;return li}));
+  $("qsNeedsBox").hidden=!r.needs.length;
+  $("qsNeeds").replaceChildren(...r.needs.map(n=>{
+   const li=document.createElement("li"),go=document.createElement("button");
+   li.textContent=n.text+" ";go.type="button";go.className="secondary";go.textContent="Open";go.addEventListener("click",()=>window.section(n.page,{push:true}));
+   li.append(go);return li;
+  }));
+  $("qsDoneTitle").textContent=r.assistant_ready&&r.synced?"Your agent is ready":"Your agent is saved";
+  $("qsStatus2").textContent="";qsShow(3);
+ }catch(e){$("qsStatus2").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("qsRedo").addEventListener("click",()=>qsShow(2));
+$("qsToTest").addEventListener("click",()=>{qsShow(4);$("qsQuestion").focus()});
+$("qsBack4").addEventListener("click",()=>qsShow(3));
+$("qsVoice").addEventListener("click",()=>{window.section("simulator",{push:true});setTimeout(()=>$("startVoicePractice")?.scrollIntoView({block:"center"}),400)});
+$("qsLive").addEventListener("click",()=>window.section("channels",{push:true}));
+$("qsChatForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),input=$("qsQuestion"),question=input.value.trim(),button=event.submitter;
+ if(!question||button.disabled)return;
+ const add=(who,text)=>{const row=document.createElement("p");row.className="qs-msg "+who;row.textContent=text;$("qsChat").append(row);row.scrollIntoView({block:"nearest"})};
+ add("you",question);input.value="";button.disabled=true;
+ try{const r=await request("/organizations/"+oid+"/simulate","POST",{question});add("agent",r.answer||"I don’t have verified information about that. I would take a message.")}
+ catch(e){add("agent",e.message)}
+ finally{button.disabled=false;input.focus()}
 });
 async function loadConnections(){
  const oid=organization();

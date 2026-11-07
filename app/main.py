@@ -798,6 +798,8 @@ from app.sheets import router as sheets_router
 from app.account_delete import router as account_delete_router
 from app.after_hours import router as after_hours_router
 from app.custom_apis import router as custom_apis_router
+from app.quick_setup import router as quick_setup_router
+app.include_router(quick_setup_router)
 app.include_router(custom_apis_router)
 from app.enterprise import router as enterprise_router
 app.include_router(enterprise_router)
