@@ -4,7 +4,7 @@
 - Starter: $49/month, 100 completed inbound AI call minutes (about 50 calls at two minutes each).
 - Growth: $99/month, 300 minutes (about 150 estimated calls).
 - Business: $179/month, 600 minutes (about 300 estimated calls).
-- Mandatory $100 one-time professional setup per business, collected on initial subscription checkout only.
+- Mandatory $25 one-time professional setup per business, collected on initial subscription checkout only.
 - No automatic overage purchases, no daily call cap.
 - Every call is capped by Vapi at four minutes (240 seconds); a wrap-up cue at 215 seconds.
 - Even with a hard cap, the last accepted call can exceed the remaining monthly allowance by up to four minutes. Disclose this operationally; never promise an exact zero-overage provider invoice.
@@ -40,7 +40,7 @@
 6. **Overflow tests.** Simulate exhausted allowance, same-time inbound calls, webhook outage, optional human transfer, carrier failure, busy/no answer, and limited carrier credits. A human transfer can be billed separately even with AI off.
 7. **Service capacity.** Vapi concurrency is subscription-shared (usage-only plan base capacity should be verified in account). Ten numbers do not guarantee ten simultaneous calls. Monitor and upgrade at measured peaks.
 8. **Security/privacy.** Make repo private, audit Supabase tenant boundaries, require recording consent/disclosures where applicable, add retention/deletion policy, secure recording URLs and export logs.
-9. **Commercial/legal.** Publish terms of service, privacy policy, recorded-call disclosures, $100 setup fee refund and cancellation terms, monthly call limits and four-minute cap, support contact and response policy.
+9. **Commercial/legal.** Publish terms of service, privacy policy, recorded-call disclosures, $25 setup fee refund and cancellation terms, monthly call limits and four-minute cap, support contact and response policy.
 10. **Operations.** Run end-to-end browser, desktop/mobile, real phone, SMS/email verification and accessibility tests; establish uptime monitoring and customer support procedure.
 
 ## Market differentiation
