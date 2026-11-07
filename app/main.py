@@ -763,6 +763,8 @@ app.include_router(calendar_router)
 from app.highlevel import router as highlevel_router
 from app.sheets import router as sheets_router
 from app.account_delete import router as account_delete_router
+from app.after_hours import router as after_hours_router
+app.include_router(after_hours_router)
 app.include_router(account_delete_router)
 app.include_router(sheets_router)
 app.include_router(highlevel_router)

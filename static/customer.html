@@ -1329,6 +1329,13 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    <label for="greeting">Opening greeting</label><textarea id="greeting" minlength="10" maxlength="500" required></textarea>
    <button type="submit">Save name and greeting</button>
   </form>
+  <form id="identityClosedForm" class="cp-section-box"><h3>Closed-hours greeting</h3>
+   <p>Callers hear this instead of your regular greeting outside your open hours. Set your hours in Open hours first. It applies to the next call without a sync.</p>
+   <label for="identityClosedGreeting">Greeting when closed <span class="muted">(optional)</span></label>
+   <textarea id="identityClosedGreeting" maxlength="500" placeholder="Thanks for calling. We are closed right now, but I can take a message."></textarea>
+   <p id="identityClosedHint" class="muted" role="status"></p>
+   <button type="submit">Save closed-hours greeting</button>
+  </form>
   <form id="identityVoiceForm" class="cp-section-box"><h3>Voice</h3>
    <p>Choose a stock voice or keep the voice already selected on the managed assistant.</p>
    <label for="identityStockVoice">Stock voice</label><select id="identityStockVoice"><option value="">Keep the current voice</option></select>
@@ -2589,7 +2596,7 @@ for(const tab of identityTabs){
   selectIdentityTab(identityTabs[next]);identityTabs[next].focus();
  });
 }
-const identityForms=["identityGreetingForm","identityVoiceForm","identitySpeechForm","identityProfileForm"];
+const identityForms=["identityGreetingForm","identityClosedForm","identityVoiceForm","identitySpeechForm","identityProfileForm"];
 const identityUnsaved=new Map();
 let identityEditSequence=0;
 for(const id of identityForms)$(id).addEventListener("input",()=>identityUnsaved.set(id,++identityEditSequence));
@@ -2628,8 +2635,13 @@ async function loadAgent(){
  identityCanManage=false;
  updateIdentityControls();
  try{
-  const [agent,identity]=await Promise.all([request("/organizations/"+oid+"/agent"),request(identityPath(oid))]);
+  const [agent,identity,afterHours]=await Promise.all([request("/organizations/"+oid+"/agent"),request(identityPath(oid)),
+   request("/organizations/"+oid+"/after-hours").catch(()=>null)]);
   if(oid!==organization()||run!==identityRun)return;
+  $("identityClosedGreeting").value=afterHours?.closed_greeting||"";
+  $("identityClosedHint").textContent=!afterHours?"":afterHours.hours_configured?
+   "Your business is "+(afterHours.open_now?"open":"closed")+" right now ("+afterHours.timezone+").":
+   "No open hours are set, so this greeting is not used yet. Set them in Open hours.";
   $("agent").value=agent.agent_name||"Alex";
   $("greeting").value=agent.greeting||"";
   const speech=identity.speech,profile=identity.profile;
@@ -2682,6 +2694,9 @@ function registerIdentitySave(formId,path,read,onSuccess){
 function identitySaved(){
  $("identityStatus").textContent="Saved. Sync the managed assistant when you want the change to take effect.";
 }
+registerIdentitySave("identityClosedForm",oid=>"/organizations/"+oid+"/after-hours",
+ ()=>({closed_greeting:v("identityClosedGreeting").trim()||null}),
+ ()=>{$("identityStatus").textContent="Saved. It applies to the next call outside your open hours."});
 registerIdentitySave("identityGreetingForm",oid=>"/organizations/"+oid+"/agent",()=>({
  agent_name:v("agent").trim(),greeting:v("greeting").trim()
 }),(_,values)=>{

@@ -260,8 +260,11 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
         return {"error":"The AI receptionist is currently unavailable. Please contact the business directly or try again later."}
     if routing.get("enabled"):
         from app.runtime_routing import runtime_admission
-        return await run_in_threadpool(runtime_admission,oid,phone_id,agent_id,message,assigned[0])
-    return {"assistantId":agent_id}
+        routed=await run_in_threadpool(runtime_admission,oid,phone_id,agent_id,message,assigned[0])
+        from app.after_hours import apply_after_hours
+        return await run_in_threadpool(apply_after_hours,oid,agent_id,routed)
+    from app.after_hours import apply_after_hours
+    return await run_in_threadpool(apply_after_hours,oid,agent_id,{"assistantId":agent_id})
 
 class HumanFallback(BaseModel):
     number:str|None=None
