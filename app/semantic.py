@@ -139,9 +139,19 @@ def _normalize_spoken_name(oid:str,question:str)->tuple[str,set[str]]:
     if 6<=len(brand)<=20:
         tokens=re.findall(r"\b[a-zA-Z][a-zA-Z0-9]{4,}\b",question)
         for token in tokens:
-            if token.casefold()!=brand and difflib.SequenceMatcher(
-                None,token.casefold(),brand).ratio()>=0.84:
+            candidate=token.casefold()
+            if (candidate!=brand and len(candidate)>=6 and
+                abs(len(candidate)-len(brand))<=2 and
+                candidate[0]==brand[0] and candidate[-1]==brand[-1] and
+                difflib.SequenceMatcher(None,candidate,brand).ratio()>=0.74):
                 question=re.sub(r"\b"+re.escape(token)+r"\b",brand,question,flags=re.I)
+        # Rewrite common generic requests to a canonical, business-specific
+        # overview question. This is not an exact-string lookup: vector retrieval
+        # still determines which approved fact (if any) may answer.
+        question=re.sub(r"\b(?:can you (?:please )?tell me )?what (?:does|can) "+
+            re.escape(brand)+r" do\b", "What is "+brand+"?",question,flags=re.I)
+        question=re.sub(r"\b(?:can you (?:please )?tell me )?what "+
+            re.escape(brand)+r" does\b", "What is "+brand+"?",question,flags=re.I)
     return question,brands
 
 def retrieve(organization_id:str,question:str):
