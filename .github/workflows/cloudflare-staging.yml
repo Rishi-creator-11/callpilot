@@ -33,7 +33,7 @@ jobs:
         run: |
           set -o pipefail
           uv run pywrangler deploy 2>&1 | tee /tmp/callpilot-cloudflare-deploy.txt
-          URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\\.workers\\.dev' /tmp/callpilot-cloudflare-deploy.txt | tail -n 1 || true)"
+          URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/callpilot-cloudflare-deploy.txt | tail -n 1 || true)"
           if [ -z "$URL" ]; then
             echo "No workers.dev staging URL found; check whether workers.dev is enabled in Cloudflare."
             exit 1
