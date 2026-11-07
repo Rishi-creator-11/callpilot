@@ -804,6 +804,19 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </div>
  </form>
  <p id="workerStatus" role="status" class="muted"></p>
+ <details class="cp-section-box">
+  <summary>Spoken call menu</summary>
+  <p>Offer callers numbered choices. Each phrase opens a specific workflow. Callers can ask for the receptionist at any time.</p>
+  <form id="callMenuForm" hidden>
+   <label class="cp-studio-check"><input id="callMenuEnabled" type="checkbox"> Offer this menu at the start of a call</label>
+   <div id="callMenuOptions"></div>
+   <div class="cp-inline-actions"><button id="addCallMenuOption" type="button" class="secondary">Add choice</button>
+    <button id="saveCallMenu" type="submit">Save call menu</button>
+    <button id="syncCallMenu" type="button" class="secondary">Sync live assistant</button>
+    <button id="reloadCallMenu" type="button" class="secondary">Refresh</button></div>
+  </form>
+  <p id="callMenuStatus" role="status" class="muted"></p>
+ </details>
 </section>
 
 <div id="studio" class="panel card" style="display:none">
@@ -1515,7 +1528,7 @@ function loadActivePage(id){
  if(!current||!organization())return;
  const load={
    studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics(),channels:()=>loadChannels(),
-   workers:()=>loadWorkers(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   workers:()=>Promise.all([loadWorkers(),loadCallMenu(organization())]),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
@@ -1878,6 +1891,7 @@ window.loadWorkspace=async({destination}={})=>{
     $("channelDemoStatus").textContent="";
     resetTransfers();
     resetRouting();
+    resetCallMenu();
     $("phoneReserveForm").reset();$("phoneReserveForm").hidden=true;
     $("phoneReserveCheck").hidden=true;$("phoneReserveStatus").textContent="";
     $("usageActivateForm").reset();$("usageActivateForm").hidden=true;
@@ -2819,6 +2833,98 @@ function resetWorkers(){
  $("workerList").textContent="Loading playbooks…";
  $("workerStatus").textContent="";
 }
+const callMenuPath=oid=>"/organizations/"+oid+"/workers/call-menu";
+const callMenuActions={operator:"General receptionist",appointment:"Schedule an appointment",
+ order:"Take an order request",callback:"Request a callback",transfer:"Transfer to a department"};
+let callMenuState=null,callMenuDirty=false;
+function resetCallMenu(){
+ callMenuState=null;callMenuDirty=false;
+ $("callMenuForm").reset();$("callMenuForm").hidden=true;
+ $("callMenuOptions").replaceChildren();$("callMenuStatus").textContent="";
+}
+async function loadCallMenu(oid,refresh=false){
+ if(callMenuState?.oid===oid&&!refresh)return;
+ $("callMenuStatus").textContent="Loading call menu…";
+ try{
+  const state=await request(callMenuPath(oid));
+  if(oid!==organization())return;
+  callMenuState={...state,oid};callMenuDirty=false;
+  $("callMenuEnabled").checked=state.menu.enabled;
+  $("callMenuForm").hidden=false;
+  $("callMenuStatus").textContent=state.can_edit?"":"View only";
+  renderCallMenu();
+ }catch(e){if(oid===organization())$("callMenuStatus").textContent=e.message}
+}
+function callMenuChanged(){
+ callMenuDirty=true;$("syncCallMenu").disabled=true;
+}
+function renderCallMenu(){
+ const {menu,can_edit:editable}=callMenuState;
+ const list=$("callMenuOptions");list.replaceChildren();
+ $("callMenuEnabled").disabled=!editable;
+ $("addCallMenuOption").disabled=!editable||menu.options.length>=8;
+ $("saveCallMenu").disabled=!editable;
+ $("syncCallMenu").disabled=!editable||callMenuDirty;
+ for(const [index,option] of menu.options.entries()){
+  const row=document.createElement("fieldset"),caption=document.createElement("legend");
+  row.className="cp-section-box";caption.textContent="Choice "+(index+1);row.append(caption);
+  const phrase=document.createElement("input"),phraseLabel=document.createElement("label");
+  phrase.id="menu-phrase-"+index;phraseLabel.htmlFor=phrase.id;phraseLabel.textContent="Spoken phrase";
+  phrase.value=option.phrase;phrase.required=true;phrase.maxLength=48;phrase.disabled=!editable;
+  phrase.placeholder="Appointments or Citas";
+  phrase.addEventListener("input",()=>{option.phrase=phrase.value;callMenuChanged()});
+  const action=document.createElement("select"),actionLabel=document.createElement("label");
+  action.id="menu-action-"+index;actionLabel.htmlFor=action.id;actionLabel.textContent="Next workflow";
+  for(const [key,label] of Object.entries(callMenuActions))action.add(new Option(label,key));
+  action.value=option.action;action.disabled=!editable;
+  action.addEventListener("change",()=>{option.action=action.value;callMenuChanged()});
+  row.append(phraseLabel,phrase,actionLabel,action);
+  if(editable){
+   const remove=document.createElement("button");remove.type="button";remove.className="secondary";remove.textContent="Remove choice";
+   remove.addEventListener("click",()=>{menu.options.splice(index,1);callMenuChanged();renderCallMenu()});
+   row.append(remove);
+  }
+  list.append(row);
+ }
+}
+$("callMenuEnabled").addEventListener("change",event=>{
+ if(!callMenuState?.can_edit)return;
+ callMenuState.menu.enabled=event.currentTarget.checked;callMenuChanged();
+});
+$("addCallMenuOption").addEventListener("click",()=>{
+ if(!callMenuState?.can_edit||callMenuState.menu.options.length>=8)return;
+ callMenuState.menu.options.push({phrase:"",action:"operator"});callMenuChanged();renderCallMenu();
+ $("menu-phrase-"+(callMenuState.menu.options.length-1)).focus();
+});
+$("reloadCallMenu").addEventListener("click",()=>{
+ if(!callMenuDirty||window.confirm("Discard your unsaved menu changes?"))void loadCallMenu(organization(),true);
+});
+$("callMenuForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=$("saveCallMenu"),status=$("callMenuStatus");
+ if(callMenuState?.oid!==oid||!callMenuState.can_edit||button.disabled)return;
+ const state=callMenuState,sent=structuredClone(state.menu);
+ button.disabled=true;status.textContent="Saving menu…";
+ try{
+  const result=await request(callMenuPath(oid),"PUT",{revision:state.revision,menu:sent});
+  if(oid!==organization()||state!==callMenuState)return;
+  state.revision=result.revision;callMenuDirty=JSON.stringify(state.menu)!==JSON.stringify(sent);
+  if(!callMenuDirty){state.menu=result.menu;renderCallMenu()}
+  status.textContent=callMenuDirty?"Save again to include your latest edits.":"Menu saved. Sync the managed assistant to apply it.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{if(oid===organization()&&state===callMenuState)button.disabled=false}
+});
+$("syncCallMenu").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget,status=$("callMenuStatus");
+ if(callMenuState?.oid!==oid||!callMenuState.can_edit||callMenuDirty||button.disabled||
+    !window.confirm("Sync saved settings to the managed receptionist?"))return;
+ button.disabled=true;status.textContent="Syncing receptionist…";
+ try{
+  await request("/organizations/"+oid+"/agent/sync","POST");
+  if(oid===organization())status.textContent="Saved receptionist settings synced.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{if(oid===organization())button.disabled=callMenuDirty}
+});
 async function loadWorkers(refresh=false){
  const oid=organization();
  if(!refresh&&workersWorkspace===oid)return;

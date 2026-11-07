@@ -18,14 +18,14 @@ from app.cloud import api, public_base
 
 MANAGED_TOOLS = frozenset({
     "capture_customer_lead", "check_appointment_availability", "book_appointment",
-    "lookup_catalog_item", "submit_order_request",
+    "lookup_catalog_item", "submit_order_request", "resolve_call_menu",
 })
 
 
 def feature_flags(oid: str) -> dict:
     rows = api("agent_configs", params={
         "organization_id": "eq." + oid,
-        "select": "provider_agent_id,voice_leads_enabled,voice_booking_enabled,allow_price_quotes,voice_catalog_enabled,voice_order_requests_enabled,call_instructions,worker_playbooks,speech_language,speech_pronunciations,transfer_directory",
+        "select": "provider_agent_id,voice_leads_enabled,voice_booking_enabled,allow_price_quotes,voice_catalog_enabled,voice_order_requests_enabled,call_instructions,worker_playbooks,speech_language,speech_pronunciations,transfer_directory,call_menu",
         "limit": 1,
     })
     return rows[0] if rows else {}
@@ -50,6 +50,15 @@ def _definition(name: str, description: str, properties: dict, required: list,
 def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
     tools = []
     s = lambda explanation: {"type": "string", "description": explanation}
+    if (flags.get("call_menu") or {}).get("enabled"):
+        tools.append(_definition(
+            "resolve_call_menu",
+            "List the business's spoken menu options with an empty choice. To resolve a caller's choice, "
+            "pass the exact words or option number they spoke. Never infer or invent their selection. "
+            "This tool chooses the next workflow; it never performs a booking, transfer, or order.",
+            {"spoken_choice": s("The caller's exact menu choice, or an empty string to list choices.")},
+            ["spoken_choice"], oid, credential,
+        ))
     if flags.get("voice_leads_enabled"):
         tools.append(_definition(
             "capture_customer_lead",
@@ -441,10 +450,18 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
     return "Order request "+str(found[0]["id"])+" already submitted. Do not submit it again."
 
 
+def resolve_call_menu(oid: str, message: dict, args: dict) -> str:
+    _call_context(oid, message)
+    from app.call_menu import resolve
+
+    return resolve(feature_flags(oid), _text(args.get("spoken_choice", ""), maximum=80))
+
+
 def execute_voice_action(oid: str, message: dict, name: str, args: dict) -> str:
     if not isinstance(args, dict):
         raise ValueError("Invalid action arguments")
     handlers = {
+        "resolve_call_menu": resolve_call_menu,
         "capture_customer_lead": capture_customer_lead,
         "check_appointment_availability": check_appointment_availability,
         "book_appointment": book_appointment,
