@@ -403,6 +403,49 @@ def analyze_past_call(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
     if not rows:raise HTTPException(404,"Call not found")
     return request_call_analysis(oid,rows[0]["provider_call_id"])
 
+def refresh_receptionist_prompt(oid:str):
+    """Synchronize platform conversation policy to already-created managed assistants.
+
+    Preserve the existing voice, tools, recording/analysis settings, and other
+    system/developer messages. Skip external assistants not tagged to this tenant.
+    """
+    from app.cloud import org_or_404,api as cloud_api,receptionist_prompt
+    cfg=cloud_api("agent_configs",params={"organization_id":"eq."+oid,
+        "select":"provider_agent_id,agent_name","limit":1})
+    if not cfg or not cfg[0].get("provider_agent_id"):
+        return {"updated":False,"reason":"no_assistant"}
+    aid=cfg[0]["provider_agent_id"]
+    assistant=vapi("GET","/assistant/"+aid)
+    if assistant.get("id")!=aid or not owns_assistant(assistant,oid):
+        return {"updated":False,"reason":"not_managed_assistant"}
+    model=assistant.get("model") or {}
+    if not any(isinstance(t,dict) and (t.get("function") or {}).get("name")=="lookup_approved_knowledge"
+               for t in (model.get("tools") or [])):
+        return {"updated":False,"reason":"missing_semantic_tool"}
+    messages=model.get("messages") or []
+    if not isinstance(messages,list) or not any(
+        isinstance(m,dict) and m.get("role")=="system" for m in messages):
+        return {"updated":False,"reason":"no_system_message"}
+    org=org_or_404(oid)
+    desired=receptionist_prompt(oid,org["name"],cfg[0].get("agent_name") or "Alex")
+    first=True
+    next_messages=[]
+    for message in messages:
+        if isinstance(message,dict) and message.get("role")=="system" and first:
+            next_messages.append(dict(message,content=desired))
+            first=False
+        else:
+            next_messages.append(message)
+    if next_messages==messages:
+        return {"updated":False,"reason":"already_current"}
+    new_model=dict(model,messages=next_messages)
+    vapi("PATCH","/assistant/"+aid,body={"model":new_model})
+    verified=vapi("GET","/assistant/"+aid)
+    saved=(verified.get("model") or {}).get("messages") or []
+    if not saved or saved[0].get("content")!=desired:
+        raise HTTPException(502,"Vapi did not confirm updated conversation policy")
+    return {"updated":True,"reason":"policy_synced"}
+
 def disable_knowledge_filler(oid:str):
     """Silence Vapi's default request-start filler on approved FAQ lookups.
 
