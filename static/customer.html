@@ -407,7 +407,11 @@ border-radius:11px;min-height:46px;min-width:46px}
 .cp-usage-fill.cp-usage-warning{background:#d18b38}
 .cp-price-calls{font-size:12px!important;color:#5c4dd2!important;font-weight:750;margin-top:-4px!important}
 @media(max-width:550px){.cp-usage-stats{grid-template-columns:1fr 1fr}.cp-usage-stats>div{padding:13px}}
-</style><style id="cp-fallback-settings">.cp-fallback-check{display:flex;align-items:center;gap:10px;margin:14px 0;color:#4a5266;font-weight:600;line-height:1.5}.cp-fallback-check input{width:18px;height:18px;flex:none}</style></head><body data-app-state="loading">
+</style><style id="cp-fallback-settings">.cp-fallback-check{display:flex;align-items:center;gap:10px;margin:14px 0;color:#4a5266;font-weight:600;line-height:1.5}.cp-fallback-check input{width:18px;height:18px;flex:none}</style><style id="cp-account-billing-badge">.cp-account-plan{display:inline-flex;align-self:flex-start;max-width:100%;font-size:10px;font-weight:700;line-height:1.3;color:#b7adff;padding:2px 7px;margin-top:3px;background:#29244f;border:1px solid #514881;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-account-plan[data-state="inactive"]{background:#283144;color:#a8b4c8;border-color:#3d4a60}
+.cp-account-plan[data-state="pending"]{background:#443623;color:#f9d594;border-color:#665437}
+body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
+@media(max-width:850px){body.cp-signed-in .sidebar .cp-account-trigger{min-height:74px}}</style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
@@ -470,7 +474,7 @@ border-radius:11px;min-height:46px;min-width:46px}
 <button onclick="window.signOut()" class="cp-menu-signout"><span aria-hidden="true">⇥</span> Sign out</button>
 </div>
 <button id="cpAccountTrigger" class="cp-account-trigger" onclick="window.toggleAccountMenu()" aria-expanded="false" aria-controls="cpAccountMenu" aria-label="Account menu">
-<span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
+<span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small><span id="sideAccountPlan" class="cp-account-plan" role="status">Checking plan…</span></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
 </button></div></aside>
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
 <div id="calls" class="panel">
@@ -916,6 +920,7 @@ window.loadWorkspace=async({preserve=false}={})=>{
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
    const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"calls";
    window.section(destination);
+   window.refreshAccountPlan();
  });
 };
 window.fillProfile=()=>{
@@ -1059,6 +1064,37 @@ window.linkBusinessPhone=()=>safe(async()=>{
  return "Existing number linked"+(r.number?": "+r.number:"")+". Inbound enforcement remains off until tested.";
 });
 
+const planDisplay={starter:"Starter",growth:"Growth",business:"Business"};
+let billingCached=null,billingWorkspace=null;
+function paintSubscription(b,oid){
+ if(oid!==organization())return;
+ billingCached=b;billingWorkspace=oid;
+ const plan=b?.selected_plan&&planDisplay[b.selected_plan]?planDisplay[b.selected_plan]:null;
+ const active=["active","trialing"].includes(b?.status);
+ const label=active&&plan?plan+" plan"+(b.mode==="sandbox"?" · Test":""):
+   b?.pending_confirmation?"Payment pending":
+   b?.status==="past_due"?"Payment overdue":
+   b?.status==="canceled"?"Canceled plan":
+   b?.status==="incomplete"?"Payment incomplete":
+   "No active plan";
+ const el=$("sideAccountPlan");
+ el.textContent=label;
+ el.title=active&&plan?(b.plans?.[b.selected_plan]?.included_minutes||"")+" included monthly minutes"+(b.mode==="sandbox"?" · Sandbox only":""):
+    "Visit Billing & plans for subscription details";
+ el.dataset.state=active?"active":b?.pending_confirmation?"pending":"inactive";
+}
+window.refreshAccountPlan=async()=>{
+ const oid=organization();
+ if(!oid||!current){$("sideAccountPlan").textContent="No workspace";return}
+ $("sideAccountPlan").textContent="Checking plan…";
+ try{
+  const b=await request("/organizations/"+oid+"/billing");
+  paintSubscription(b,oid);
+ }catch(e){
+  if(oid===organization()){$("sideAccountPlan").textContent="Plan unavailable";$("sideAccountPlan").dataset.state="inactive"}
+ }
+};
+
 let billingPlan="growth";
 function updatePlanSelection(){
  document.querySelectorAll("[data-plan]").forEach(button=>{
@@ -1077,14 +1113,20 @@ window.pickPlan=plan=>{
  window.checkout();
 };
 async function loadBilling(){
- const b=await request("/organizations/"+organization()+"/billing");
+ const oid=organization();
+ const b=await request("/organizations/"+oid+"/billing");
+ if(oid!==organization())return;
+ paintSubscription(b,oid);
  const active=["active","trialing"].includes(b.status);
  window.callpilotCheckoutEnabled=Boolean(b.checkout_enabled&&!active);
- $("billingState").textContent=active?"Subscription "+b.status:(b.mode==="sandbox"?"Sandbox checkout":"Checkout unavailable");
+ $("billingState").textContent=active?(planDisplay[b.selected_plan]||"Subscription")+" · "+(b.mode==="sandbox"?"Test ":"")+b.status:
+   b.pending_confirmation?"Payment confirmation pending":(b.mode==="sandbox"?"Sandbox checkout":"No active plan");
  $("billingHeading").textContent=active?"Your subscription is "+b.status:"Your subscription";
  $("billingInfo").textContent=active?
-  "Your subscription is recorded. Use Stripe to manage invoices and payment details.":
-  b.has_customer?"A Stripe customer exists, but an active subscription isn't confirmed. Please check the Stripe portal before starting another checkout.":
+  "Current plan: "+(planDisplay[b.selected_plan]||"Subscription")+" · "+(b.plans?.[b.selected_plan]?.included_minutes||"—")+" included minutes/month"+(b.mode==="sandbox"?" · Sandbox test subscription (no real charges).":"")+(b.cancel_at_period_end?" Cancellation scheduled at period end.":""):
+  b.pending_confirmation?"Your checkout was started, but Stripe has not confirmed an active subscription yet. Refresh this page to verify payment. Do not pay again.":
+  b.status==="past_due"?"Your subscription payment is overdue. Open Stripe to update payment details.":
+  b.has_customer?"A Stripe customer exists, but no active subscription is confirmed. Use the Stripe portal or contact support before paying again.":
   "Choose a plan above. Monthly subscriptions have one mandatory $100 setup payment for new businesses.";
  $("billingCheckoutNote").textContent=b.mode==="sandbox"?
   "Sandbox test only — no real payment is charged. Your first checkout includes $100 setup, followed by the plan's monthly charge.":
@@ -1093,8 +1135,8 @@ async function loadBilling(){
  if(b.selected_plan&&["starter","growth","business"].includes(b.selected_plan))billingPlan=b.selected_plan;
  updatePlanSelection();
  document.querySelectorAll("[data-plan]").forEach(button=>{
-  button.disabled=active||!b.checkout_enabled;
-  button.textContent=active?"Subscription active":b.checkout_enabled?"Choose "+button.dataset.plan[0].toUpperCase()+button.dataset.plan.slice(1)+" (test)":"Checkout coming soon";
+  button.disabled=active||b.pending_confirmation||!b.checkout_enabled;
+  button.textContent=active?"Current subscription":b.pending_confirmation?"Payment pending":b.checkout_enabled?"Choose "+button.dataset.plan[0].toUpperCase()+button.dataset.plan.slice(1)+(b.mode==="sandbox"?" (test)":""):"Checkout coming soon";
  });
 }
 window.requestVoice=()=>safe(async()=>{$("voiceResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/voice-requests","POST",{owner_contact:v("voiceOwnerEmail"),provider_voice_id:v("voiceId"),consent_acknowledged:$("voiceConsent").checked}),null,2)});
@@ -1315,8 +1357,18 @@ async function boot(){
      }
    });
    await render();
-   if(new URLSearchParams(location.search).get("billing")==="success")
-     msg("Checkout finished. Open Billing to confirm your subscription status.");
+   if(new URLSearchParams(location.search).get("billing")==="success"&&current&&organization()){
+     try{
+       const check=await request("/organizations/"+organization()+"/billing/confirm-checkout","POST");
+       if(check.confirmed)msg("Your "+(planDisplay[check.selected_plan]||"subscription")+" plan is confirmed"".");
+       else msg("Checkout returned successfully, but Stripe confirmation is still pending. Please refresh Billing.",true);
+     }catch(e){
+       msg("Stripe confirmation is pending. Your plan will appear once the payment is verified.",true);
+     }
+     await window.loadBilling().catch(()=>{});
+     const clean=new URL(location.href);clean.searchParams.delete("billing");
+     history.replaceState(null,"",clean.pathname+clean.search+clean.hash);
+   }
  }catch(e){
    current=null;
    document.body.classList.remove("cp-signed-in","cp-collapsed","cp-mobile-open");
