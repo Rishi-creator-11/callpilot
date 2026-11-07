@@ -3,21 +3,6 @@ import os, hmac, uuid
 from fastapi import APIRouter, Request, Header, HTTPException
 from app.cloud import api, org_or_404
 router = APIRouter(tags=["vapi"])
-
-# Only the CallPilot marketing demo may disclose published pricing.
-CALLPILOT_DEMO_ORG = "d4d04caa-e532-44e8-b692-0c821d912ef5"
-CALLPILOT_PLAN_ANSWER = (
-    "CallPilot has three plans: Starter is $49 per month with 100 included "
-    "calling minutes, Growth is $99 per month, and Business is $179 per month. "
-    "There is a $25 one-time setup fee. Taxes, if applicable, are additional. "
-    "I can explain the published plans, but cannot change prices or agree to deals."
-)
-CALLPILOT_DEAL_ANSWER = (
-    "I can only share CallPilot's published prices. I can't negotiate, "
-    "offer discounts, promise special terms, or finalize a deal. "
-    "A CallPilot team member can discuss your requirements."
-)
-
 @router.post("/webhooks/vapi/{organization_id}")
 async def vapi_event(organization_id:str, request:Request, authorization:str|None=Header(default=None)):
     secret=os.getenv("VAPI_WEBHOOK_TOKEN","")
@@ -125,14 +110,7 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
         question=args.get("question","") if isinstance(args,dict) else ""
         if not isinstance(question,str) or not (1<=len(question)<=500):
             results.append({"toolCallId":call_id,"error":"Invalid question"});continue
-        if organization_id==CALLPILOT_DEMO_ORG and PRICE.search(question):
-            import re
-            wants_deal = bool(re.search(
-                r"\b(discount|negotiate|negotiation|deal|waive|lower|reduce|"
-                r"match|coupon|promo|promotion|free setup|special offer)\b",
-                question, re.I))
-            answer=CALLPILOT_DEAL_ANSWER if wants_deal else CALLPILOT_PLAN_ANSWER
-        elif PRICE.search(question):
+        if PRICE.search(question):
             answer=NO_PRICE
         else:
             try:
