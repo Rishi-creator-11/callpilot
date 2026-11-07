@@ -93,3 +93,60 @@ def test_tool_action_fails_without_feature_flag(monkeypatch):
         voice_actions.check_appointment_availability(OID, CALL, {
             "start": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
             "duration_minutes": 30})
+
+
+def test_booked_calendar_event_is_persisted(monkeypatch):
+    """Offline e2e of reservation -> Google Calendar -> confirmed DB event."""
+    import app.calendar as calendar
+    import app.account as account
+    monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: flags(voice_booking_enabled=True))
+    monkeypatch.setattr(calendar, "google_token", lambda oid: "fake-calendar-token")
+    monkeypatch.setattr(calendar, "free_busy", lambda token, a, b: True)
+    monkeypatch.setattr(account, "rpc", lambda name, args: [{
+        "reservation_status": "reserved",
+        "reservation_id": "00000000-0000-4000-8000-000000000001",
+    }])
+    updates=[]
+    monkeypatch.setattr(voice_actions, "api", lambda table, method="GET", params=None,
+                        data=None, prefer=None: updates.append((table, method, data)) or [])
+    class Response:
+        def __init__(self, status, data=None):
+            self.status_code = status
+            self._data = data or {}
+        def json(self):
+            return self._data
+    class FakeClient:
+        def __init__(self, timeout):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def get(self, url, headers):
+            return Response(404)
+        def post(self, url, headers, json):
+            assert json["extendedProperties"]["private"]["callpilot_org"] == OID
+            return Response(201, {"id": json["id"]})
+    monkeypatch.setattr(voice_actions.httpx, "Client", FakeClient)
+    future = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
+    reply = voice_actions.book_appointment(OID, CALL, {
+        "confirmed": True, "start": future.isoformat(),
+        "duration_minutes": 30, "caller_name": "Sam Taylor",
+        "caller_contact": "+15555550100", "service": "Business card consultation"})
+    assert "Confirmed Google Calendar appointment" in reply
+    assert any(t == "appointment_requests" and method == "PATCH" and
+               data["status"] == "confirmed" and data["calendar_event_id"].startswith("cp")
+               for t, method, data in updates)
+
+
+def test_conflicting_reservation_does_not_create_event(monkeypatch):
+    import app.account as account
+    monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: flags(voice_booking_enabled=True))
+    monkeypatch.setattr(account, "rpc", lambda name, args: [{
+        "reservation_status": "conflict", "reservation_id": None}])
+    future = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
+    reply = voice_actions.book_appointment(OID, CALL, {
+        "confirmed": True, "start": future.isoformat(), "duration_minutes": 30,
+        "caller_name": "Sam Taylor", "caller_contact": "+15555550100",
+        "service": "Consultation"})
+    assert "another customer" in reply
