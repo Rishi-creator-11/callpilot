@@ -1038,7 +1038,26 @@ async function loadSemanticStatus(){const result=await request("/organizations/"
     "Semantic search is not connected. Check your Supabase embedding service configuration."}
 window.indexKnowledge=()=>safe(async()=>{const result=await request("/organizations/"+organization()+"/knowledge/reindex","POST");await loadSemanticStatus();return "Indexed "+result.indexed+" approved answers."});
 window.ask=()=>safe(async()=>{const question=v("question").trim();if(!question)throw Error("Please enter a question.");const result=await request("/organizations/"+organization()+"/simulate","POST",{question});$("reply").textContent=result.answer+(result.matched_question?"\n\nMatched approved knowledge: "+result.matched_question:"");});
-async function loadCalendar(){let c=await request("/organizations/"+organization()+"/calendar");$("calendarStatus").textContent=c.connected?"Google Calendar connected":c.configured?"Google Calendar available — connect your account":"Google OAuth credentials not yet configured"}
+async function loadCalendar(){
+ let c=await request("/organizations/"+organization()+"/calendar");
+ const statuses={
+  connected:"Google Calendar connected successfully.",
+  not_connected:"Google declined or cancelled the connection. Please authorize access to continue.",
+  access_denied:"Google denied access. If CallPilot is in OAuth testing, ensure this Google account is listed as a test user.",
+  expired:"The calendar connection expired. Please try connecting again.",
+  missing_refresh_token:"Google did not issue a refresh token. Try reconnecting and accepting the requested permissions.",
+  error:"Google Calendar authentication failed. Verify OAuth client settings, authorized redirect URI, and consent-screen test users."
+ };
+ const result=new URLSearchParams(location.search).get("calendar");
+ $("calendarStatus").textContent=c.connected?"Google Calendar connected":
+  result&&statuses[result]?statuses[result]:
+  c.configured?"Google Calendar available — connect your account":"Google OAuth credentials not yet configured";
+ if(result){
+  $("calendarResult").textContent=statuses[result]||"Calendar connection status: "+result;
+  const url=new URL(location.href);url.searchParams.delete("calendar");
+  history.replaceState(null,"",url.pathname+url.search+(url.hash||"#appointments"));
+ }
+}
 window.connectCalendar=()=>safe(async()=>{let r=await request("/organizations/"+organization()+"/calendar/connect","POST");location.href=r.url});
 const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Number(v("cduration"))});
 window.checkAvailability=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/availability","POST",slot()),null,2)});
