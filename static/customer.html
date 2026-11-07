@@ -571,6 +571,31 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 #analyticsChart{display:flex;align-items:end;gap:3px;height:160px;padding:8px 4px 0;border-bottom:1px solid #d4e4dc;background:#f1f6f2}
 #analyticsChart span{flex:1;background:#228171;border-radius:3px 3px 0 0;min-width:0}
 #analyticsDaily,#analyticsOutcomes{max-height:260px;overflow:auto}
+.wk-tree{background:#fff;border:1px solid var(--cp-border);border-radius:18px;overflow:hidden;margin-top:6px}
+.wk-row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#fff;color:var(--cp-text);border:0;border-bottom:1px solid var(--cp-border);border-radius:0;padding:16px 18px;box-shadow:none;cursor:pointer;font:inherit}
+.wk-row:last-child{border-bottom:0}
+.wk-row:hover{background:#f6faf8}
+.wk-row.child{padding-left:46px;position:relative}
+.wk-row.child::before{content:"";position:absolute;left:30px;top:0;bottom:50%;width:12px;border-left:2px solid #dce6e1;border-bottom:2px solid #dce6e1;border-bottom-left-radius:8px}
+.wk-icon{width:42px;height:42px;border-radius:12px;background:#e8edf0;display:grid;place-items:center;flex:none;font-size:18px;color:#145a4a}
+.wk-row strong{display:inline;font-size:16px}
+.wk-badge{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;background:#e8edf0;font-size:12px;color:#344e65}
+.wk-sub{display:block;color:var(--cp-muted);font-size:14px;margin-top:2px}
+.wk-chev{margin-left:auto;color:var(--cp-muted)}
+.wk-actions{display:flex;gap:10px}
+.wk-actions button{width:46px;height:46px;padding:0;font-size:20px;border-radius:14px}
+.id-card{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#fff;color:var(--cp-text);border:1px solid var(--cp-border);border-radius:16px;padding:16px 18px;margin:0 0 12px;box-shadow:none;cursor:pointer;font:inherit}
+.id-card:hover{border-color:#b9cbc3}
+.id-card small{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:11px;color:var(--cp-muted)}
+.id-card strong{display:block;font-size:17px}
+.id-card span.id-sub{display:block;color:var(--cp-muted);font-size:14px}
+.id-card .id-chev{margin-left:auto;color:var(--cp-muted)}
+.id-avatar{width:64px;height:64px;border-radius:18px;background:#dcefe7;color:#145a4a;display:grid;place-items:center;font-size:28px;font-weight:800;flex:none}
+.id-persona{background:#fff;border:1px solid var(--cp-border);border-radius:20px;padding:14px;margin-bottom:22px}
+.id-persona .id-card{border:0;padding:6px 4px 14px}
+.id-grid{display:grid;gap:0}
+.id-section-title{font-size:15px;font-weight:700;margin:22px 0 10px}
+.id-back{background:transparent;color:#145a4a;box-shadow:none;padding:6px 0;margin-bottom:8px;font-weight:700}
 .identity-tabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid #dce4df;margin-bottom:15px;padding-bottom:8px}
 .identity-tabs button{background:transparent;color:#344e65;box-shadow:none;padding:8px 11px}
 .identity-tabs button[aria-selected="true"]{background:#dcefe7;color:#145a4a}
@@ -803,14 +828,18 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <section id="workers" class="panel card" style="display:none">
  <div class="cp-panel-heading"><div><p class="cp-worker-kicker">Receptionist configuration</p>
   <h2>Workers</h2><p>Give each type of call a specialist, a set of questions, or a path to the right team.</p></div>
-  <button class="secondary" type="button" onclick="window.section('channels')">Manage call routing</button></div>
+  <div class="wk-actions"><button class="secondary" type="button" id="workersPractice" aria-label="Practice a call" title="Practice a call">☎</button>
+  <button type="button" id="workersAdd" aria-label="Add worker" title="Add worker">+</button></div></div>
  <div class="cp-worker-nav" role="group" aria-label="Workers workspace">
-  <button type="button" data-worker-view="playbooks" aria-controls="workerPlaybooks" aria-pressed="true">Playbooks</button>
+  <button type="button" data-worker-view="overview" aria-controls="workerOverview" aria-pressed="true">Workers</button>
+  <button type="button" data-worker-view="playbooks" aria-controls="workerPlaybooks" aria-pressed="false">Playbooks</button>
   <button type="button" data-worker-view="intake" aria-controls="workerIntake" aria-pressed="false">Intake forms</button>
   <button type="button" data-worker-view="menu" aria-controls="workerMenu" aria-pressed="false">Call menu</button>
   <button type="button" onclick="window.section('knowledge')">Knowledge ↗</button>
  </div>
- <div id="workerPlaybooks">
+ <div id="workerOverview"><p class="muted">Manage the AI workers that handle your calls.</p>
+  <div id="workerTree" class="wk-tree" aria-live="polite"><p class="muted" style="padding:16px">Loading workers…</p></div></div>
+ <div id="workerPlaybooks" hidden>
  <div class="cp-section-box"><h3>Default receptionist</h3>
  <p>When no playbook matches, the receptionist follows its general instructions and approved tools.</p>
  <div class="cp-inline-actions"><button class="secondary" onclick="window.section('builder')">Edit general instructions</button>
@@ -1174,6 +1203,22 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  <div class="cp-panel-heading"><div><h2>Identity &amp; business</h2><p>Manage the receptionist’s voice, conversation style, business profile and availability.</p></div>
   <div class="cp-inline-actions"><button id="identityEdit" class="secondary" type="button" hidden>Edit</button>
   <button class="secondary" onclick="window.section('builder',{push:true});openIdentityHistory()">Configuration history</button></div></div>
+ <div id="identityOverview">
+  <div class="id-persona">
+   <button type="button" class="id-card" data-identity-tab="identityTabPersona" aria-label="Edit persona">
+    <span class="id-avatar" id="idAvatar" aria-hidden="true">A</span>
+    <span><strong id="idName">Your receptionist</strong><span class="id-sub" id="idTagline">English and Spanish</span></span><span class="id-chev" aria-hidden="true">›</span></button>
+   <button type="button" class="id-card" data-identity-tab="identityTabPersona"><span><small>Voice</small><strong id="idVoice">Current voice</strong><span class="id-sub">Stock voice for calls</span></span><span class="id-chev" aria-hidden="true">›</span></button>
+   <button type="button" class="id-card" data-identity-tab="identityTabSpeech"><span><small>Keywords</small><strong id="idKeywords">0 keywords</strong><span class="id-sub" id="idKeywordsSub">No keywords configured</span></span><span class="id-chev" aria-hidden="true">›</span></button>
+   <button type="button" class="id-card" data-identity-tab="identityTabSpeech" style="margin-bottom:0"><span><small>Language</small><strong id="idLanguage">English and Spanish</strong><span class="id-sub" id="idLanguageSub">Callers choose by speaking</span></span><span class="id-chev" aria-hidden="true">›</span></button>
+  </div>
+  <p class="id-section-title">Business</p>
+  <button type="button" class="id-card" data-identity-tab="identityTabProfile"><span><small>Address</small><strong id="idAddress">Not set</strong></span><span class="id-chev" aria-hidden="true">›</span></button>
+  <button type="button" class="id-card" data-identity-tab="identityTabHours"><span><small>Hours</small><strong id="idHours">Open any time</strong></span><span class="id-chev" aria-hidden="true">›</span></button>
+  <button type="button" class="id-card" data-identity-tab="identityTabProfile"><span><small>Website</small><strong id="idWebsite">Not set</strong></span><span class="id-chev" aria-hidden="true">›</span></button>
+ </div>
+ <div id="identityConfigure" hidden>
+ <button type="button" id="identityBack" class="id-back">← Identity</button>
  <div class="identity-tabs" role="tablist" aria-label="Identity configuration">
   <button type="button" role="tab" aria-selected="true" aria-controls="identityPersona" id="identityTabPersona">Persona</button>
   <button type="button" role="tab" aria-selected="false" aria-controls="identitySpeech" id="identityTabSpeech" tabindex="-1">Speech</button>
@@ -1232,6 +1277,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   </form>
  </section>
  <section role="tabpanel" id="identityHours" aria-labelledby="identityTabHours" hidden><p id="identityHoursInfo" class="muted" role="status"></p><div id="identityHoursMount"></div></section>
+ </div>
 </section>
 <div id="simulator" class="panel card">
 <div class="cp-panel-heading"><div><h2>Test assistant</h2><p>Check what your receptionist would say before taking a real customer call.</p></div><span class="pill">Safe-answer simulator</span></div>
@@ -1950,7 +1996,7 @@ window.loadWorkspace=async({destination}={})=>{
     resetRouting();
     resetCallMenu();
     resetIntakeForms();
-    showWorkerView("playbooks");
+    showWorkerView("overview");
     $("phoneReserveForm").reset();$("phoneReserveForm").hidden=true;
     $("phoneReserveCheck").hidden=true;$("phoneReserveStatus").textContent="";
     $("usageActivateForm").reset();$("usageActivateForm").hidden=true;
@@ -2215,6 +2261,60 @@ function moveIdentityHours(){
  const panel=$("bookingHoursPanel");
  if(panel.parentElement!==$(target))$(target).append(panel);
 }
+const WEEK_SHORT={mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat",sun:"Sun"};
+function clock12(value){
+ const [h,m]=value.split(":").map(Number);
+ return (h%12||12)+":"+String(m).padStart(2,"0")+" "+(h<12?"AM":"PM");
+}
+function hoursSummary(data){
+ if(!data||data.hours===null)return "Open any time";
+ const week=data.hours.week||{},groups=[];
+ for(const [key] of weekdays){
+  const text=(week[key]||[]).map(w=>clock12(w.start)+" – "+clock12(w.end)).join(", ");
+  if(!text)continue;
+  const last=groups[groups.length-1];
+  if(last&&last.text===text&&last.end===weekdays.findIndex(d=>d[0]===key)-1)last.end++,last.keys.push(key);
+  else groups.push({text,end:weekdays.findIndex(d=>d[0]===key),keys:[key]});
+ }
+ if(!groups.length)return "Closed";
+ return groups.map(g=>(g.keys.length>1?WEEK_SHORT[g.keys[0]]+"–"+WEEK_SHORT[g.keys[g.keys.length-1]]:WEEK_SHORT[g.keys[0]])+" "+g.text).join(" · ");
+}
+function showIdentityOverview(show){
+ $("identityOverview").hidden=!show;
+ $("identityConfigure").hidden=show;
+ if(show)void updateIdentityOverview();
+}
+async function updateIdentityOverview(){
+ const name=$("agent").value.trim()||"Your receptionist";
+ const language={multi:"English and Spanish",en:"English",es:"Spanish"}[$("identityLanguage").value]||"English and Spanish";
+ const terms=$("identityTerms").value.split("\n").map(t=>t.trim()).filter(Boolean);
+ $("idName").textContent=name;
+ $("idAvatar").textContent=name.charAt(0).toUpperCase();
+ $("idTagline").textContent=language;
+ $("idVoice").textContent=$("identityStockVoice").value||"Current voice";
+ $("idKeywords").textContent=terms.length+(terms.length===1?" keyword":" keywords");
+ $("idKeywordsSub").textContent=terms.length?terms.slice(0,3).join(", "):"No keywords configured";
+ $("idLanguage").textContent=language;
+ $("idLanguageSub").textContent=$("identityLanguage").value==="multi"?"Callers choose by speaking":"Fixed for every call";
+ $("idAddress").textContent=$("identityAddress").value.trim()||"Not set";
+ $("idWebsite").textContent=$("identityWebsite").value.trim()||"Not set";
+ const oid=organization();
+ if(!["owner","admin"].includes(orgs.find(org=>org.id===oid)?.role)){$("idHours").textContent="Ask an owner or admin";return}
+ try{
+  const data=await request("/organizations/"+encodeURIComponent(oid)+"/booking-hours");
+  if(oid===organization())$("idHours").textContent=hoursSummary(data);
+ }catch(e){if(oid===organization())$("idHours").textContent="Open Hours to set"}
+}
+document.addEventListener("click",event=>{
+ const card=event.target.closest("[data-identity-tab]");
+ if(!card)return;
+ showIdentityOverview(false);
+ selectIdentityTab($(card.dataset.identityTab));
+});
+$("identityBack").addEventListener("click",()=>{
+ if(identityEditing&&identityUnsaved.size&&!window.confirm("Leave without saving your changes?"))return;
+ showIdentityOverview(true);
+});
 function selectIdentityTab(tab){
  selectedIdentityTab=tab;
  for(const item of identityTabs){
@@ -2267,6 +2367,7 @@ function resetIdentity(){
  $("identityStatus").textContent="";
  updateIdentityControls();
  selectIdentityTab(identityTabs[0]);
+ showIdentityOverview(true);
 }
 async function loadAgent(){
  const oid=organization(),run=++identityRun;
@@ -2290,6 +2391,7 @@ async function loadAgent(){
   $("identityWebsite").value=profile.business_website||"";
   identityCanManage=identity.can_manage;
   $("identityStatus").textContent=identityCanManage?"":"View only. Owners and admins can edit this identity.";
+  if(!$("identityOverview").hidden)void updateIdentityOverview();
  }catch(e){if(oid===organization()&&run===identityRun)$("identityStatus").textContent=e.message}
  finally{if(oid===organization()&&run===identityRun)updateIdentityControls()}
  if(selectedIdentityTab.id==="identityTabHours"&&activePage==="voice")void loadIdentityHours();
@@ -2887,7 +2989,7 @@ $("shopifyLookup").addEventListener("submit",async event=>{
 const workersPath=oid=>"/organizations/"+oid+"/workers";
 let workersWorkspace="",workersSaved=[],workersDraft=[],workersEditable=false,workersDirty=false;
 function showWorkerView(view){
- for(const [key,id] of [["playbooks","workerPlaybooks"],["intake","workerIntake"],["menu","workerMenu"]]){
+ for(const [key,id] of [["overview","workerOverview"],["playbooks","workerPlaybooks"],["intake","workerIntake"],["menu","workerMenu"]]){
   $(id).hidden=key!==view;
   document.querySelector("[data-worker-view='"+key+"']").setAttribute("aria-pressed",String(key===view));
  }
@@ -2907,6 +3009,7 @@ function resetWorkers(){
  $("syncWorkers").disabled=true;
  $("workerList").textContent="Loading playbooks…";
  $("workerStatus").textContent="";
+ if($("workerTree"))$("workerTree").textContent="Loading workers…";
 }
 const callMenuPath=oid=>"/organizations/"+oid+"/workers/call-menu";
 const callMenuActions={operator:"General receptionist",appointment:"Schedule an appointment",
@@ -3136,6 +3239,41 @@ async function loadWorkers(refresh=false){
   if(!intakeDirty)await loadIntakeForms(oid);
  }catch(e){if(oid===organization())$("workerList").textContent=e.message}
 }
+function renderWorkerTree(){
+ const tree=$("workerTree");
+ if(!tree)return;
+ tree.replaceChildren();
+ const row=(cls,icon,name,desc,badge,open)=>{
+  const button=document.createElement("button"),text=document.createElement("span"),title=document.createElement("strong");
+  const ic=document.createElement("span"),sub=document.createElement("span"),chev=document.createElement("span");
+  button.type="button";button.className="wk-row "+cls;
+  ic.className="wk-icon";ic.setAttribute("aria-hidden","true");ic.textContent=icon;
+  title.textContent=name;text.append(title);
+  if(badge){const b=document.createElement("span");b.className="wk-badge";b.textContent=badge;text.append(b)}
+  sub.className="wk-sub";sub.textContent=desc;text.append(sub);
+  chev.className="wk-chev";chev.setAttribute("aria-hidden","true");chev.textContent="›";
+  button.append(ic,text,chev);button.addEventListener("click",open);
+  return button;
+ };
+ const org=orgs.find(workspace=>workspace.id===organization());
+ tree.append(row("","◉","Operator",(org?.name||"Your business")+"’s phone operator",workersDraft.length?workersDraft.filter(w=>w.enabled).length+" workers":"",
+  ()=>{showWorkerView("menu")}));
+ workersDraft.forEach((worker,index)=>{
+  tree.append(row("child","◇",worker.name||"New worker",worker.when||worker.instructions||"",worker.enabled?"":"Off",()=>{
+   showWorkerView("playbooks");
+   const field=$("worker-"+index+"-name");
+   if(field){field.scrollIntoView({block:"center"});field.focus()}
+  }));
+ });
+ if(!workersDraft.length){const empty=document.createElement("p");empty.className="muted";empty.style.padding="16px";
+  empty.textContent="No specialist workers yet. Use + to add one for a common caller request.";tree.append(empty)}
+}
+$("workersAdd").addEventListener("click",()=>{
+ showWorkerView("playbooks");
+ if(workersEditable&&!$("addWorker").disabled)$("addWorker").click();
+ else $("workerStatus").textContent=workersEditable?"You have reached the worker limit.":"Only workspace owners and admins can add workers.";
+});
+$("workersPractice").addEventListener("click",()=>window.section("simulator"));
 function markWorkersDirty(){
  workersDirty=true;
  $("syncWorkers").disabled=true;
@@ -3144,6 +3282,7 @@ function renderWorkers(){
  const list=$("workerList");
  list.replaceChildren();
  $("addWorker").disabled=workersDraft.length>=12;
+ renderWorkerTree();
  if(!workersDraft.length){list.textContent="No worker playbooks yet. Add one for a common caller request.";return}
  workersDraft.forEach((worker,index)=>{
   const card=document.createElement("fieldset"),title=document.createElement("legend");
