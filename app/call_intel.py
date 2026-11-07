@@ -436,15 +436,31 @@ def refresh_receptionist_prompt(oid:str):
             first=False
         else:
             next_messages.append(message)
-    if next_messages==messages:
+    # Hang-up requires an actual Vapi endCall tool, not just instructions
+    # to say goodbye. Preserve all other provider tools and custom settings.
+    existing_tools=model.get("tools") or []
+    if not isinstance(existing_tools,list):
+        return {"updated":False,"reason":"invalid_tool_configuration"}
+    next_tools=list(existing_tools)
+    if not any(isinstance(t,dict) and t.get("type")=="endCall" for t in next_tools):
+        next_tools.append({"type":"endCall"})
+    goodbye="Thanks for calling. Goodbye."
+    if (next_messages==messages and next_tools==existing_tools
+            and assistant.get("endCallMessage")==goodbye):
         return {"updated":False,"reason":"already_current"}
-    new_model=dict(model,messages=next_messages)
-    vapi("PATCH","/assistant/"+aid,body={"model":new_model})
+    new_model=dict(model,messages=next_messages,tools=next_tools)
+    vapi("PATCH","/assistant/"+aid,body={
+        "model":new_model,"endCallMessage":goodbye})
     verified=vapi("GET","/assistant/"+aid)
-    saved=(verified.get("model") or {}).get("messages") or []
-    if not saved or saved[0].get("content")!=desired:
-        raise HTTPException(502,"Vapi did not confirm updated conversation policy")
-    return {"updated":True,"reason":"policy_synced"}
+    saved_model=verified.get("model") or {}
+    saved=saved_model.get("messages") or []
+    saved_tools=saved_model.get("tools") or []
+    if (not any(m.get("role")=="system" and m.get("content")==desired
+                for m in saved if isinstance(m,dict))
+        or not any(t.get("type")=="endCall" for t in saved_tools if isinstance(t,dict))
+        or verified.get("endCallMessage")!=goodbye):
+        raise HTTPException(502,"Vapi did not confirm closing policy and hang-up tool")
+    return {"updated":True,"reason":"closing_policy_and_hangup_synced"}
 
 def disable_knowledge_filler(oid:str):
     """Silence Vapi's default request-start filler on approved FAQ lookups.
