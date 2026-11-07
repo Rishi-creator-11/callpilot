@@ -123,7 +123,7 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
             try:
                 fact,meta=retrieve(organization_id,question)
                 answer=fact["answer"] if fact else UNKNOWN
-                if MONEY.search(answer):answer=NO_PRICE
+                if MONEY.search(answer) and organization_id!=CALLPILOT_ORG:answer=NO_PRICE
             except Exception:
                 answer=UNKNOWN
         # Tool output must be a flat string for Vapi's parser.
