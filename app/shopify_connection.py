@@ -27,7 +27,7 @@ STOCK_QUERY = """
 query StockBySku($search: String!) {
   productVariants(first: 20, query: $search) {
     pageInfo { hasNextPage }
-    nodes { sku title inventoryQuantity inventoryItem { tracked } product { title status } }
+    nodes { id sku title inventoryQuantity inventoryItem { tracked } product { title status } }
   }
 }
 """
@@ -75,7 +75,7 @@ def graphql(domain: str, token: str, query: str, variables: dict | None = None) 
         json={"query": query, "variables": variables or {}})
     data = result.get("data")
     if result.get("errors") or not isinstance(data, dict):
-        raise HTTPException(502, "Shopify did not return catalog data. Check the app’s read permissions.")
+        raise HTTPException(502, "Shopify could not complete this operation. Check the app’s permissions.")
     return data
 
 
@@ -136,17 +136,23 @@ def inventory(oid: UUID, body: SkuInput, user=Depends(current_user)):
     return {"product": lookup_inventory(oid, body.sku)}
 
 
-def lookup_inventory(oid: UUID, sku: str) -> dict | None:
+def connected_store(oid: UUID, expected_domain: str | None = None) -> tuple[str, str]:
     rows = api(TABLE, params={**filters(oid), "select": "account_ref,token_ciphertext", "limit": 1})
     if not rows:
         raise HTTPException(409, "Connect Shopify first.")
     account = rows[0]
+    domain = account["account_ref"]
+    if expected_domain and domain != expected_domain:
+        raise HTTPException(409, "Reconnect the original Shopify store to manage this checkout.")
     try:
         credentials = json.loads(vault("shopify").decrypt(account["token_ciphertext"].encode()))
     except (InvalidToken, ValueError) as exc:
         raise HTTPException(503, "Reconnect Shopify to refresh its stored credentials.") from exc
-    domain = account["account_ref"]
-    data = graphql(domain, access_token(domain, credentials), STOCK_QUERY, {"search": "sku:" + json.dumps(sku)})
+    return domain, access_token(domain, credentials)
+
+
+def exact_variant(domain: str, token: str, sku: str) -> dict | None:
+    data = graphql(domain, token, STOCK_QUERY, {"search": "sku:" + json.dumps(sku)})
     connection = data.get("productVariants") or {}
     variants = [
         row for row in connection.get("nodes", [])
@@ -155,9 +161,14 @@ def lookup_inventory(oid: UUID, sku: str) -> dict | None:
     ]
     if len(variants) > 1 or (connection.get("pageInfo") or {}).get("hasNextPage"):
         raise HTTPException(409, "The SKU search returned multiple possible variants. Use a unique SKU.")
-    if not variants:
+    return variants[0] if variants else None
+
+
+def lookup_inventory(oid: UUID, sku: str) -> dict | None:
+    domain, token = connected_store(oid)
+    row = exact_variant(domain, token, sku)
+    if not row:
         return None
-    row = variants[0]
     tracked = (row.get("inventoryItem") or {}).get("tracked") is True
     return {"sku": row["sku"], "name": row["product"]["title"], "variant": row["title"],
             "quantity": row.get("inventoryQuantity") if tracked else None}

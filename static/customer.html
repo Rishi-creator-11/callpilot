@@ -724,7 +724,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
     <label for="shopifyDomain">Store domain</label><input id="shopifyDomain" required maxlength="80" placeholder="your-store.myshopify.com" autocomplete="off">
     <label for="shopifyClient">App client ID</label><input id="shopifyClient" required maxlength="128" autocomplete="off">
     <label for="shopifySecret">App client secret</label><input id="shopifySecret" type="password" required maxlength="512" autocomplete="new-password">
-    <p class="muted">Install an app owned by your Shopify organization with read_products and read_inventory.</p>
+    <p class="muted">Install an app owned by your Shopify organization with read_products and read_inventory. For hosted checkout and order status, also grant write_draft_orders and read_orders.</p>
     <button type="submit">Save connection</button>
    </form>
    <form id="shopifyLookup" hidden>
@@ -1259,7 +1259,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
     <option value="">All requests</option><option value="requested">Awaiting review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
    </select></div>
   </div>
-  <p class="muted">Approval records your team’s review decision. Handle payment, fulfillment and any customer confirmation in your order system.</p>
+  <p class="muted">Approve requests before creating a Shopify checkout link. Shopify collects payment and shows fulfillment progress here when you refresh the order.</p>
   <p id="orderReviewStatus" class="muted" role="status"></p>
   <div id="orderReviewList" aria-live="polite">Loading order requests…</div>
  </div>
@@ -3320,8 +3320,8 @@ function renderOrderReview(){
   details.append(title,description);
   item.append(details);
   const actions=row.status==="requested"?[["Approve request","approved"],["Reject","rejected"],["Cancel","cancelled"]]:
-   row.status==="approved"?[["Cancel","cancelled"]]:[];
-  if(canEdit&&actions.length){
+   row.status==="approved"&&!["pending","created"].includes(row.checkout_state)?[["Cancel","cancelled"]]:[];
+  if(canEdit&&(actions.length||row.status==="approved")){
    const controls=document.createElement("div");
    controls.className="cp-inline-actions";
    for(const [label,status] of actions){
@@ -3342,10 +3342,62 @@ function renderOrderReview(){
     });
     controls.append(button);
    }
+   if(row.status==="approved")addOrderCheckout(oid,row,details,controls);
    item.append(controls);
   }
   list.append(item);
  }
+}
+function addOrderCheckout(oid,row,details,controls){
+ const button=document.createElement("button"),result=document.createElement("div");
+ button.type="button";button.className="secondary";result.setAttribute("role","status");
+ details.append(result);controls.append(button);
+ const labels={pending:"Check Shopify checkout",created:"Refresh checkout and fulfillment"};
+ let state=row.checkout_state;
+ button.textContent=labels[state]||"Create Shopify checkout";
+ button.addEventListener("click",async()=>{
+  if(oid!==organization()||button.disabled)return;
+  if(!labels[state]&&!window.confirm("Create a Shopify checkout link for "+row.quantity+" × "+row.sku+"? You’ll be able to share it with the customer."))return;
+  for(const control of controls.children)control.disabled=true;
+  result.textContent="Checking Shopify…";
+  try{
+   const data=await request(orderReviewPath(oid)+"/"+encodeURIComponent(row.id)+"/checkout","POST",{});
+   if(oid!==organization())return;
+   row.checkout_state=state=data.state;
+   button.textContent=labels[state]||"Create Shopify checkout";
+   for(const control of [...controls.children])if(control!==button)control.remove();
+   const label=value=>String(value||"").toLowerCase().replaceAll("_"," ");
+   const summary=document.createElement("p");summary.className="muted";
+   summary.textContent=data.message||(data.order_name?[data.order_name,
+     data.payment_status&&"Payment "+label(data.payment_status),
+     data.fulfillment_status&&"Fulfillment "+label(data.fulfillment_status)].filter(Boolean).join(" · "):
+     "Shopify draft · "+label(data.draft_status));
+   result.replaceChildren(summary);
+   if(data.admin_url){
+    const link=document.createElement("a");link.href=data.admin_url;link.target="_blank";link.rel="noopener noreferrer";
+    link.textContent=data.order_name?"Manage fulfillment in Shopify ↗":"Open draft in Shopify ↗";
+    result.append(link);
+   }
+   if(data.checkout_url){
+    const field=document.createElement("input"),copy=document.createElement("button");
+    field.value=data.checkout_url;field.readOnly=true;field.setAttribute("aria-label","Shopify checkout link");
+    copy.type="button";copy.className="secondary";copy.textContent="Copy checkout link";
+    copy.addEventListener("click",async()=>{
+     try{await navigator.clipboard.writeText(field.value);copy.textContent="Copied"}
+     catch{field.focus();field.select();copy.textContent="Select and copy the link"}
+    });
+    result.append(field,copy);
+   }
+  }catch(e){
+   if(oid!==organization())return;
+   result.textContent=e.message;
+   if(!labels[state]){
+    // A provider timeout can leave a draft pending. Reload its durable state.
+    $("orderReviewStatus").textContent=e.message;
+    await loadOrderReview();
+   }
+  }finally{for(const control of controls.children)control.disabled=false}
+ });
 }
 $("orderQuery").addEventListener("input",renderOrderReview);
 $("orderFilter").addEventListener("change",renderOrderReview);

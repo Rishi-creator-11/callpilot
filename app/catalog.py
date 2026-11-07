@@ -1,6 +1,6 @@
 """Owner-approved native catalog and pending order requests.
 
-No checkout, stock decrement, payment or fulfillment happens here. An order
+Checkout is handled separately through the connected merchant store. An order
 request is not an accepted order. All queries are scoped to an authenticated
 organization and use server-side credentials.
 """
@@ -125,10 +125,12 @@ def archive_catalog_item(oid: str, iid: uuid.UUID,user=Depends(current_user)):
 
 @router.get("/orders/requests")
 def order_requests(oid: str,user=Depends(current_user)):
-    membership(oid, user)
+    role = membership(oid, user)
+    columns = "id,sku,quantity,caller_name,caller_contact,status,created_at"
+    if role in ("owner", "admin"):
+        columns += ",checkout_state"
     return api("order_requests",params={"organization_id":"eq."+oid,
-        "select":"id,sku,quantity,caller_name,caller_contact,status,created_at",
-        "order":"created_at.desc","limit":200})
+        "select":columns, "order":"created_at.desc","limit":200})
 
 
 class OrderReview(BaseModel):
@@ -143,12 +145,15 @@ def review_order_request(oid: uuid.UUID, rid: uuid.UUID, body: OrderReview, user
     if body.expected_status == "approved" and body.status != "cancelled":
         raise HTTPException(422, "An approved request can only be cancelled.")
     key = {"organization_id": "eq." + workspace, "id": "eq." + str(rid)}
-    rows = api("order_requests", "PATCH", params={**key, "status": "eq." + body.expected_status},
+    rows = api("order_requests", "PATCH", params={**key, "status": "eq." + body.expected_status,
+                       "or": "(checkout_state.is.null,checkout_state.eq.failed)"},
                data={"status": body.status}, prefer="return=representation")
     if not rows:
-        current = api("order_requests", params={**key, "select": "status", "limit": 1})
+        current = api("order_requests", params={**key, "select": "status,checkout_state", "limit": 1})
         if not current:
             raise HTTPException(404, "Order request not found.")
+        if current[0].get("checkout_state") in ("pending", "created"):
+            raise HTTPException(409, "This request has a Shopify checkout. Manage it in Shopify.")
         if current[0]["status"] != body.status:
             raise HTTPException(409, "This order request changed. Refresh and review it again.")
     return {"status": body.status}

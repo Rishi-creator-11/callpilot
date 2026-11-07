@@ -41,7 +41,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 `/app#workers` supports creating, editing, reordering and disabling named call playbooks. Channels can enable separate runtime specialists and deterministic inbound rules. In-call branching and provider verification remain open.
 
-Order requests have a dedicated CallPilot review page at `/app#orders`. Provider order placement, fulfillment, and customer confirmation remain open.
+The `/app#orders` review page supports staff approval, Shopify checkout creation and recovery, a copyable checkout link, live payment and fulfillment status, and a shortcut to manage shipments in Shopify. Direct shipment creation, customer confirmation and live checkout testing remain open.
 
 | Done | Goodcall page, tab, or dialog | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
