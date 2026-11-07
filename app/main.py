@@ -178,6 +178,30 @@ PRODUCT_PAGES = {
         "An unanswered call reaches your receptionist", "A carrier can forward an unanswered call to your connected CallPilot number when that forwarding option is available.",
         "/app#usage", "Review your phone setup",
     ),
+    "call-routing": (
+        "Decide where calls should go", "Set screening rules before a caller reaches your receptionist.",
+        "CallPilot evaluates saved rules in order. Match a caller-number prefix, calls without caller ID, or times outside your booking hours.",
+        ("Open Channels and add a rule with the conditions you want.", "Choose the operator, an enabled specialist, your human fallback, or decline the call.",
+         "Activate CallPilot admission for the business number and review recent routing decisions."),
+        "An after-hours call gets a defined route", "A saved rule can forward calls outside your hours to your configured backup line.",
+        "/app#channels", "Open call routing",
+    ),
+    "receptionist-workers": (
+        "Give each caller the right specialist", "Set a role, approved knowledge, and an intake form for different kinds of calls.",
+        "Keep general questions with the receptionist. Add a specialist for focused conversations such as sales intake or service questions.",
+        ("Create a worker and explain when it should handle the call.", "Choose what the specialist should ask and mark required questions.",
+         "Enable runtime specialists in Channels and review the saved intake after a call."),
+        "A new customer explains a job", "A specialist collects the details your team needs and saves the confirmed answers to the call.",
+        "/app#workers", "Open Workers",
+    ),
+    "business-phone-number": (
+        "Start with a local area code", "Choose a U.S. area code for your CallPilot number or connect an existing line.",
+        "Eligible workspaces can ask the phone provider to reserve a number. Availability is confirmed during reservation, and an owner activates incoming calls separately.",
+        ("Enter the area code you want to use.", "Open Channels to request a number if your workspace is eligible.",
+         "Activate the line with a paid plan, or set forwarding through your current carrier."),
+        "A number for your service area", "Start with your preferred area code. The provider confirms the exact number when it accepts the reservation.",
+        "/app#channels", "Open phone channels",
+    ),
     "lead-capture": (
         "Capture leads while you work", "Give callers a way to leave a clear callback request.",
         "CallPilot can ask what the caller needs, confirm their contact details, and record an approved callback request for your team.",
@@ -239,6 +263,17 @@ def render_product_page(product_page: str):
 <p class="lead">{lead}</p><a class="button dark" href="{destination}">{action} →</a></div>
 <div class="detail-layout"><div><h2>How it works</h2><p>{introduction}</p><ol>{sequence}</ol></div>
 <article class="card"><p class="eyebrow">Example workflow</p><h3>{sample_title}</h3><p>{sample}</p></article></div>
+</div></section>"""
+    if product_page == "business-phone-number":
+        content += """
+<section class="band shaded"><div class="wrap"><h2>Choose your area code.</h2>
+<form action="/app" method="get" class="resource-search">
+ <label for="area-code">U.S. area code</label>
+ <input id="area-code" name="area_code" pattern="[2-9][0-9]{2}" inputmode="numeric"
+        maxlength="3" placeholder="212" required>
+ <button type="submit" class="button dark">Continue to Channels</button>
+</form>
+<p class="price-note">CallPilot saves this preference on your device. The provider confirms number availability during reservation.</p>
 </div></section>"""
     return marketing_page(title=heading, content=content)
 

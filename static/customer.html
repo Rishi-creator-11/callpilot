@@ -4174,6 +4174,19 @@ async function loadChannels(){
  }),loadDemoLinks(oid),loadTransfers(oid),loadRouting(oid),loadPhoneReservation(oid)]);
 }
 const phoneReservePath=oid=>"/organizations/"+oid+"/phone/provision";
+function preferredAreaCode(){
+ const value=new URLSearchParams(location.search).get("area_code");
+ try{
+  if(/^[2-9][0-9]{2}$/.test(value||"")){
+   sessionStorage.setItem("callpilot.areaCode",value);
+   const url=new URL(location.href);url.searchParams.delete("area_code");
+   history.replaceState(null,"",url.pathname+url.search+"#channels");
+  }
+  return sessionStorage.getItem("callpilot.areaCode")||"";
+ }catch{return value||""}
+}
+let phoneAreaPreference=preferredAreaCode();
+
 async function loadPhoneReservation(oid,message=""){
  const form=$("phoneReserveForm"),check=$("phoneReserveCheck"),status=$("phoneReserveStatus");
  form.hidden=true;check.hidden=true;
@@ -4184,6 +4197,7 @@ async function loadPhoneReservation(oid,message=""){
   const pending=state.job?.status==="pending";
   check.hidden=!pending;
   form.hidden=!state.available||phone.connected||pending||state.job?.status==="provisioned";
+  if(!form.hidden&&phoneAreaPreference&&!$("phoneReserveArea").value)$("phoneReserveArea").value=phoneAreaPreference;
   status.textContent=message||(pending?"Checking with the provider. You can return here to recover the number.":
    phone.provisioning==="provisioned"?"Open Manage phone to activate incoming calls.":
    state.job?.status==="failed"?"The reservation was declined. You can try another area code.":"");
@@ -4199,7 +4213,9 @@ async function reservePhone(event,reconcile=false){
    reconcile?{}:{area_code:v("phoneReserveArea"),confirm:$("phoneReserveConfirm").checked});
   if(oid!==organization())return;
   if(state.status==="provisioned"){
-   $("phoneReserveForm").reset();await loadChannels();return;
+   $("phoneReserveForm").reset();phoneAreaPreference="";
+   try{sessionStorage.removeItem("callpilot.areaCode")}catch{}
+   await loadChannels();return;
   }
   message=state.status==="pending"?"The provider has not confirmed the number yet. Check again shortly.":"The provider declined the reservation.";
  }catch(e){message=e.message}

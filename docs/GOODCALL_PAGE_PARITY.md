@@ -14,8 +14,8 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | `/appointment-scheduling` | Observed | `/appointment-scheduling` explains booking and links to Appointments. Carrier and calendar tests are tracked separately. |
 | [ ] | Lead capture, catalog and order, call review, and phone setup | Homepage and product documentation observed | Dedicated CallPilot pages link to the corresponding workspace tools. Expand industry-specific journeys. |
 | [ ] | `/business-productivity-ai` and individual integration pages | Index observed, child enumeration pending | Directory and detail pages cover Google Calendar, HighLevel, Shopify and Vapi. Goodcall’s broader catalog remains. |
-| [ ] | `/business-phone-number` area-code lookup | Observed | Standalone lookup and area-code pages missing. |
-| [ ] | `/local-phone-numbers` | Observed | `/local-phone-numbers` explains number connection and forwarding. Live area-code inventory and self-service provisioning remain. |
+| [ ] | `/business-phone-number` area-code lookup | Observed | CallPilot offers a public area-code preference form that carries the area code into Channels for eligible owners. Live carrier inventory browsing and country coverage remain open. |
+| [ ] | `/local-phone-numbers` | Observed | `/local-phone-numbers` explains reservation, number connection, and forwarding. Live area-code inventory and self-service reservation verification remain. |
 | [ ] | `/enterprise` | Observed | Enterprise details and lead entry point missing. |
 | [ ] | `/case-study-goodcall-ai-phone-assistant` and case-study details | Index observed, details pending | CallPilot case studies and proof pages missing. |
 | [ ] | `/about` | Observed | `/about` describes CallPilot’s supported product and privacy workflow. |
