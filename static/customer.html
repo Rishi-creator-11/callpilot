@@ -724,7 +724,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
     <label for="shopifyDomain">Store domain</label><input id="shopifyDomain" required maxlength="80" placeholder="your-store.myshopify.com" autocomplete="off">
     <label for="shopifyClient">App client ID</label><input id="shopifyClient" required maxlength="128" autocomplete="off">
     <label for="shopifySecret">App client secret</label><input id="shopifySecret" type="password" required maxlength="512" autocomplete="new-password">
-    <p class="muted">Install an app owned by your Shopify organization with read_products and read_inventory. For hosted checkout and order status, also grant write_draft_orders and read_orders.</p>
+    <p class="muted">Install an app owned by your Shopify organization with read_products and read_inventory. For hosted checkout and order status, also grant write_draft_orders and read_orders. Shipment recording requires write_merchant_managed_fulfillment_orders.</p>
     <button type="submit">Save connection</button>
    </form>
    <form id="shopifyLookup" hidden>
@@ -1272,7 +1272,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
     <option value="">All requests</option><option value="requested">Awaiting review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
    </select></div>
   </div>
-  <p class="muted">Approve requests before creating a Shopify checkout link. Shopify collects payment and shows fulfillment progress here when you refresh the order.</p>
+  <p class="muted">Approve requests before creating a Shopify checkout link. Shopify collects payment. Review payment and fulfillment, then record tracking for eligible shipments here.</p>
   <p id="orderReviewStatus" class="muted" role="status"></p>
   <div id="orderReviewList" aria-live="polite">Loading order requests…</div>
  </div>
@@ -3484,6 +3484,7 @@ function addOrderCheckout(oid,row,details,controls){
     link.textContent=data.order_name?"Manage fulfillment in Shopify ↗":"Open draft in Shopify ↗";
     result.append(link);
    }
+   if(data.order_name)addOrderShipments(oid,row.id,result);
    if(data.checkout_url){
     const field=document.createElement("input"),copy=document.createElement("button");
     field.value=data.checkout_url;field.readOnly=true;field.setAttribute("aria-label","Shopify checkout link");
@@ -3504,6 +3505,85 @@ function addOrderCheckout(oid,row,details,controls){
    }
   }finally{for(const control of controls.children)control.disabled=false}
  });
+}
+function addOrderShipments(oid,requestId,result){
+ const path=orderReviewPath(oid)+"/"+encodeURIComponent(requestId)+"/fulfillment";
+ const view=document.createElement("button"),panel=document.createElement("div");
+ view.type="button";view.className="secondary";view.textContent="Review shipments";
+ result.append(view,panel);
+ const active=()=>organization()===oid&&panel.isConnected;
+ const message=text=>{
+  const status=document.createElement("p");
+  status.className="muted";status.setAttribute("role","status");status.textContent=text;
+  return status;
+ };
+ async function loadShipments(feedback=""){
+  view.disabled=true;panel.replaceChildren(message("Reading shipment details…"));
+  try{
+   const data=await request(path);
+   if(!active())return;
+   panel.replaceChildren();
+   if(feedback||data.message)panel.append(message(feedback||data.message));
+   for(const shipment of data.shipments){
+    const entry=document.createElement("div");
+    entry.append(message(shipment.carrier+" · "+shipment.tracking_number+" · "+
+     (shipment.status==="recorded"?"Recorded in Shopify":"Awaiting confirmation")));
+    if(shipment.status==="pending"){
+     const check=document.createElement("button");
+     check.type="button";check.className="secondary";check.textContent="Check pending shipment";
+     check.addEventListener("click",async()=>{
+      check.disabled=true;
+      try{
+       const result=await request(path+"/reconcile","POST",{fulfillment_order_id:shipment.fulfillment_order_id});
+       if(active())await loadShipments(result.message||"Shopify confirmed the shipment.");
+      }catch(e){if(active())entry.append(message(e.message))}
+      finally{check.disabled=false}
+     });
+     entry.append(check);
+    }
+    panel.append(entry);
+   }
+   for(const option of data.options){
+    const form=document.createElement("form"),group=document.createElement("fieldset");
+    group.className="cp-section-box";
+    const heading=document.createElement("legend");
+    heading.textContent="Ship from "+option.location;
+    const items=document.createElement("ul");
+    for(const item of option.items){
+     const line=document.createElement("li");
+     line.textContent=item.quantity+" × "+item.name+(item.sku?" ("+item.sku+")":"");
+     items.append(line);
+    }
+    const carrierLabel=document.createElement("label"),carrier=document.createElement("input");
+    carrierLabel.textContent="Carrier";carrier.required=true;carrier.minLength=2;carrier.maxLength=80;
+    carrierLabel.append(carrier);
+    const trackingLabel=document.createElement("label"),tracking=document.createElement("input");
+    trackingLabel.textContent="Tracking number";tracking.required=true;tracking.maxLength=80;
+    tracking.pattern="[A-Za-z0-9][A-Za-z0-9\\-]{2,79}";trackingLabel.append(tracking);
+    const confirmation=document.createElement("label"),confirm=document.createElement("input");
+    confirm.type="checkbox";confirm.required=true;confirmation.className="cp-studio-check";
+    confirmation.append(confirm," These listed items are packed and ready to ship.");
+    const save=document.createElement("button");
+    save.type="submit";save.textContent="Record shipment";
+    const state=message("");
+    group.append(heading,items,carrierLabel,trackingLabel,confirmation,save,state);form.append(group);
+    form.addEventListener("submit",async event=>{
+     event.preventDefault();
+     if(!active()||save.disabled)return;
+     save.disabled=true;state.textContent="Recording in Shopify…";
+     try{
+      await request(path,"POST",{fulfillment_order_id:option.id,snapshot:option.snapshot,
+       carrier:carrier.value,tracking_number:tracking.value,confirm:confirm.checked});
+      if(active())await loadShipments("Shipment recorded in Shopify.");
+     }catch(e){if(active())await loadShipments(e.message)}
+     finally{save.disabled=false}
+    });
+    panel.append(form);
+   }
+  }catch(e){if(active())panel.replaceChildren(message(e.message))}
+  finally{view.disabled=false}
+ }
+ view.addEventListener("click",()=>loadShipments());
 }
 $("orderQuery").addEventListener("input",renderOrderReview);
 $("orderFilter").addEventListener("change",renderOrderReview);

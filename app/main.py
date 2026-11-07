@@ -752,6 +752,8 @@ from app.shopify_connection import router as shopify_connection_router
 app.include_router(shopify_connection_router)
 from app.shopify_checkout import router as shopify_checkout_router
 app.include_router(shopify_checkout_router)
+from app.shopify_fulfillment import router as shopify_fulfillment_router
+app.include_router(shopify_fulfillment_router)
 from app.call_menu import router as call_menu_router
 app.include_router(call_menu_router)
 
