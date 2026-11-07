@@ -67,7 +67,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Settings, Billing summary, payment method and invoices | Observed | `/app#billing` has plan entry points and Stripe portal. Verify setup, payments and invoice history in sandbox. |
 | [ ] | Account menu, agent switcher, new agent and sign-out | Menu observed, creation workflow pending | Workspace switcher and sign-out exist. Multi-agent management missing. |
 | [ ] | Support control and contextual help | Entry point observed | `/app#help` exists. Compare support dialogs and escalation. |
-| [ ] | Browser practice, microphone prompt, typing and return to setup | Entry points observed, live voice exchange pending | `/app#simulator` verified for text retrieval and repeatable saved answer checks. Voice practice, share, transcript and evaluation missing. |
+| [ ] | Browser practice, microphone prompt, typing and return to setup | Entry points observed, live voice exchange pending | `/app#simulator` verified for text retrieval and repeatable saved answer checks. Voice practice and an in-session transcript are implemented behind the provider-use flag. Spoken verification, sharing and recorded evaluations remain open. |
 | [ ] | Mobile navigation, menus, empty/loading/error states and accessibility | Some desktop states observed, mobile inventory pending | Validate every implemented surface at mobile breakpoints and with keyboard navigation. |
 
 ## Coverage limits

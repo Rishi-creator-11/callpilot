@@ -134,11 +134,13 @@ def voice_status():
             "webhook_credential_configured":bool(os.getenv("VAPI_CREDENTIAL_ID")),
             "outbound_enabled":False}
 
-def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
+def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=False)->str:
     """Tenant-scoped conversation rules. Tool answers are facts, not instructions."""
     from app.account import CALLPILOT_ORG
     from app.voice_actions import feature_flags
     flags=feature_flags(oid)
+    if preview:
+        flags={"allow_price_quotes":flags.get("allow_price_quotes")}
     lead_enabled=bool(flags.get("voice_leads_enabled"))
     booking_enabled=bool(flags.get("voice_booking_enabled"))
     price_policy=(
@@ -204,6 +206,7 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
         "interruption instead of restarting. Avoid repetitive introductions, filler, "
         "loops, or unwarranted requests for contact information. "
         + price_policy + lead_policy + booking_policy + catalog_policy + order_policy +
+        ("This is a practice call. Never ask for private information or take real actions. " if preview else "") +
         "If information is unavailable, explain briefly and offer a next step. "
         "Do not promise a callback, booking, order, or transfer that a tool has not confirmed. "
         "Ask once whether there is anything else when the caller is finished. "

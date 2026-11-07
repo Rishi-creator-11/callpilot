@@ -743,6 +743,16 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <button onclick="window.ask()">Test safe answer</button>
 <h3 style="margin-top:19px">Assistant response</h3><pre id="reply" role="status" style="font-family:inherit;font-size:14px;line-height:1.65">Ask a question to preview the answer.</pre></div>
 <div class="cp-section-box">
+ <h3>Practice by voice</h3>
+ <p>Use your microphone to try an English or Spanish conversation with your receptionist. Practice uses approved knowledge and cannot place orders or book appointments.</p>
+ <div class="cp-inline-actions">
+  <button type="button" id="startVoicePractice" disabled>Start voice practice</button>
+  <button type="button" id="stopVoicePractice" class="secondary" hidden>End practice</button>
+ </div>
+ <p id="voicePracticeStatus" role="status" class="muted">Checking voice practice availability…</p>
+ <ol id="voicePracticeTranscript" aria-label="Practice transcript" aria-live="polite"></ol>
+</div>
+<div class="cp-section-box">
  <h3>Saved knowledge checks</h3>
  <p>Save the questions you want to test again after changing your knowledge. Each check runs the text-answer simulator and reports what matched.</p>
  <form id="knowledgeCheckForm">
@@ -950,6 +960,7 @@ window.setRecoveredPassword=async()=>{
  await render();
 };
 window.signOut=async()=>{
+ endVoicePractice();
  document.body.dataset.appState="loading";
  window.closeAccountMenu();
  try{await sb.auth.signOut()}catch(e){ /* Local sign-out still clears the visible account. */ }
@@ -1012,13 +1023,14 @@ function loadActivePage(id){
  if(!current||!organization())return;
  const load={
    studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
-   simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
+   simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours()])
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
 }
 window.section=(x,options={})=>{
  if(!pageMeta[x])x="calls";
+ if(x!=="simulator"&&activePage==="simulator")endVoicePractice();
  activePage=x;
  window.closeSidebar();window.closeAccountMenu();
  for(const id of Object.keys(pageMeta)){
@@ -1131,6 +1143,8 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("websiteImportStatus").textContent="";
    $("websiteImportButton").disabled=false;
    window.cancelDescriptionEdit();
+   endVoicePractice();
+   $("voicePracticeTranscript").replaceChildren();
    $("bookingHoursPanel").hidden=true;
    pdfImportRun++;
    $("pdfImportFile").value="";
@@ -1502,6 +1516,72 @@ async function loadSemanticStatus(){const result=await request("/organizations/"
     "Semantic search ready: "+result.indexed_facts+" of "+result.approved_facts+" approved answers indexed.":
     "Semantic search is not connected. Check your Supabase embedding service configuration."}
 window.indexKnowledge=()=>safe(async()=>{const result=await request("/organizations/"+organization()+"/knowledge/reindex","POST");await loadSemanticStatus();return "Indexed "+result.indexed+" approved answers."});
+let voicePractice=null,voicePracticeRun=0,voicePracticeAvailable=false;
+const voicePracticePath=oid=>"/organizations/"+encodeURIComponent(oid)+"/voice-preview";
+function endVoicePractice(message="Practice ended."){
+ voicePracticeRun++;
+ const instance=voicePractice;
+ voicePractice=null;
+ instance?.stop();
+ $("startVoicePractice").disabled=!voicePracticeAvailable;
+ $("stopVoicePractice").hidden=true;
+ $("voicePracticeStatus").textContent=message;
+}
+async function loadVoicePractice(){
+ if(!$("stopVoicePractice").hidden)return;
+ const oid=organization(),run=voicePracticeRun;
+ voicePracticeAvailable=false;
+ $("startVoicePractice").disabled=true;
+ $("voicePracticeStatus").textContent="Checking voice practice availability…";
+ try{
+  const {available}=await request(voicePracticePath(oid));
+  if(oid!==organization()||run!==voicePracticeRun)return;
+  voicePracticeAvailable=available;
+  $("startVoicePractice").disabled=!available;
+  $("voicePracticeStatus").textContent=available?"Ready to practice. Use fictional caller information.":"Voice practice is unavailable for this workspace.";
+ }catch(e){
+  if(oid===organization()&&run===voicePracticeRun)$("voicePracticeStatus").textContent=e.message;
+ }
+}
+$("stopVoicePractice").addEventListener("click",()=>endVoicePractice());
+$("startVoicePractice").addEventListener("click",async()=>{
+ const oid=organization(),start=$("startVoicePractice"),status=$("voicePracticeStatus");
+ if(!voicePracticeAvailable||start.disabled)return;
+ const run=++voicePracticeRun;
+ const isCurrent=()=>oid===organization()&&run===voicePracticeRun;
+ start.disabled=true;
+ $("stopVoicePractice").hidden=false;
+ $("voicePracticeTranscript").replaceChildren();
+ status.textContent="Connecting your microphone…";
+ try{
+  if(!navigator.mediaDevices?.getUserMedia)throw Error("This browser does not provide microphone access.");
+  const microphone=await navigator.mediaDevices.getUserMedia({audio:true});
+  microphone.getTracks().forEach(track=>track.stop());
+  if(!isCurrent())return;
+  const {default:sdk}=await import("https://cdn.jsdelivr.net/npm/@vapi-ai/web@3.1.0/+esm");
+  const Vapi=sdk.default??sdk;
+  if(!isCurrent())return;
+  status.textContent="Starting a private practice room…";
+  const room=await request(voicePracticePath(oid),"POST");
+  if(!isCurrent())return;
+  const instance=new Vapi("");
+  voicePractice=instance;
+  instance.on("call-end",()=>{if(isCurrent())endVoicePractice()});
+  instance.on("error",()=>{if(isCurrent())endVoicePractice("Voice practice disconnected. Try again when available.")});
+  instance.on("message",event=>{
+   if(!isCurrent()||event.type!=="transcript"||event.transcriptType!=="final"||!event.transcript)return;
+   const line=document.createElement("li");
+   line.textContent=(event.role==="assistant"?"Receptionist: ":"You: ")+event.transcript;
+   $("voicePracticeTranscript").append(line);
+  });
+  await instance.reconnect(room);
+  if(isCurrent())status.textContent="Practice is live. Speak in English or Spanish.";
+  else instance.stop();
+ }catch(e){
+  if(isCurrent())endVoicePractice(e.name==="NotAllowedError"?"Allow microphone access to use voice practice.":e.message||"Voice practice could not connect.");
+ }
+});
+
 const knowledgeCheckPath=oid=>"/organizations/"+encodeURIComponent(oid)+"/knowledge-checks";
 $("checkExpectation").addEventListener("change",()=>{
  const contains=v("checkExpectation")==="contains";
