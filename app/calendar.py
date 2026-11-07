@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib,os,re,secrets,urllib.parse,httpx
 from datetime import datetime,timedelta,timezone
 from uuid import UUID
-from fastapi import APIRouter,Depends,HTTPException,Query
+from fastapi import APIRouter,Depends,HTTPException,Query,Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel,Field
 from cryptography.fernet import Fernet,InvalidToken
@@ -57,11 +57,11 @@ def authorize(oid:str,user=Depends(current_user)):
     return {"url":"https://accounts.google.com/o/oauth2/v2/auth?"+urllib.parse.urlencode(params)}
 
 @router.get("/api/oauth/google/callback")
-def oauth_callback(code:str|None=None,state:str|None=None,error:str|None=None):
+def oauth_callback(request:Request,code:str|None=None,state:str|None=None,error:str|None=None):
     # Google Sheets reuses this registered redirect; its states carry a distinguishing prefix.
     if state and state.startswith("sheets."):
         from app.sheets import handle_callback
-        return handle_callback(code,state,error)
+        return handle_callback(code,state,error,request)
     # Never reflect arbitrary Google error details or authorization codes to the UI.
     if error:
         result="access_denied" if error=="access_denied" else "error"

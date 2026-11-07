@@ -5,6 +5,8 @@ so it can read and write only that file. Each captured lead appends one row, onc
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import os
 import secrets
@@ -14,7 +16,7 @@ from uuid import UUID
 
 import httpx
 from cryptography.fernet import InvalidToken
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
 from app.account import current_user, membership, rpc
@@ -25,6 +27,7 @@ router = APIRouter(tags=["sheets"])
 log = logging.getLogger("callpilot")
 SCOPE = "https://www.googleapis.com/auth/drive.file"
 STATE_PREFIX = "sheets."
+STATE_COOKIE = "cp_sheets_state"
 SHEET_TITLE = "Leads"
 HEADERS = ["Captured at (UTC)", "Caller name", "Callback phone", "Interest", "Call ID"]
 
@@ -98,7 +101,7 @@ def sheets_status(oid: UUID, user=Depends(current_user)):
 
 
 @router.post("/api/account/organizations/{oid}/sheets/connect")
-def sheets_connect(oid: UUID, user=Depends(current_user)):
+def sheets_connect(oid: UUID, response: Response, user=Depends(current_user)):
     workspace = str(oid)
     membership(workspace, user, ("owner", "admin"))
     if not configured():
@@ -108,16 +111,24 @@ def sheets_connect(oid: UUID, user=Depends(current_user)):
         "nonce": state, "organization_id": workspace, "created_by": user["id"],
         "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
     }, prefer="return=minimal")
+    # Bind the state to this browser so a forged callback link cannot attach someone else's Google account.
+    response.set_cookie(STATE_COOKIE, hashlib.sha256(state.encode()).hexdigest(), max_age=600,
+                        httponly=True, secure=True, samesite="lax", path="/api/oauth/google")
     params = {"client_id": os.environ["GOOGLE_OAUTH_CLIENT_ID"], "redirect_uri": REDIRECT,
               "response_type": "code", "scope": SCOPE, "state": state, "access_type": "offline",
               "prompt": "consent", "include_granted_scopes": "false"}
     return {"url": "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)}
 
 
-def handle_callback(code: str | None, state: str, error: str | None) -> RedirectResponse:
+def handle_callback(code: str | None, state: str, error: str | None, request: Request) -> RedirectResponse:
     """Called from the shared Google OAuth callback for states that start with sheets."""
     def back(result: str) -> RedirectResponse:
-        return RedirectResponse("/app?sheets=" + result + "#connections")
+        redirect = RedirectResponse("/app?sheets=" + result + "#connections")
+        redirect.delete_cookie(STATE_COOKIE, path="/api/oauth/google")
+        return redirect
+    expected = hashlib.sha256(state.encode()).hexdigest()
+    if not hmac.compare_digest(request.cookies.get(STATE_COOKIE, ""), expected):
+        return back("error")
     if error:
         return back("access_denied" if error == "access_denied" else "error")
     if not code:
@@ -126,6 +137,10 @@ def handle_callback(code: str | None, state: str, error: str | None) -> Redirect
     if not valid:
         return back("expired")
     record = valid[0]
+    try:  # The person who started the flow must still be an owner or admin of the workspace.
+        membership(str(record["organization_id"]), {"id": str(record["created_by"])}, ("owner", "admin"))
+    except HTTPException:
+        return back("error")
     try:
         with httpx.Client(timeout=15) as client:
             response = client.post("https://oauth2.googleapis.com/token", data={
@@ -165,6 +180,8 @@ def sheets_disconnect(oid: UUID, user=Depends(current_user)):
                 client.post("https://oauth2.googleapis.com/revoke", data={"token": refresh})
         except (HTTPException, InvalidToken, httpx.HTTPError):
             pass
+    api("oauth_states", "DELETE", params={"organization_id": "eq." + workspace, "nonce": "like." + STATE_PREFIX + "*"},
+        prefer="return=minimal")
     api("sheet_connections", "DELETE", params={"organization_id": "eq." + workspace}, prefer="return=minimal")
     return {"connected": False}
 

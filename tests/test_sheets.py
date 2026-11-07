@@ -1,4 +1,6 @@
 """Google Sheets lead export: least-privilege connection, idempotent rows, failure isolation."""
+import hashlib
+
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -125,9 +127,45 @@ def test_callback_for_sheets_state_rejects_missing_scope_and_never_stores_a_conn
         def post(self, *a, **k): return Resp()
     monkeypatch.setattr(sheets.httpx, "Client", Client)
     store.saved = None
-    response = client.get("/api/oauth/google/callback?code=c&state=sheets.abc", follow_redirects=False)
+    cookie = hashlib.sha256(b"sheets.abc").hexdigest()
+    response = client.get("/api/oauth/google/callback?code=c&state=sheets.abc", follow_redirects=False,
+                          cookies={sheets.STATE_COOKIE: cookie})
     assert response.headers["location"] == "/app?sheets=missing_permission#connections"
     assert store.saved is None
+
+
+def test_callback_without_the_browser_cookie_is_rejected_before_the_state_is_consumed(store, monkeypatch):
+    consumed = []
+    store.saved = None
+    monkeypatch.setattr(sheets, "rpc", lambda *a, **k: consumed.append(a) or [{"organization_id": WORKSPACE, "created_by": "u1"}])
+    for cookies in ({}, {sheets.STATE_COOKIE: "wrong"}):
+        response = client.get("/api/oauth/google/callback?code=c&state=sheets.abc", follow_redirects=False, cookies=cookies)
+        assert response.headers["location"] == "/app?sheets=error#connections"
+    assert consumed == [] and store.saved is None
+
+
+def test_callback_requires_the_initiator_to_still_be_an_admin(store, monkeypatch):
+    monkeypatch.setattr(sheets, "rpc", lambda *a, **k: [{"organization_id": WORKSPACE, "created_by": "u1"}])
+    def removed(*a, **k):
+        raise HTTPException(404, "Workspace not found")
+    monkeypatch.setattr(sheets, "membership", removed)
+    cookie = hashlib.sha256(b"sheets.abc").hexdigest()
+    response = client.get("/api/oauth/google/callback?code=c&state=sheets.abc", follow_redirects=False,
+                          cookies={sheets.STATE_COOKIE: cookie})
+    assert response.headers["location"] == "/app?sheets=error#connections"
+
+
+def test_connect_sets_a_bound_httponly_cookie_and_disconnect_clears_pending_states(store):
+    response = client.post(URL + "/connect")
+    cookie = response.headers["set-cookie"].lower()
+    assert sheets.STATE_COOKIE in cookie and "httponly" in cookie and "samesite=lax" in cookie
+    deleted = []
+    real = store.api
+    store.api = lambda table, method="GET", **kw: deleted.append((table, method, kw.get("params"))) or real(table, method, **kw)
+    import app.sheets as module
+    module.api = store.api
+    client.delete(URL)
+    assert any(t == "oauth_states" and m == "DELETE" and p["nonce"] == "like.sheets.*" for t, m, p in deleted)
 
 
 def test_calendar_states_still_use_the_calendar_flow(store, monkeypatch):
