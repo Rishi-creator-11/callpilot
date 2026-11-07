@@ -539,7 +539,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div class="cp-section-box"><h3>Tell your assistant about your business</h3><p>Describe your business naturally: what you do, products, services, shipping, policies, and anything customers should know. CallPilot indexes approved passages by meaning—no customer questions required.</p>
 <label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
 <label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
-<div class="cp-inline-actions"><button onclick="window.saveDescription()">Save, approve &amp; index</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out monetary amounts and private details.</span></div>
+<div class="cp-inline-actions"><button id="descriptionSaveBtn" onclick="window.saveDescription()">Save, approve &amp; index</button><button id="descriptionCancelEdit" class="secondary" style="display:none" onclick="window.cancelDescriptionEdit()">Cancel edit</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out monetary amounts and private details.</span></div>
 <h3 style="margin-top:20px">Business descriptions</h3><div id="descriptions" role="region" aria-label="Business descriptions"></div></div>
 <div class="cp-section-box"><h3>Optional: Add a specific Q&amp;A</h3><p>Write a real question that customers ask, then provide an accurate business answer.</p>
 <label for="faqQ">Customer question</label><input id="faqQ" placeholder="Can I order less than a full container?">
@@ -996,6 +996,7 @@ window.saveWorkspace=()=>safe(async()=>{
 async function loadAgent(){let a=await request("/organizations/"+organization()+"/agent");$("agent").value=a.agent_name||"Alex";$("greeting").value=a.greeting||""}
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
 let descriptionItems=[];
+let descriptionEditingId=null;
 async function loadDescriptions(){
  const oid=organization();if(!oid)return;
  const docs=await request("/organizations/"+encodeURIComponent(oid)+"/descriptions");
@@ -1012,12 +1013,25 @@ async function loadDescriptions(){
  $("descriptions").querySelectorAll("[data-edit-desc]").forEach(b=>b.addEventListener("click",()=>window.editDescription(b.dataset.editDesc)));
  $("descriptions").querySelectorAll("[data-delete-desc]").forEach(b=>b.addEventListener("click",()=>window.deleteDescription(b.dataset.deleteDesc)));
 }
+window.cancelDescriptionEdit=()=>{
+ descriptionEditingId=null;
+ $("descriptionTitle").value="";$("descriptionBody").value="";
+ $("descriptionSaveBtn").textContent="Save, approve & index";
+ $("descriptionCancelEdit").style.display="none";
+};
 window.saveDescription=()=>safe(async()=>{
  const title=v("descriptionTitle").trim(),content=v("descriptionBody").trim();
  if(title.length<3||content.length<20)throw Error("Enter a title and at least 20 characters describing your business.");
- const created=await request("/organizations/"+organization()+"/descriptions","POST",{title,content});
- const result=await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(created.id)+"/approve","POST");
- $("descriptionTitle").value="";$("descriptionBody").value="";
+ const oid=organization();
+ let id=descriptionEditingId;
+ if(id){
+  await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(id),"PUT",{title,content});
+ }else{
+  const created=await request("/organizations/"+oid+"/descriptions","POST",{title,content});
+  id=created.id;
+ }
+ const result=await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
+ window.cancelDescriptionEdit();
  await loadDescriptions();await loadSemanticStatus();
  return "Business description approved and indexed into "+result.indexed_passages+" searchable passages.";
 });
@@ -1028,15 +1042,13 @@ window.approveDescription=id=>safe(async()=>{
 });
 window.editDescription=id=>{
  const doc=descriptionItems.find(d=>d.id===id);if(!doc)return;
- const title=prompt("Edit description title",doc.title);if(title===null)return;
- const content=prompt("Edit business description",doc.content);if(content===null)return;
- if(title.trim().length<3||content.trim().length<20){msg("Enter a title and at least 20 characters.",true);return}
- return safe(async()=>{
-  await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id),"PUT",
-   {title:title.trim(),content:content.trim()});
-  await loadDescriptions();await loadSemanticStatus();
-  return "Description saved as draft. Approve again to use updated information.";
- });
+ descriptionEditingId=id;
+ $("descriptionTitle").value=doc.title;
+ $("descriptionBody").value=doc.content;
+ $("descriptionSaveBtn").textContent="Save changes & reindex";
+ $("descriptionCancelEdit").style.display="";
+ $("descriptionTitle").focus();
+ $("descriptionTitle").scrollIntoView({behavior:"smooth",block:"center"});
 };
 window.deleteDescription=id=>{
  const doc=descriptionItems.find(d=>d.id===id);if(!doc)return;
