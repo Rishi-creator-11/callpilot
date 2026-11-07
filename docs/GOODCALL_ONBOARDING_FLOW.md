@@ -43,3 +43,10 @@ Progress is shown as a six-dot stepper with a small mascot above the heading and
 - Website import now skips menus, buttons and footers and also reads a few useful pages on the same site (about, services, pricing, contact), up to 4 extra.
 - Plain U.S. phone numbers are accepted for call transfer.
 - Not done: a Getting started progress checklist on the dashboard, a call-by-call explanation of how the agent will behave, and image-only PDFs.
+
+## Products vs services (business-aware setup)
+- Setup now starts with "What does your business do?": we sell products, or we provide services (clinic, salon or wellness, home or trade services, professional or digital services, or other). The answer sets sensible default abilities and shapes the agent's instructions and what we pull out of the website.
+- Services: the review step lists services with how long each takes, plus policies such as cancellation, insurance and new-customer steps, hours and contact details, so the agent can explain a service and move toward a booking. Without a connected calendar the agent saves an appointment request instead of claiming to book.
+- Clinics: instructions follow common practice from vendor guidance (booking, rescheduling and cancelling as the core jobs; new or returning patient; collect only name, number, visit type and time; no medical advice or urgency judgments; emergencies go to 911). CallPilot is not HIPAA certified and has no signed agreements with its providers, so clinics are told not to use it for patient health information.
+- Talk to your agent: after setup, "Call your agent" starts a browser call with the real agent and its real tools (bookings and requests are real, so use made-up details); "Practice call" answers from approved knowledge only. Both need VOICE_PREVIEW_ENABLED=true on the server, and the workspace allowed if VOICE_PREVIEW_WORKSPACES is set.
+- Sources: https://www.cliniqapps.com/ai-receptionist, https://www.primepro.ai/clinics, https://vortalabsai.com/blog/hipaa-compliant-ai-receptionist (vendor pages; treat as practical checklists, not legal advice).

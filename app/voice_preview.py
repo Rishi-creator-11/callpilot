@@ -100,6 +100,10 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
 
 def create_preview_room(assistant: dict) -> dict:
     result = vapi("POST", "/call/web", body={"assistant": assistant, "roomDeleteOnUserLeaveEnabled": True})
+    return validated_room(result)
+
+
+def validated_room(result) -> dict:
     if not isinstance(result, dict):
         raise HTTPException(502, "The voice provider returned an invalid practice response.")
     transport = result.get("transport")
@@ -118,6 +122,29 @@ def create_preview_room(assistant: dict) -> dict:
     if isinstance(transport.get("callToken"), str):
         safe_result["transport"] = {"callToken": transport["callToken"]}
     return safe_result
+
+
+@router.post("/api/account/organizations/{oid}/voice-test")
+def start_live_test(oid: UUID, response: Response, user=Depends(current_user)):
+    """Talk to the real managed assistant, with its real tools. Actions taken in this call are real."""
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    if not workspace_enabled(workspace):
+        raise HTTPException(503, "Browser voice calls are not enabled.")
+    rows = api("agent_configs", params={"organization_id": f"eq.{workspace}", "select": "provider_agent_id", "limit": 1})
+    assistant_id = rows[0].get("provider_agent_id") if rows else None
+    if not assistant_id:
+        raise HTTPException(409, "Build your agent first.")
+    from app.call_intel import owns_assistant
+    if not owns_assistant(vapi("GET", "/assistant/" + assistant_id), workspace):
+        raise HTTPException(409, "This assistant is not managed by this workspace.")
+    if rpc("reserve_voice_preview", {"p_organization_id": workspace, "p_user_id": user["id"]}) is not True:
+        raise HTTPException(429, "Test call limit reached. Wait a few minutes, or try again tomorrow.")
+    response.headers["Cache-Control"] = "no-store"
+    result = vapi("POST", "/call/web", body={
+        "assistantId": assistant_id, "roomDeleteOnUserLeaveEnabled": True,
+        "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20}})
+    return validated_room(result)
 
 
 @router.post("/webhooks/vapi-preview/{oid}")

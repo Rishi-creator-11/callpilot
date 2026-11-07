@@ -102,6 +102,13 @@ body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
 .qs-msg.agent{justify-self:start;background:#eef1f4}
 .qs-chatform{display:flex;gap:10px;margin-bottom:12px}
 .qs-chatform input{flex:1}
+.qs-kinds{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+.qs-kind{display:grid;gap:8px;justify-items:center;padding:26px 14px;background:#fff;color:var(--cp-text);border:2px solid var(--cp-border);border-radius:18px;font:inherit;cursor:pointer;box-shadow:none}
+.qs-kind span{font-size:32px}.qs-kind strong{font-size:17px}
+.qs-kind.on,.qs-type.on{border-color:#07104f;background:#f1f3ff}
+.qs-types{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 16px}
+.qs-type{padding:10px 16px;background:#fff;color:var(--cp-text);border:1px solid var(--cp-border);border-radius:999px;font:inherit;font-weight:600;cursor:pointer;box-shadow:none}
+@media(max-width:600px){.qs-kinds{grid-template-columns:1fr}}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -779,8 +786,20 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 
 <section id="quicksetup" class="panel card" style="display:none">
  <div class="cp-panel-heading"><div><h2>Set up your agent</h2><p>Tell us about your business, pick what the agent should do, and we build it. Then you talk to it.</p></div></div>
- <ol class="qs-steps" aria-label="Setup steps"><li id="qsDot1" aria-current="step">1. Your business</li><li id="qsDotR">2. Check it</li><li id="qsDot2">3. What it does</li><li id="qsDot3">4. Your agent</li><li id="qsDot4">5. Talk to it</li></ol>
- <div id="qsStep1" class="cp-section-box">
+ <ol class="qs-steps" aria-label="Setup steps"><li id="qsDot0" aria-current="step">1. What you do</li><li id="qsDot1">2. Your business</li><li id="qsDotR">3. Check it</li><li id="qsDot2">4. What it does</li><li id="qsDot3">5. Your agent</li><li id="qsDot4">6. Talk to it</li></ol>
+ <div id="qsStep0" class="cp-section-box">
+  <h3>What does your business do?</h3>
+  <p>This helps us set your agent up the right way. It takes ten seconds.</p>
+  <div id="qsKinds" class="qs-kinds" role="group" aria-label="What your business does"></div>
+  <div id="qsTypesBox" hidden>
+   <p><strong id="qsTypesTitle">Which fits best?</strong></p>
+   <div id="qsTypes" class="qs-types" role="group" aria-label="Business type"></div>
+  </div>
+  <p id="qsClinicNote" class="muted" hidden>For clinics: your agent books visits and answers questions, never gives medical advice, and sends emergencies to 911. It collects only a name, number, visit type and time, not health details. CallPilot is not HIPAA certified yet, so please do not use it to collect patient health information.</p>
+  <div class="cp-inline-actions"><button type="button" id="qsKindNext">Continue</button></div>
+  <p id="qsStatus0" role="status" class="muted"></p>
+ </div>
+ <div id="qsStep1" class="cp-section-box" hidden>
   <h3>Tell us about your business</h3>
   <p>Choose the easiest way. We read it, show you what we understood, and nothing is used until you say it looks right.</p>
   <div class="cn-tabs" role="group" aria-label="Ways to share your business">
@@ -848,8 +867,10 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <div id="qsChat" class="qs-chat" aria-live="polite"></div>
   <form id="qsChatForm" class="qs-chatform"><label for="qsQuestion" class="cp-visually-hidden">Your question</label>
    <input id="qsQuestion" required maxlength="500" placeholder="What are your hours?" autocomplete="off"><button type="submit">Ask</button></form>
-  <div class="cp-inline-actions"><button type="button" id="qsVoice">Talk by voice</button><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button></div>
-  <p class="muted">Voice uses your microphone and is limited per day. Typing always works.</p>
+  <div class="cp-inline-actions"><button type="button" id="qsVoiceLive">Call your agent</button><button type="button" id="qsVoice" class="secondary">Practice call (answers only)</button><button type="button" id="qsVoiceEnd" class="secondary" hidden>End call</button></div>
+  <p id="qsVoiceStatus" role="status" class="muted"></p>
+  <p class="muted"><strong>Call your agent</strong> uses your real agent, so a booking or request it takes is real. Use made-up details. The practice call only answers questions. Typing always works.</p>
+  <div class="cp-inline-actions"><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button></div>
   <div class="cp-inline-actions" style="margin-top:14px"><button type="button" id="qsFinish">I’m done. Open my dashboard</button></div>
  </div>
 </section>
@@ -3407,10 +3428,10 @@ $("capiSync").addEventListener("click",async event=>{
 const QS_ICONS={info:"💬",messages:"📝",quotes:"🧾",orders:"📦",booking:"📅",transfer:"📞"};
 const QS_HELP={info:"Answer questions about your business",messages:"Take messages and capture leads",quotes:"Collect the details for a quote",
  orders:"Take order requests for your team to review",booking:"Book appointments on your calendar",transfer:"Connect callers to a person"};
-let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null;
+let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null,qsKind=null,qsSubtype=null,qsInfo={kinds:{},presets:{}},qsVoiceInstance=null;
 const qsKey=oid=>"callpilot.qs."+oid;
 function qsShow(step){
- for(const n of [1,"R",2,3,4]){
+ for(const n of [0,1,"R",2,3,4]){
   $("qsStep"+n).hidden=n!==step;
   if(n===step)$("qsDot"+n).setAttribute("aria-current","step");else $("qsDot"+n).removeAttribute("aria-current");
  }
@@ -3437,22 +3458,97 @@ function qsRenderGoals(){
  }
  $("qsTransferBox").hidden=!qsGoals.has("transfer");
 }
+function qsPickGoals(){
+ const preset=qsInfo.presets[qsKind+":"+qsSubtype]||qsInfo.presets[qsKind];
+ if(preset){qsGoals=new Set(preset);qsRenderGoals()}
+}
+function qsRenderKinds(){
+ const box=$("qsKinds");box.replaceChildren();
+ const icons={products:"📦",services:"🛎️"};
+ for(const [key,kind] of Object.entries(qsInfo.kinds)){
+  const button=document.createElement("button");
+  button.type="button";button.className="qs-kind"+(qsKind===key?" on":"");button.setAttribute("aria-pressed",String(qsKind===key));
+  button.innerHTML="<span></span><strong></strong>";
+  button.firstChild.textContent=icons[key]||"•";button.lastChild.textContent=kind.label;
+  button.addEventListener("click",()=>{qsKind=key;qsSubtype=null;qsRenderKinds();qsRenderTypes()});
+  box.append(button);
+ }
+}
+function qsRenderTypes(){
+ const kind=qsInfo.kinds[qsKind];
+ $("qsTypesBox").hidden=!kind;
+ $("qsClinicNote").hidden=!(qsKind==="services"&&qsSubtype==="clinic");
+ if(!kind)return;
+ $("qsTypesTitle").textContent=qsKind==="products"?"What kind of products?":"What kind of services?";
+ const box=$("qsTypes");box.replaceChildren();
+ for(const [key,label] of Object.entries(kind.types)){
+  const button=document.createElement("button");
+  button.type="button";button.className="qs-type"+(qsSubtype===key?" on":"");button.setAttribute("aria-pressed",String(qsSubtype===key));
+  button.textContent=label;
+  button.addEventListener("click",()=>{qsSubtype=key;qsRenderTypes()});
+  box.append(button);
+ }
+}
+$("qsKindNext").addEventListener("click",()=>{
+ if(!qsKind){$("qsStatus0").textContent="Choose products or services to continue.";return}
+ if(!qsSubtype){$("qsStatus0").textContent="Pick the one that fits best.";return}
+ $("qsStatus0").textContent="";qsPickGoals();qsShow(1);
+});
+function qsAddMessage(who,text){
+ const row=document.createElement("p");row.className="qs-msg "+who;row.textContent=text;$("qsChat").append(row);row.scrollIntoView({block:"nearest"});
+}
+async function qsStartVoice(path,label){
+ const status=$("qsVoiceStatus");
+ if(qsVoiceInstance)return;
+ status.textContent="Connecting your microphone…";
+ try{
+  if(!navigator.mediaDevices?.getUserMedia)throw Error("This browser does not provide microphone access.");
+  const mic=await navigator.mediaDevices.getUserMedia({audio:true});mic.getTracks().forEach(t=>t.stop());
+  const {default:sdk}=await import("https://cdn.jsdelivr.net/npm/@vapi-ai/web@3.1.0/+esm");
+  const Vapi=sdk.default??sdk;
+  status.textContent="Starting "+label+"…";
+  const room=await request(path,"POST");
+  const instance=new Vapi("");qsVoiceInstance=instance;
+  const finish=text=>{
+   if(qsVoiceInstance!==instance)return;
+   qsVoiceInstance=null;try{instance.stop()}catch{}
+   $("qsVoiceEnd").hidden=true;status.textContent=text||"The call ended.";
+  };
+  instance.on("call-end",()=>finish());
+  instance.on("error",()=>finish("The call disconnected. Please try again."));
+  instance.on("message",event=>{
+   if(event.type!=="transcript"||event.transcriptType!=="final"||!event.transcript)return;
+   qsAddMessage(event.role==="assistant"?"agent":"you",event.transcript);
+  });
+  await instance.reconnect(room);
+  $("qsVoiceEnd").hidden=false;status.textContent="You are on the call. Speak normally.";
+ }catch(e){
+  qsVoiceInstance=null;
+  status.textContent=e.name==="NotAllowedError"?"Allow microphone access to talk to your agent.":(e.message||"The call could not start.");
+ }
+}
+$("qsVoiceEnd").addEventListener("click",()=>{try{qsVoiceInstance?.stop()}catch{}});
+$("qsVoiceLive").addEventListener("click",()=>qsStartVoice("/organizations/"+organization()+"/voice-test","your agent"));
 async function loadQuickSetup(){
  const oid=organization();
- qsShow(1);qsTab("website");qsRenderGoals();
- $("qsStatus1").textContent="";
+ qsShow(0);qsTab("website");qsRenderGoals();
+ $("qsStatus1").textContent="";$("qsStatus0").textContent="";
  try{
   const status=await request("/organizations/"+oid+"/quick-setup");
   if(oid!==organization())return;
+  qsInfo={kinds:status.kinds,presets:status.presets};
+  qsKind=status.business_kind||qsKind;qsSubtype=status.business_type||qsSubtype;
+  qsRenderKinds();qsRenderTypes();
   if(status.knowledge_approved)$("qsStatus1").textContent="Your agent already knows "+status.knowledge_approved+" approved source"+(status.knowledge_approved===1?"":"s")+". You can add more or skip ahead.";
-  for(const [k,on] of Object.entries(status.enabled))if(on)qsGoals.add(k);
+  if(Object.values(status.enabled).some(Boolean)){for(const [k,on] of Object.entries(status.enabled))if(on)qsGoals.add(k)}
+  else if(qsKind&&qsSubtype)qsPickGoals();
   qsRenderGoals();
- }catch(e){$("qsStatus1").textContent=e.message}
+ }catch(e){$("qsStatus0").textContent=e.message}
 }
 async function qsAnalyze(payload,status){
  const oid=organization();
  status.textContent="Reading it and working out what matters…";
- const r=await request("/organizations/"+oid+"/quick-setup/analyze","POST",payload);
+ const r=await request("/organizations/"+oid+"/quick-setup/analyze","POST",{...payload,kind:qsKind,subtype:qsSubtype});
  if(oid!==organization())return;
  $("qsOverview").value=r.overview;
  const prices=r.understanding.prices||[],list=$("qsPrices");list.replaceChildren();
@@ -3532,6 +3628,8 @@ $("qsAboutGo").addEventListener("click",async event=>{
  });
 }
 $("qsBackR").addEventListener("click",()=>qsShow(1));
+$("qsStep1").insertAdjacentHTML("afterbegin",'<button type="button" id="qsBack1" class="su-back">← Back</button>');
+$("qsBack1").addEventListener("click",()=>qsShow(0));
 $("qsLooksGood").addEventListener("click",async event=>{
  const button=event.currentTarget,oid=organization(),status=$("qsStatusR");
  if(button.disabled)return;
@@ -3553,7 +3651,7 @@ $("qsBuild").addEventListener("click",async event=>{
  const button=event.currentTarget,oid=organization();
  if(button.disabled)return;
  if(!qsGoals.size){$("qsStatus2").textContent="Pick at least one thing your agent should do.";return}
- const body={goals:[...qsGoals],other:v("qsOther").trim()||null};
+ const body={goals:[...qsGoals],other:v("qsOther").trim()||null,kind:qsKind,subtype:qsSubtype};
  if(qsGoals.has("transfer")&&v("qsTransferNumber").trim())body.transfer_number=v("qsTransferNumber").trim();
  button.disabled=true;$("qsStatus2").textContent="Building your agent… this takes a few seconds.";
  try{
@@ -3575,7 +3673,7 @@ $("qsBuild").addEventListener("click",async event=>{
 $("qsRedo").addEventListener("click",()=>qsShow(2));
 $("qsToTest").addEventListener("click",()=>{qsShow(4);$("qsQuestion").focus()});
 $("qsBack4").addEventListener("click",()=>qsShow(3));
-$("qsVoice").addEventListener("click",()=>{window.section("simulator",{push:true});setTimeout(()=>$("startVoicePractice")?.scrollIntoView({block:"center"}),400)});
+$("qsVoice").addEventListener("click",()=>qsStartVoice("/organizations/"+organization()+"/voice-preview","a practice call"));
 $("qsLive").addEventListener("click",()=>window.section("channels",{push:true}));
 $("qsFinish").addEventListener("click",()=>{
  try{localStorage.setItem(qsKey(organization()),"done")}catch{}
@@ -3585,7 +3683,7 @@ $("qsChatForm").addEventListener("submit",async event=>{
  event.preventDefault();
  const oid=organization(),input=$("qsQuestion"),question=input.value.trim(),button=event.submitter;
  if(!question||button.disabled)return;
- const add=(who,text)=>{const row=document.createElement("p");row.className="qs-msg "+who;row.textContent=text;$("qsChat").append(row);row.scrollIntoView({block:"nearest"})};
+ const add=qsAddMessage;
  add("you",question);input.value="";button.disabled=true;
  try{const r=await request("/organizations/"+oid+"/simulate","POST",{question});add("agent",r.answer||"I don’t have verified information about that. I would take a message.")}
  catch(e){add("agent",e.message)}

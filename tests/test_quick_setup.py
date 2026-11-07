@@ -177,7 +177,7 @@ def test_deterministic_fallback_finds_prices_and_a_summary():
 
 def test_analyze_needs_exactly_one_source_and_enough_text(make, monkeypatch):
     make()
-    monkeypatch.setattr(mod, "llm_understanding", lambda text: None)
+    monkeypatch.setattr(mod, "llm_understanding", lambda text, kind=None, subtype=None: None)
     assert client.post(URL + "/analyze", json={}).status_code == 422
     assert client.post(URL + "/analyze", json={"text": "short"}).status_code == 422
     assert client.post(URL + "/analyze", json={"text": "x" * 30, "document_id": "00000000-0000-0000-0000-000000000001"}).status_code == 422
@@ -187,7 +187,7 @@ def test_analyze_uses_the_model_but_filters_what_it_invents(make, monkeypatch):
     make()
     model = {"summary": "Print shop", "offerings": [{"name": "Cards", "description": ""}], "hours": "", "phone": "", "email": "",
              "address": "", "prices": [{"item": "Cards", "price_text": "$24.99"}, {"item": "Ghost", "price_text": "$5"}]}
-    monkeypatch.setattr(mod, "llm_understanding", lambda text: dict(model))
+    monkeypatch.setattr(mod, "llm_understanding", lambda text, kind=None, subtype=None: dict(model))
     monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
     result = client.post(URL + "/analyze", json={"text": "We print cards. Business cards cost $24.99 each."}).json()
     assert [p["item"] for p in result["understanding"]["prices"]] == ["Cards"] and "Ghost" not in str(result)
@@ -195,7 +195,7 @@ def test_analyze_uses_the_model_but_filters_what_it_invents(make, monkeypatch):
 
 def test_analyze_falls_back_when_the_model_is_unavailable(make, monkeypatch):
     make()
-    monkeypatch.setattr(mod, "llm_understanding", lambda text: None)
+    monkeypatch.setattr(mod, "llm_understanding", lambda text, kind=None, subtype=None: None)
     monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
     result = client.post(URL + "/analyze", json={"text": "We print cards.\nCards from $24.99 each\nOpen daily"}).json()
     assert result["understanding"]["prices"][0]["price_text"] == "$24.99"
@@ -237,3 +237,57 @@ def test_overview_with_money_is_refused(make, monkeypatch):
     k = Knowledge(); k.install(monkeypatch)
     response = client.post(URL + "/knowledge", json={"overview": "Business cards cost $24.99 and we are open daily."})
     assert response.status_code == 422 and k.calls == []
+
+
+# ---- business kinds: products vs services, and clinic safety ----
+def test_clinic_instructions_are_safe_and_minimal():
+    _, text = mod.compose("Bright Smile Clinic", "Health", "Maya", ["info", "booking", "messages"], None, "services", "clinic", booking_live=True)
+    for phrase in ("Never give medical advice", "call 911", "new or returning patient", "Do not ask for symptoms", "insurance"):
+        assert phrase in text
+    assert "usual length" in text
+
+
+def test_booking_without_a_calendar_collects_a_request_instead_of_claiming_to_book():
+    _, text = mod.compose("Bright Smile Clinic", None, "Maya", ["booking"], None, "services", "clinic", booking_live=False)
+    assert "cannot book directly yet" in text and "check availability first" not in text
+
+
+def test_products_and_services_get_different_guidance():
+    _, products = mod.compose("Metro Print", None, "Alex", ["info", "orders"], None, "products", "custom")
+    _, services = mod.compose("Metro Print", None, "Alex", ["info", "booking"], None, "services", "trades", booking_live=True)
+    assert "sells products" in products and "provides services" not in products
+    assert "provides services" in services and "sells products" not in services
+
+
+def test_no_kind_keeps_the_generic_instructions():
+    _, text = mod.compose("Metro Print", None, "Alex", ["info"], None)
+    assert "sells products" not in text and "provides services" not in text and "clinic" not in text.lower()
+
+
+def test_kind_and_type_are_validated_and_saved(make):
+    env = make(calendar=True)
+    ok = client.post(URL, json={"kind": "services", "subtype": "clinic", "goals": ["booking"]})
+    assert ok.status_code == 200 and env.patched[0]["business_kind"] == "services" and env.patched[0]["business_type"] == "clinic"
+    assert client.post(URL, json={"kind": "services", "subtype": "custom", "goals": ["info"]}).status_code == 422
+    assert client.post(URL, json={"kind": "pirates", "goals": ["info"]}).status_code == 422
+
+
+def test_booking_goal_without_calendar_still_saves_requests(make):
+    env = make(calendar=False)
+    result = client.post(URL, json={"kind": "services", "subtype": "clinic", "goals": ["booking"]}).json()
+    assert env.patched[0]["voice_leads_enabled"] is True and env.patched[0]["voice_booking_enabled"] is False
+    assert "cannot book directly yet" in result["instructions"] and any(n["key"] == "calendar" for n in result["needs"])
+
+
+def test_status_offers_kinds_and_presets(make, monkeypatch):
+    make()
+    body = client.get(URL).json()
+    assert set(body["kinds"]) == {"products", "services"} and "clinic" in body["kinds"]["services"]["types"]
+    assert body["presets"]["services:clinic"] == ["info", "booking", "messages", "transfer"]
+
+
+def test_services_and_policies_reach_the_overview_without_prices():
+    text = mod.overview_text({"summary": "Family clinic.", "offerings": [], "services": [
+        {"name": "Checkup", "description": "Routine visit", "duration": "30 min"}, {"name": "Cleaning", "description": "From $90", "duration": ""}],
+        "policies": ["Cancel 24 hours ahead", "We accept most insurance"], "hours": "Mon-Fri 8-5", "phone": "", "email": "", "address": ""})
+    assert "Service: Checkup: Routine visit (30 min)" in text and "Good to know: Cancel 24 hours ahead" in text and "$" not in text

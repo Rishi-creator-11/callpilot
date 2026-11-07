@@ -101,3 +101,46 @@ def test_preview_can_be_limited_to_selected_workspaces(preview_client, monkeypat
     monkeypatch.setenv("VOICE_PREVIEW_WORKSPACES", OTHER)
     assert preview_client.get(START).json() == {"available": False}
     assert preview_client.post(START).status_code == 503
+
+
+LIVE = f"/api/account/organizations/{OID}/voice-test"
+
+
+def test_live_test_calls_the_workspaces_real_assistant_only(preview_client, monkeypatch):
+    monkeypatch.setattr(voice_preview, "api", lambda *a, **k: [{"provider_agent_id": "asst_1"}])
+    monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: assistant.get("id") == "asst_1" and oid == OID)
+    monkeypatch.setattr(voice_preview, "rpc", lambda name, args: True)
+    calls = []
+
+    def provider(method, path, *, body=None):
+        calls.append((method, path, body))
+        if method == "GET":
+            return {"id": "asst_1"}
+        return {"webCallUrl": "https://callpilot.daily.co/room", "id": "call_1"}
+
+    monkeypatch.setattr(voice_preview, "vapi", provider)
+    response = preview_client.post(LIVE)
+    assert response.status_code == 200 and response.json()["webCallUrl"] == "https://callpilot.daily.co/room"
+    assert response.headers["cache-control"] == "no-store"
+    create = calls[-1]
+    assert create[1] == "/call/web" and create[2]["assistantId"] == "asst_1" and "assistant" not in create[2]
+    assert create[2]["assistantOverrides"]["maxDurationSeconds"] == 150
+
+
+def test_live_test_needs_an_agent_ownership_and_quota_before_contacting_the_provider(preview_client, monkeypatch):
+    provider_calls = []
+    monkeypatch.setattr(voice_preview, "vapi", lambda *a, **k: provider_calls.append(a) or {"id": "asst_1"})
+    monkeypatch.setattr(voice_preview, "api", lambda *a, **k: [{"provider_agent_id": None}])
+    assert preview_client.post(LIVE).status_code == 409 and provider_calls == []
+    monkeypatch.setattr(voice_preview, "api", lambda *a, **k: [{"provider_agent_id": "asst_1"}])
+    monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: False)
+    assert preview_client.post(LIVE).status_code == 409
+    monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: True)
+    monkeypatch.setattr(voice_preview, "rpc", lambda name, args: False)
+    assert preview_client.post(LIVE).status_code == 429
+    assert not any(call[0] == "POST" for call in provider_calls)  # no call room was ever created
+
+
+def test_live_test_is_off_when_voice_calls_are_disabled(preview_client, monkeypatch):
+    monkeypatch.setenv("VOICE_PREVIEW_ENABLED", "false")
+    assert preview_client.post(LIVE).status_code == 503
