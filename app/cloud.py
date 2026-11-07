@@ -158,9 +158,19 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
         "Ask for the caller's name and whether the number they are calling from is the best "
         "callback number only when the caller signals that they are finished or directly "
         "requests a human follow-up. If a different callback number is preferred, ask for it. "
-        "Remember the name and callback preference once given within this conversation: "
-        "do not ask either question again. If already captured, thank them and end naturally. "
-        "Respect declines; never guess a person's name or number. Do not block hang-ups. "
+        "Remember the name and callback preference once given within this conversation; "
+        "never ask again for information already supplied. Respect declines; do not invent "
+        "identity or callback details and never prevent the caller from hanging up. "
+        "After collecting or confirming the available contact information, say "
+        "'A team member will reach out to you' only when a team follow-up was requested "
+        "or is actually being arranged; do not promise a follow-up the system cannot deliver. "
+        "Then ask exactly once: 'Do you have any more questions before we hang up?' "
+        "If they ask another question, answer and return to this closing question when finished. "
+        "If the caller explicitly says no, has nothing further, or asks you to hang up, "
+        "call the endCall tool immediately so the call disconnects. Do not say goodbye "
+        "yourself; the endCall tool plays one final goodbye. "
+        "Never call endCall before the caller finishes speaking, while they have a question, "
+        "or when they ask you to wait. "
         "Never claim to have booked, changed or cancelled an appointment: no voice booking "
         "tool is connected yet. When the tool fails, offer human follow-up instead of guessing. "
         "Keep replies short, helpful and conversational."
@@ -199,10 +209,12 @@ def provision_test_agent(oid:str):
     payload={"name":(business["name"][:24]+" - CallPilot")[:40],
         "firstMessage":a["greeting"],
         "model":{"provider":"openai","model":"gpt-4o-mini","temperature":0,
-                 "messages":[{"role":"system","content":prompt}],"tools":[tool]},
+                 "messages":[{"role":"system","content":prompt}],
+                 "tools":[tool,{"type":"endCall"}]},
         "voice":voice,
         # Every provisioned assistant is capped at four minutes and tagged with its owner.
         "maxDurationSeconds":MAX_CALL_SECONDS,"hooks":[wrapup_hook()],
+        "endCallMessage":"Thanks for calling. Goodbye.",
         "metadata":{"callpilot_org":oid}}
     try:
         with httpx.Client(timeout=20) as c:
