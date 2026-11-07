@@ -411,7 +411,34 @@ border-radius:11px;min-height:46px;min-width:46px}
 .cp-account-plan[data-state="inactive"]{background:#283144;color:#a8b4c8;border-color:#3d4a60}
 .cp-account-plan[data-state="pending"]{background:#443623;color:#f9d594;border-color:#665437}
 body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
-@media(max-width:850px){body.cp-signed-in .sidebar .cp-account-trigger{min-height:74px}}</style></head><body data-app-state="loading">
+@media(max-width:850px){body.cp-signed-in .sidebar .cp-account-trigger{min-height:74px}}</style>
+<style id="cp-studio-styles">
+.cp-google-signin{width:100%;display:flex;align-items:center;justify-content:center;gap:11px;border:1px solid #dce2ec!important;background:#fff!important;color:#273248!important;margin-top:12px;min-height:46px}
+.cp-google-signin:hover{background:#f6f8fc!important}.cp-google-mark{font-size:20px;font-weight:850;color:#4285f4}
+.cp-studio-hero{background:linear-gradient(115deg,#211c50,#4540a0 62%,#685de3);color:#fff;border-radius:17px;padding:29px 32px;margin-bottom:20px}
+.cp-studio-hero h2{font-size:clamp(23px,3vw,32px);color:white;margin:9px 0;max-width:640px}.cp-studio-hero p{color:#e3e1ff;max-width:660px;margin:0 0 18px}
+.cp-studio-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.5px;color:#c6c4ff}
+.cp-studio-meter{height:9px;background:#ffffff38;border-radius:999px;overflow:hidden}.cp-studio-meter>div{height:100%;background:#c5f0df;border-radius:999px;transition:width .2s}
+.cp-studio-progressline{display:flex;justify-content:space-between;gap:15px;margin-top:10px;font-size:12px;color:#e8e7ff;flex-wrap:wrap}
+.cp-studio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.cp-studio-step{border:1px solid #e1e6f0;background:#fff;border-radius:15px;padding:21px;min-width:0}
+.cp-studio-wide{grid-column:1/-1}.cp-studio-step-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:15px}
+.cp-studio-step-head h3{font-size:17px;margin:0 0 3px}.cp-studio-step-head p{font-size:13px;margin:0}
+.cp-studio-num{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:35px;height:35px;border-radius:11px;background:#f0efff;color:#574cc8;font-size:13px;font-weight:850}
+.cp-studio-value{font-size:15px;font-weight:750;color:#182034;margin-bottom:17px}
+.cp-studio-step label{margin-top:12px}.cp-studio-step textarea{min-height:88px}.cp-studio-step button{margin-top:10px}
+.cp-studio-check{display:flex!important;gap:9px;align-items:flex-start;line-height:1.4;color:#46536b!important}
+.cp-studio-check input{flex-shrink:0;margin-top:3px}
+.cp-studio-textbtn{border:0!important;background:transparent!important;color:#5146c8!important;padding:6px 0!important;font-size:12px;box-shadow:none!important}
+.cp-studio-chips{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0}.cp-studio-chips button{padding:7px 10px;margin-top:0}
+.cp-studio-answer{white-space:pre-wrap;overflow-wrap:anywhere;border-radius:10px;border:1px solid #e2e7f0;background:#f8f9fd;color:#303c52;padding:13px;margin-top:13px;min-height:60px;font-size:13px}
+.cp-studio-connections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cp-studio-connection{padding:13px 15px;border-radius:11px;background:#f8f9fd;border:1px solid #e2e7f0;font-size:13px}
+.cp-studio-connection strong{display:block;color:#27334a;margin-bottom:3px}.cp-studio-connection span{color:#5b6980}
+.cp-studio-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+.cp-studio-warning{margin:15px 0 0;color:#695c3d;background:#fffbec;border:1px solid #f3e5b5;border-radius:10px;padding:12px;font-size:12px}
+@media(max-width:760px){.cp-studio-grid,.cp-studio-connections{grid-template-columns:1fr}.cp-studio-hero{padding:22px}.cp-studio-step{padding:17px}}
+</style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
@@ -435,6 +462,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div id="passwordRow"><label for="password">Password</label><input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="Enter your password"></div>
 <div class="row" style="margin-top:22px"><button id="authSubmit" onclick="window.authAction('signin')">Sign in</button></div>
 <div style="display:flex;align-items:center;gap:12px;margin:15px 0;color:#99a5b7;font-size:11px"><span style="height:1px;flex:1;background:#e9eaf1"></span>or<span style="height:1px;flex:1;background:#e9eaf1"></span></div>
+<button id="authGoogle" class="secondary cp-google-signin" type="button" onclick="window.googleSignIn()"><span class="cp-google-mark" aria-hidden="true">G</span> Continue with Google</button>
 <button id="authMagic" class="secondary" style="width:100%;border:1px solid #e1e5ed" onclick="window.magicLink()">Continue with email link</button>
 <div class="cp-inline-actions" style="justify-content:space-between;margin-top:14px">
 <button id="authSwap" class="cp-top-link" onclick="window.authMode('signup')">Create a free account</button>
@@ -455,6 +483,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 
 <div class="cp-side-scroll">
 <div class="cp-nav-group">WORKSPACE</div>
+<button data-section="studio" onclick="window.section('studio')"><span class="cp-nav-icon">✦</span> Launch studio</button>
 <button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
 <button data-section="knowledge" onclick="window.section('knowledge')"><span class="cp-nav-icon">▤</span> Knowledge base</button>
 <button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
@@ -477,6 +506,49 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small><span id="sideAccountPlan" class="cp-account-plan" role="status">Checking plan…</span></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
 </button></div></aside>
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
+
+<div id="studio" class="panel card" style="display:none">
+ <div class="cp-studio-hero">
+  <span class="cp-studio-eyebrow">CALLPILOT / LAUNCH STUDIO</span>
+  <h2>Make your first great impression on every call.</h2>
+  <p>Teach your front desk, give it a voice, check its answers, and connect your tools. No code needed.</p>
+  <div class="cp-studio-meter"><div id="studioProgressBar" style="width:0%"></div></div>
+  <div class="cp-studio-progressline"><strong id="studioProgressText">Checking your setup…</strong><span id="studioProgressNote">Nothing goes live without your review.</span></div>
+ </div>
+ <div class="cp-studio-grid">
+  <article class="cp-studio-step"><div class="cp-studio-step-head"><span class="cp-studio-num">01</span><div><h3>Know your business</h3><p>One private workspace per business.</p></div></div>
+   <div class="cp-studio-value" id="studioBusiness">Loading your business…</div>
+   <button class="secondary" onclick="window.section('workspace')">Edit business profile</button>
+  </article>
+  <article class="cp-studio-step"><div class="cp-studio-step-head"><span class="cp-studio-num">02</span><div><h3>Teach your receptionist</h3><p>Paste what customers should know. Review it before publishing.</p></div></div>
+   <label for="studioDescription">Business services, hours, policies and common questions</label>
+   <textarea id="studioDescription" maxlength="10000" rows="6" placeholder="We help customers with… We are open… When someone calls about…"></textarea>
+   <label class="cp-studio-check"><input id="studioApproveKnowledge" type="checkbox"> I confirm these details are accurate and approved for callers.</label>
+   <button id="studioSaveKnowledge" onclick="window.studioSaveKnowledge()">Approve &amp; teach AI</button>
+   <p id="studioKnowledgeResult" class="muted" role="status">For safety, numeric prices and sensitive information need a separate review.</p>
+   <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Manage all knowledge →</button>
+  </article>
+  <article class="cp-studio-step"><div class="cp-studio-step-head"><span class="cp-studio-num">03</span><div><h3>Make it sound like you</h3><p>A warm greeting, not a phone menu.</p></div></div>
+   <label for="studioAgentName">Receptionist name</label><input id="studioAgentName" maxlength="80" placeholder="Alex">
+   <label for="studioGreeting">What should your receptionist say first?</label>
+   <textarea id="studioGreeting" maxlength="500" rows="3" placeholder="Hi, thanks for calling… I'm your AI receptionist. How can I help?"></textarea>
+   <button onclick="window.studioSaveAgent()">Save greeting</button>
+   <p class="muted">Saving a greeting updates your workspace. An already-live Vapi assistant must be synced separately.</p>
+  </article>
+  <article class="cp-studio-step"><div class="cp-studio-step-head"><span class="cp-studio-num">04</span><div><h3>Practice before going live</h3><p>Check approved answers without using phone minutes.</p></div></div>
+   <label for="studioQuestion">Try a caller question</label><input id="studioQuestion" maxlength="1000" placeholder="What services do you offer?">
+   <div class="cp-studio-chips"><button class="secondary" onclick="window.studioExample('What services do you offer?')">Services</button><button class="secondary" onclick="window.studioExample('What are your business hours?')">Hours</button><button class="secondary" onclick="window.studioExample('Can I book an appointment?')">Booking</button></div>
+   <button onclick="window.studioTest()">Test this answer</button>
+   <div id="studioTestResult" class="cp-studio-answer" role="status">This is a knowledge-answer test, not a simulated voice conversation or a confirmed booking.</div>
+   <button class="cp-studio-textbtn" onclick="window.section('simulator')">Open full knowledge tester →</button>
+  </article>
+  <article class="cp-studio-step cp-studio-wide"><div class="cp-studio-step-head"><span class="cp-studio-num">05</span><div><h3>Connect, verify, launch</h3><p>See what is connected—and what still needs a real-world test.</p></div></div>
+   <div id="studioConnections" class="cp-studio-connections" role="status">Checking integrations…</div>
+   <div class="cp-studio-actions"><button class="secondary" onclick="window.connectCalendar()">Connect Google Calendar</button><button class="secondary" onclick="window.section('usage')">Phone setup</button><button class="secondary" onclick="window.section('calls')">Calls &amp; leads</button><button class="secondary" onclick="window.loadStudio()">Refresh checklist</button></div>
+   <p class="cp-studio-warning">Before taking customer calls, verify live voice answers, caller contact capture, appointment booking, call transfers and recording consent. A connected calendar does not mean voice booking is enabled.</p>
+  </article>
+ </div>
+</div>
 <div id="calls" class="panel">
   <div class="ci-head">
     <div><h2 style="font-size:24px;margin:0">Your conversations</h2><p class="muted">Review calls, identify genuine interest and follow up with confidence.</p></div>
@@ -697,6 +769,7 @@ window.authMode=mode=>{
  $("authSwap").setAttribute("onclick",isSignUp||isReset?"window.authMode('signin')":"window.authMode('signup')");
  $("authForgot").style.display=isReset?"none":"inline-block";
  $("authMagic").style.display=isReset?"none":"block";
+ $("authGoogle").style.display=isReset?"none":"flex";
  $("authmsg").textContent="";
  $("password").setAttribute("autocomplete",isSignUp?"new-password":"current-password");
 };
@@ -718,6 +791,19 @@ window.authAction=async mode=>{
    if(mode==="signin")await render();
  }catch(e){$("authmsg").textContent=e.message||"Unable to sign in"}
  finally{button.disabled=false;button.textContent=label}
+};
+window.googleSignIn=async()=>{
+ const button=$("authGoogle");
+ if(!sb){$("authmsg").textContent="Sign-in is still loading. Please try again.";return}
+ button.disabled=true;
+ $("authmsg").textContent="Connecting securely to Google…";
+ try{
+  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/app"}});
+  if(error)throw error;
+ }catch(e){
+  $("authmsg").textContent="Google sign-in is not ready: "+(e?.message||"Check the Google provider in Supabase Auth.");
+  button.disabled=false;
+ }
 };
 window.magicLink=async()=>{
  const email=v("email").trim();
@@ -797,6 +883,7 @@ document.addEventListener("click",e=>{
  if(!e.target.closest(".cp-sidebar-bottom"))window.closeAccountMenu();
 });
 const pageMeta={
+ studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
@@ -811,7 +898,7 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>loadSemanticStatus(),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),workspace:()=>window.fillWorkspace()
  }[id];
@@ -927,7 +1014,7 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("wsName").value=o?.name||"";
    $("wsIndustry").value=o?.industry||"";
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
-   const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"calls";
+   const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"studio";
    window.section(destination);
    window.refreshAccountPlan();
  });
@@ -1480,6 +1567,76 @@ window.enableCallAnalysis=()=>safe(async()=>{
  try{const r=await request("/organizations/"+organization()+"/calls/enable-analysis","POST");
  return r.message+" New calls will be analyzed after they end.";
  }finally{b.disabled=false}
+});
+
+
+window.studioExample=(question)=>{$("studioQuestion").value=question;$("studioQuestion").focus()};
+window.loadStudio=async()=>{
+ const oid=organization();if(!oid)return;
+ const o=orgs.find(x=>x.id===oid);
+ $("studioBusiness").textContent=(o?.name||"Your business")+(o?.industry?" · "+o.industry:"");
+ const paths=["/agent","/descriptions","/calendar","/phone"];
+ const settled=await Promise.allSettled(paths.map(p=>request("/organizations/"+oid+p)));
+ if(oid!==organization())return;
+ const values=settled.map(x=>x.status==="fulfilled"?x.value:null);
+ const [agent,docs,calendar,phone]=values;
+ const approved=Array.isArray(docs)?docs.filter(d=>d.approved_at).length:0;
+ const hasGreeting=Boolean(agent?.greeting?.trim());
+ const hasCalendar=calendar?.connected===true,hasPhone=phone?.connected===true;
+ if(agent){
+  if(!$("studioAgentName").value.trim())$("studioAgentName").value=agent.agent_name||"Alex";
+  if(!$("studioGreeting").value.trim())$("studioGreeting").value=agent.greeting||"";
+ }
+ const checks=[true,approved>0,hasGreeting,hasCalendar,hasPhone];
+ const done=checks.filter(Boolean).length;
+ $("studioProgressBar").style.width=(done/checks.length*100)+"%";
+ $("studioProgressText").textContent=done+" of "+checks.length+" setup checks complete";
+ $("studioProgressNote").textContent=done===5?"Connected does not mean voice workflows are tested.":"Next: finish the unchecked items below.";
+ const labels=[
+  ["Business workspace",o?"Ready":"Missing"],
+  ["Approved business knowledge",docs?approved+" approved document"+(approved===1?"":"s"):"Could not check"],
+  ["Saved greeting",agent?(hasGreeting?"Saved":"Not configured"):"Could not check"],
+  ["Google Calendar",calendar?(hasCalendar?"Connected":"Not connected"):"Could not check"],
+  ["Business phone",phone?(hasPhone?"Connected":"Not connected"):"Could not check"]
+ ];
+ $("studioConnections").innerHTML=labels.map(([name,status],i)=>
+  '<div class="cp-studio-connection"><strong>'+(checks[i]?"✓ ":"○ ")+esc(name)+'</strong><span>'+esc(status)+'</span></div>'
+ ).join("");
+};
+window.studioSaveKnowledge=()=>safe(async()=>{
+ const content=v("studioDescription").trim(),oid=organization(),button=$("studioSaveKnowledge");
+ if(content.length<20)throw Error("Add at least 20 characters of verified business information.");
+ if(!$("studioApproveKnowledge").checked)throw Error("Confirm that the information is accurate before publishing.");
+ button.disabled=true;button.textContent="Teaching your AI…";
+ try{
+  const draft=await request("/organizations/"+oid+"/descriptions","POST",{title:"Business essentials",content});
+  let result;
+  try{result=await request("/organizations/"+oid+"/descriptions/"+encodeURIComponent(draft.id)+"/approve","POST")}
+  catch(e){throw Error("Saved as a draft, but could not publish it. Review the draft in Knowledge base: "+e.message)}
+  $("studioKnowledgeResult").textContent="Approved and indexed "+result.indexed_passages+" searchable passages.";
+  $("studioDescription").value="";$("studioApproveKnowledge").checked=false;
+  await window.loadStudio();
+  return "Your verified business information is now searchable.";
+ }catch(e){$("studioKnowledgeResult").textContent=e.message;throw e}
+ finally{button.disabled=false;button.textContent="Approve & teach AI"}
+});
+window.studioSaveAgent=()=>safe(async()=>{
+ const agent_name=v("studioAgentName").trim(),greeting=v("studioGreeting").trim();
+ if(!agent_name||greeting.length<10)throw Error("Add an assistant name and a greeting of at least 10 characters.");
+ await request("/organizations/"+organization()+"/agent","PUT",{agent_name,greeting});
+ await window.loadStudio();
+ return "Greeting saved in your workspace. Existing live Vapi assistants require a separate sync.";
+});
+window.studioTest=()=>safe(async()=>{
+ const question=v("studioQuestion").trim(),target=$("studioTestResult");
+ if(!question)throw Error("Enter a customer question first.");
+ target.textContent="Checking approved knowledge…";
+ try{
+  const answer=await request("/organizations/"+organization()+"/simulate","POST",{question});
+  target.textContent=(answer.answer||"No verified answer.")+"\n\nSource: "+(answer.source||"unknown")+
+   (answer.source==="unknown"?"\nNeeds human review before a live call.":"")+
+   "\nText test only: no voice call or booking was made.";
+ }catch(e){target.textContent="Test failed: "+e.message;throw e}
 });
 
 async function boot(){
