@@ -212,6 +212,10 @@ def capture_customer_lead(oid: str, message: dict, args: dict) -> str:
             "lead_reason": "Caller explicitly requested a callback about: " + interest,
             **update,
         }, prefer="resolution=merge-duplicates,return=minimal")
+    # Exported in the background so a slow Google response can never delay the spoken reply.
+    import threading
+    from app.sheets import export_lead
+    threading.Thread(target=export_lead, args=(oid, call_id, name, number, interest), daemon=True).start()
     return "Callback request saved for " + (name or "the caller") + " about " + interest + ". A team member has not yet contacted them."
 
 

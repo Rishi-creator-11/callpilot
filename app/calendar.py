@@ -58,6 +58,10 @@ def authorize(oid:str,user=Depends(current_user)):
 
 @router.get("/api/oauth/google/callback")
 def oauth_callback(code:str|None=None,state:str|None=None,error:str|None=None):
+    # Google Sheets reuses this registered redirect; its states carry a distinguishing prefix.
+    if state and state.startswith("sheets."):
+        from app.sheets import handle_callback
+        return handle_callback(code,state,error)
     # Never reflect arbitrary Google error details or authorization codes to the UI.
     if error:
         result="access_denied" if error=="access_denied" else "error"

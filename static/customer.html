@@ -792,8 +792,17 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    <h3 class="cn-group">OAuth</h3>
   <article class="cp-studio-connection" data-connection-type="calendar"><h3>Google Calendar</h3><p>Check availability and create confirmed appointments.</p>
    <p id="connectionCalendar" role="status"></p><button class="secondary" onclick="window.section('appointments')">Manage calendar</button></article>
-  <article class="cp-studio-connection cn-soon" data-connection-type="business"><h3>Google Sheets</h3><p>Append, read, update and search spreadsheet rows from calls.</p>
-   <p class="muted" role="status">Not available yet. We will add it with least-privilege access and approved sheets.</p><button type="button" class="secondary" disabled>Coming soon</button></article>
+  <article class="cp-studio-connection" data-connection-type="business"><h3>Google Sheets</h3>
+    <p>Add each captured lead as a row in a spreadsheet CallPilot creates in your Google Drive. CallPilot can only access that one file.</p>
+    <p id="connectionSheets" role="status">Checking connection…</p>
+    <div class="cp-inline-actions">
+     <button id="sheetsConnect" type="button" class="secondary" hidden>Connect Google Sheets</button>
+     <a id="sheetsOpen" href="#" target="_blank" rel="noopener noreferrer" hidden>Open spreadsheet</a>
+     <button id="sheetsTest" type="button" class="secondary" hidden>Send test row</button>
+     <button id="sheetsDisconnect" type="button" class="secondary" hidden>Disconnect</button>
+    </div>
+    <p id="sheetsResult" role="status" class="muted"></p>
+   </article>
   <h3 class="cn-group">Voice and phone</h3>
   <article class="cp-studio-connection" data-connection-type="phone"><h3>Vapi voice assistant</h3><p>Connect the assistant that answers your business calls.</p>
    <p id="connectionVoice" role="status"></p><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage voice assistant</button></article>
@@ -3048,6 +3057,59 @@ async function loadCalendar(){
  }
 }
 window.connectCalendar=()=>safe(async()=>{let r=await request("/organizations/"+organization()+"/calendar/connect","POST");location.href=r.url});
+const sheetsPath=oid=>"/organizations/"+oid+"/sheets";
+const SHEETS_RESULTS={connected:"Google Sheets connected. A spreadsheet was created in your Drive.",access_denied:"Google Sheets access was not granted.",
+ expired:"The connection expired. Please try again.",missing_permission:"Google did not grant the file permission CallPilot needs. Try again and accept it.",
+ missing_refresh_token:"Google did not issue a refresh token. Try reconnecting and accepting the permissions.",
+ error:"Google Sheets could not be connected. Please try again.",not_connected:"Google Sheets was not connected."};
+function clearSheets(){
+ for(const id of ["sheetsConnect","sheetsOpen","sheetsTest","sheetsDisconnect"])$(id).hidden=true;
+ $("sheetsResult").textContent="";
+}
+async function loadSheets(){
+ const oid=organization();
+ clearSheets();
+ $("connectionSheets").textContent="Checking connection…";
+ try{
+  const status=await request(sheetsPath(oid));
+  if(oid!==organization())return;
+  $("connectionSheets").textContent=status.connected?"Connected. New leads are added as rows.":
+   status.configured?"Ready to connect":"Service unavailable";
+  $("sheetsConnect").hidden=status.connected||!status.can_manage||!status.configured;
+  $("sheetsTest").hidden=$("sheetsDisconnect").hidden=!status.connected||!status.can_manage;
+  if(status.connected&&status.can_manage&&status.spreadsheet_url){$("sheetsOpen").href=status.spreadsheet_url;$("sheetsOpen").hidden=false}
+  const result=new URLSearchParams(location.search).get("sheets");
+  if(result){
+   $("sheetsResult").textContent=SHEETS_RESULTS[result]||"Google Sheets status: "+result;
+   const url=new URL(location.href);url.searchParams.delete("sheets");
+   history.replaceState(null,"",url.pathname+url.search+(url.hash||"#connections"));
+  }
+ }catch(e){if(oid===organization())$("connectionSheets").textContent="Could not check this connection"}
+}
+$("sheetsConnect").addEventListener("click",async event=>{
+ const button=event.currentTarget;
+ if(button.disabled)return;
+ button.disabled=true;
+ try{const r=await request(sheetsPath(organization())+"/connect","POST");location.href=r.url}
+ catch(e){$("sheetsResult").textContent=e.message;button.disabled=false}
+});
+$("sheetsTest").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled)return;
+ button.disabled=true;
+ $("sheetsResult").textContent="Sending a test row…";
+ try{await request(sheetsPath(oid)+"/test-row","POST");if(oid===organization())$("sheetsResult").textContent="Test row added. You can delete it from the spreadsheet."}
+ catch(e){if(oid===organization())$("sheetsResult").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("sheetsDisconnect").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled||!window.confirm("Disconnect Google Sheets? New leads will stop being added. The spreadsheet stays in your Google Drive."))return;
+ button.disabled=true;
+ try{await request(sheetsPath(oid),"DELETE");if(oid===organization())await loadSheets()}
+ catch(e){if(oid===organization())$("sheetsResult").textContent=e.message}
+ finally{button.disabled=false}
+});
 async function loadConnections(){
  const oid=organization();
  const services=[
@@ -3061,7 +3123,7 @@ async function loadConnections(){
   try{status=describe(await request("/organizations/"+oid+path))}
   catch{status="Could not check this connection"}
   if(oid===organization())$(id).textContent=status;
- }),loadHighLevel(),loadShopify()]);
+ }),loadHighLevel(),loadShopify(),loadSheets()]);
 }
 for(const tab of document.querySelectorAll("[data-cn-tab]")){
  tab.addEventListener("click",()=>{

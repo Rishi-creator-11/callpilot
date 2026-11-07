@@ -761,6 +761,8 @@ from app.calendar import router as calendar_router
 app.include_router(calendar_router)
 
 from app.highlevel import router as highlevel_router
+from app.sheets import router as sheets_router
+app.include_router(sheets_router)
 app.include_router(highlevel_router)
 
 from app.agent_builder import router as agent_builder_router
