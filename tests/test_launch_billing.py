@@ -65,6 +65,19 @@ def post_checkout(monkeypatch,plan="starter"):
 def session_data(calls):
     return [d for p,d in calls if p=="checkout/sessions"][0]
 
+def test_sandbox_checkout_does_not_use_live_price_ids(db,monkeypatch):
+    # Production price IDs may already be staged in Render while test payments
+    # are running. Stripe test mode must always use sandbox/inline prices.
+    monkeypatch.setenv("STRIPE_PRICE_STARTER","price_live_starter")
+    monkeypatch.setenv("STRIPE_PRICE_SETUP","price_live_setup")
+    r,calls=post_checkout(monkeypatch)
+    assert r.status_code==200
+    data=session_data(calls)
+    assert "line_items[0][price]" not in data
+    assert "line_items[1][price]" not in data
+    assert data["line_items[0][price_data][unit_amount]"]=="4900"
+    assert data["line_items[1][price_data][unit_amount]"]=="2500"
+
 def test_first_checkout_includes_the_25_dollar_setup_fee(db,monkeypatch):
     r,calls=post_checkout(monkeypatch)
     assert r.status_code==200
