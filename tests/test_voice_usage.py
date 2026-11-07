@@ -32,8 +32,12 @@ def test_monthly_plan_usage_is_actual_minutes_and_warning(monkeypatch):
     assert result["usage_status"]=="not_enforced"
 
 def test_usage_exhausted_alert(monkeypatch):
+    now=datetime.now(timezone.utc)
+    first=now.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
     monkeypatch.setattr(usage,"account",lambda oid:{
-        "selected_plan":"growth","status":"active","enforcement_enabled":True})
+        "selected_plan":"growth","status":"active","enforcement_enabled":True,
+        "current_period_start":first.isoformat(),
+        "current_period_end":(first+__import__("datetime").timedelta(days=32)).isoformat()})
     monkeypatch.setattr(usage,"api",lambda table,method="GET",**kwargs:[
         {"call_count":10,"used_seconds":18000,"live_seconds":0}])
     outcome=usage.compute_usage(OID)
@@ -43,7 +47,7 @@ def test_usage_exhausted_alert(monkeypatch):
 
 def test_no_plan_has_no_fake_allowance(monkeypatch):
     monkeypatch.setattr(usage,"account",lambda oid:{"status":"unconfigured"})
-    monkeypatch.setattr(usage,"api",lambda table,**kwargs:[
+    monkeypatch.setattr(usage,"api",lambda table,method="GET",**kwargs:[
         {"call_count":1,"used_seconds":131,"live_seconds":0}])
     x=usage.compute_usage(OID)
     assert x["calls_completed"]==1

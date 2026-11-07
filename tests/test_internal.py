@@ -40,3 +40,11 @@ def test_webhook_denied_without_configured_token(monkeypatch):
     monkeypatch.delenv("VAPI_WEBHOOK_TOKEN",raising=False)
     x=client.post("/webhooks/vapi/11111111-1111-1111-1111-111111111111",json={"message":{"type":"end-of-call-report"}})
     assert x.status_code==401
+def test_legal_page_states_launch_policies():
+    r=client.get("/legal")
+    assert r.status_code==200
+    for text in ("$49","$99","$179","100","300","600","$100","four minutes","No automatic overage","recorded"):
+        assert text in r.text
+    assert "to be confirmed" in r.text  # open decisions are flagged, never invented
+def test_customer_app_links_to_policies():
+    assert "/legal" in client.get("/app").text

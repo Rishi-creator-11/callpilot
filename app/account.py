@@ -10,9 +10,9 @@ SUPA=lambda:os.getenv("SUPABASE_URL","").rstrip("/")
 PUB=lambda:os.getenv("SUPABASE_PUBLISHABLE_KEY","")
 
 def current_user(authorization:str|None=Header(default=None)):
-    if not SUPA() or not PUB():raise HTTPException(503,"Authentication is not configured")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401,"Sign in required")
+    if not SUPA() or not PUB():raise HTTPException(503,"Authentication is not configured")
     token=authorization[7:]
     if len(token)<20 or len(token)>4096:raise HTTPException(401,"Invalid token")
     try:

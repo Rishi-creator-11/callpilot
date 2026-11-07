@@ -1,0 +1,54 @@
+# Production configuration for Render Starter ($7/month, always on). NOT applied automatically:
+# the live service "callpilot-internal" is unchanged until the owner upgrades its instance type in
+# the Render dashboard (Settings > Instance Type > Starter). Keep the existing URL and environment.
+services:
+  - type: web
+    name: callpilot-internal
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    # Secret values are set in the Render dashboard and are never stored in this file.
+    envVars:
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: PUBLIC_BASE_URL
+        value: https://callpilot-internal.onrender.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_WEBHOOK_TOKEN
+        sync: false
+      - key: VAPI_CREDENTIAL_ID
+        sync: false
+      - key: STRIPE_MODE
+        value: test
+      - key: STRIPE_BILLING_ENABLED
+        value: "false"
+      - key: STRIPE_LIVE_APPROVED
+        value: "false"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_STARTER
+        sync: false
+      - key: STRIPE_PRICE_GROWTH
+        sync: false
+      - key: STRIPE_PRICE_BUSINESS
+        sync: false
+      - key: STRIPE_PRICE_SETUP
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_TOKEN_ENCRYPTION_KEY
+        sync: false

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from app.main import authorize, PRICE, MONEY, NO_PRICE, UNKNOWN
+from app.common import authorize, public_base, wrapup_hook, MAX_CALL_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN
 
 router = APIRouter(prefix="/api/cloud", dependencies=[Depends(authorize)], tags=["persistent-workspaces"])
 BASE = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -152,7 +152,7 @@ def provision_test_agent(oid:str):
     credential=os.getenv("VAPI_CREDENTIAL_ID","")
     if not credential or not os.getenv("VAPI_WEBHOOK_TOKEN"):
         raise HTTPException(503,"Vapi private webhook credential must be configured before voice testing")
-    base=os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")
+    base=public_base()
     prompt=("You are "+a["agent_name"]+", an AI receptionist for "+business["name"]+". "
         "Immediately disclose that you are an AI assistant. Never impersonate the owner. "
         "For EVERY business fact or customer question, call lookup_approved_knowledge with the caller's full question. "
@@ -176,7 +176,10 @@ def provision_test_agent(oid:str):
         "firstMessage":a["greeting"],
         "model":{"provider":"openai","model":"gpt-4o-mini","temperature":0,
                  "messages":[{"role":"system","content":prompt}],"tools":[tool]},
-        "voice":voice}
+        "voice":voice,
+        # Every provisioned assistant is capped at four minutes and tagged with its owner.
+        "maxDurationSeconds":MAX_CALL_SECONDS,"hooks":[wrapup_hook()],
+        "metadata":{"callpilot_org":oid}}
     try:
         with httpx.Client(timeout=20) as c:
             resp=c.post("https://api.vapi.ai/assistant",

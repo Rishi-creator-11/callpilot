@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from app.account import current_user, membership
 from app.cloud import api, org_or_404
+from app.common import wrapup_hook, WRAPUP_HOOK_NAME, MAX_CALL_SECONDS
 
 router = APIRouter(prefix="/api/account/organizations/{oid}", tags=["call-intelligence"])
 VALID_STAGES = {"hot","warm","general","not_qualified","needs_review"}
@@ -30,6 +31,11 @@ def vapi(method:str, path:str, *, params=None, body=None):
     if response.status_code>=400:
         raise HTTPException(502,"Vapi request failed (HTTP "+str(response.status_code)+")")
     return response.json() if response.content else {}
+
+def owns_assistant(assistant,oid:str)->bool:
+    """Tenant ownership is an immutable server-set tag, never a display-name match."""
+    meta=assistant.get("metadata") if isinstance(assistant,dict) else None
+    return isinstance(meta,dict) and meta.get("callpilot_org")==oid
 
 def agent_config(oid:str):
     records=api("agent_configs",params={"organization_id":"eq."+oid,
@@ -249,11 +255,9 @@ def voice_assistants(oid:str,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     result=vapi("GET","/assistant",params={"limit":100})
     if not isinstance(result,list):result=[]
-    business=org_or_404(oid)
-    prefix=(business["name"]+" - CallPilot").casefold()
     return {"assistants":[{"id":x["id"],"name":x.get("name") or "Unnamed assistant"}
              for x in result if isinstance(x,dict) and isinstance(x.get("id"),str)
-             and isinstance(x.get("name"),str) and x["name"].casefold().startswith(prefix)],
+             and owns_assistant(x,oid)],
             "linked":agent_config(oid).get("provider_agent_id")}
 
 class LinkAssistant(BaseModel):
@@ -265,8 +269,7 @@ def link_voice_assistant(oid:str,body:LinkAssistant,user=Depends(current_user)):
     assistant=vapi("GET","/assistant/"+body.assistant_id)
     if not isinstance(assistant,dict) or assistant.get("id")!=body.assistant_id:
         raise HTTPException(404,"Vapi assistant not found")
-    prefix=(org_or_404(oid)["name"]+" - CallPilot").casefold()
-    if not str(assistant.get("name") or "").casefold().startswith(prefix):
+    if not owns_assistant(assistant,oid):
         raise HTTPException(403,"Assistant does not belong to this business")
     other=api("agent_configs",params={"provider_agent_id":"eq."+body.assistant_id,
         "select":"organization_id","limit":10})
@@ -280,13 +283,9 @@ def sync_org_calls(oid:str,limit:int=50):
     config=agent_config(oid)
     assistant=config.get("provider_agent_id")
     if not assistant:
-        # Safely auto-discover only one explicitly named CallPilot assistant for this workspace.
-        business=org_or_404(oid)
+        # Auto-discover only one assistant that CallPilot itself tagged for this workspace.
         available=vapi("GET","/assistant",params={"limit":100})
-        prefix=(business["name"]+" - CallPilot").casefold()
-        matches=[x for x in available if isinstance(x,dict)
-                 and isinstance(x.get("name"),str)
-                 and x["name"].casefold().startswith(prefix)]
+        matches=[x for x in available if isinstance(x,dict) and owns_assistant(x,oid)]
         if len(matches)==1:
             proposed=matches[0]["id"]
             others=api("agent_configs",params={"provider_agent_id":"eq."+proposed,
@@ -475,17 +474,18 @@ def apply_call_duration_policy(oid:str):
     if not isinstance(prior,list):
         prior=[]
     existing=[hook for hook in prior if not (
-        isinstance(hook,dict) and hook.get("name")=="callpilot-four-minute-wrapup")]
-    hook={"name":"callpilot-four-minute-wrapup",
-          "on":"call.timeElapsed",
-          "options":{"seconds":215},
-          "do":[{"type":"say","exact":"We're almost at the end of this call. Is there one last thing I can help with?"}]}
-    target=existing+[hook]
-    if assistant.get("maxDurationSeconds")==240 and prior==target:
-        return {"configured":True,"changed":False,"max_duration_seconds":240}
+        isinstance(hook,dict) and hook.get("name")==WRAPUP_HOOK_NAME)]
+    target=existing+[wrapup_hook()]
+    meta=assistant.get("metadata") if isinstance(assistant.get("metadata"),dict) else {}
+    if meta.get("callpilot_org") not in (None,oid):
+        raise HTTPException(409,"Assistant is tagged to another workspace")
+    tagged=dict(meta,callpilot_org=oid)
+    if (assistant.get("maxDurationSeconds")==MAX_CALL_SECONDS and prior==target
+            and meta.get("callpilot_org")==oid):
+        return {"configured":True,"changed":False,"max_duration_seconds":MAX_CALL_SECONDS}
     vapi("PATCH","/assistant/"+aid,
-         body={"maxDurationSeconds":240,"hooks":target})
+         body={"maxDurationSeconds":MAX_CALL_SECONDS,"hooks":target,"metadata":tagged})
     verified=vapi("GET","/assistant/"+aid)
     if verified.get("maxDurationSeconds")!=240:
         raise HTTPException(502,"Vapi did not confirm the 4-minute call limit")
-    return {"configured":True,"changed":True,"max_duration_seconds":240}
+    return {"configured":True,"changed":True,"max_duration_seconds":MAX_CALL_SECONDS}

@@ -85,8 +85,14 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
     calls=msg.get("toolCallList",[])
     if not isinstance(calls,list) or len(calls)>5:
         raise HTTPException(400,"Invalid tool call list")
-    # Fail closed on unknown workspaces.
+    # Fail closed on unknown workspaces and on calls handled by another workspace's assistant.
     org_or_404(organization_id)
+    claimed=(msg.get("call") or {}).get("assistantId") if isinstance(msg.get("call"),dict) else None
+    if claimed is not None:
+        rows=api("agent_configs",params={"organization_id":"eq."+organization_id,
+            "select":"provider_agent_id","limit":1})
+        if not rows or rows[0].get("provider_agent_id")!=claimed:
+            raise HTTPException(403,"Assistant does not belong to this workspace")
     from app.semantic import retrieve
     from app.cloud import PRICE, MONEY, NO_PRICE, UNKNOWN
     results=[]

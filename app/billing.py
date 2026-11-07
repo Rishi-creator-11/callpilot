@@ -6,6 +6,7 @@ import httpx
 from fastapi import APIRouter,Depends,HTTPException,Request
 from app.account import current_user,membership
 from app.cloud import api
+from app.common import public_base
 
 router=APIRouter(tags=["billing"])
 PLANS={"starter":{"name":"Starter","monthly_cents":4900,"included_minutes":100},
@@ -106,7 +107,7 @@ def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
                   "stripe_mode":billing_mode()},
             prefer="resolution=merge-duplicates,return=minimal")
     plan=PLANS[selection.plan]
-    base=os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")
+    base=public_base()
     data={
         "mode":"subscription","customer":customer,
         "line_items[0][quantity]":"1",
@@ -136,7 +137,14 @@ def checkout(oid:str,selection:CheckoutSelection,user=Depends(current_user)):
             "line_items[1][price_data][product_data][name]":"One-time professional AI receptionist setup",
             "line_items[1][quantity]":"1",
             "metadata[setup_applied]":"true"})
+    # Only one checkout may be open per workspace, so the one-time setup fee can never be paid twice.
+    previous=(a or {}).get("pending_checkout_session_id")
+    if previous:
+        try:stripe_call("checkout/sessions/"+previous+"/expire")
+        except HTTPException:pass
     session=stripe_call("checkout/sessions",data=data)
+    api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},
+        data={"pending_checkout_session_id":session.get("id")},prefer="return=minimal")
     return {"url":session["url"],"mode":"sandbox" if billing_mode()=="test" else "live","plan":selection.plan}
 
 @router.post("/api/account/organizations/{oid}/billing-portal")
@@ -148,7 +156,7 @@ def billing_portal(oid:str,user=Depends(current_user)):
         raise HTTPException(503,"The configured billing environment does not match this account")
     session=stripe_call("billing_portal/sessions",data={
         "customer":a["stripe_customer_id"],
-        "return_url":"https://callpilot-internal.onrender.com/app"})
+        "return_url":public_base()+"/app"})
     return {"url":session["url"]}
 
 def check_signature(payload:bytes,header:str,secret:str)->bool:
@@ -173,12 +181,25 @@ async def stripe_webhook(request:Request):
     event=json.loads(body)
     eid=event.get("id","")
     if not isinstance(eid,str) or not eid.startswith("evt_"):raise HTTPException(400,"Invalid event")
-    exists=api("stripe_webhook_events",params={"id":"eq."+eid,"select":"id"})
-    if exists:return {"received":True,"duplicate":True}
     e_type=event.get("type","")
     if event.get("livemode") != (billing_mode()=="live"):
         raise HTTPException(400,"Wrong Stripe payment environment")
     obj=event.get("data",{}).get("object",{})
+    # Atomically claim the event id so concurrent or repeated deliveries are processed once.
+    claimed=api("stripe_webhook_events","POST",params={"on_conflict":"id"},
+        data={"id":eid,"event_type":e_type},
+        prefer="resolution=ignore-duplicates,return=representation")
+    if not claimed:return {"received":True,"duplicate":True}
+    try:
+        handle_stripe_event(e_type,obj)
+    except Exception:
+        # Release the claim so Stripe's retry can process the event again.
+        try:api("stripe_webhook_events","DELETE",params={"id":"eq."+eid},prefer="return=minimal")
+        except Exception:pass
+        raise
+    return {"received":True}
+
+def handle_stripe_event(e_type,obj):
     if e_type in ("checkout.session.completed","checkout.session.async_payment_succeeded") and obj.get("mode")=="subscription":
         oid=(obj.get("metadata") or {}).get("organization_id")
         customer=obj.get("customer")
@@ -186,12 +207,20 @@ async def stripe_webhook(request:Request):
             rows=api("billing_accounts",params={
                 "organization_id":"eq."+str(oid),
                 "stripe_customer_id":"eq."+str(customer),
-                "select":"organization_id,setup_paid_at"})
+                "select":"organization_id,setup_paid_at,setup_session_id,pending_checkout_session_id"})
             if rows:
                 patch={"last_checkout_session_id":obj.get("id"),
                        "selected_plan":(obj.get("metadata") or {}).get("plan")}
-                if (obj.get("metadata") or {}).get("setup_applied")=="true" and not rows[0].get("setup_paid_at"):
-                    patch["setup_paid_at"]=datetime.now(timezone.utc).isoformat()
+                if rows[0].get("pending_checkout_session_id")==obj.get("id"):
+                    patch["pending_checkout_session_id"]=None
+                if (obj.get("metadata") or {}).get("setup_applied")=="true":
+                    if not rows[0].get("setup_paid_at"):
+                        patch["setup_paid_at"]=datetime.now(timezone.utc).isoformat()
+                        patch["setup_session_id"]=obj.get("id")
+                    elif rows[0].get("setup_session_id")!=obj.get("id"):
+                        # A second setup fee was somehow paid. Never auto-refund; flag for the operator.
+                        patch["billing_review_note"]=("Duplicate $100 setup fee paid in checkout session "
+                            +str(obj.get("id"))+"; manual refund review required")
                 api("billing_accounts","PATCH",
                     params={"organization_id":"eq."+str(oid),"stripe_customer_id":"eq."+str(customer)},
                     data=patch,prefer="return=minimal")
@@ -220,7 +249,8 @@ async def stripe_webhook(request:Request):
                     prefer="return=minimal")
     if e_type in ("customer.subscription.created","customer.subscription.updated","customer.subscription.deleted"):
         customer=obj.get("customer")
-        subscriptions=api("billing_accounts",params={"stripe_customer_id":"eq."+str(customer),"select":"organization_id"})
+        subscriptions=api("billing_accounts",params={"stripe_customer_id":"eq."+str(customer),
+            "stripe_mode":"eq."+billing_mode(),"select":"organization_id"})
         if subscriptions:
             oid=subscriptions[0]["organization_id"]
             item=(obj.get("items",{}).get("data") or [{}])[0]
@@ -228,6 +258,7 @@ async def stripe_webhook(request:Request):
             info={"stripe_subscription_id":obj.get("id"),
                 "status":obj.get("status","unknown"),
                 "price_id":p.get("id"),
+                "cancel_at_period_end":bool(obj.get("cancel_at_period_end")),
                 "updated_at":datetime.now(timezone.utc).isoformat()}
             plan=(obj.get("metadata") or {}).get("plan")
             # Stripe's customer portal can change the price without changing metadata.
@@ -244,5 +275,3 @@ async def stripe_webhook(request:Request):
                 if isinstance(epoch,(int,float)) and epoch>0:
                     info[field]=datetime.fromtimestamp(epoch,timezone.utc).isoformat()
             api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},data=info,prefer="return=minimal")
-    api("stripe_webhook_events","POST",data={"id":eid,"event_type":e_type},prefer="return=minimal")
-    return {"received":True}

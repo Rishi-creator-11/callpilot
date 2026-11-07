@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from app.common import authorize, PRICE, MONEY, NO_PRICE, UNKNOWN
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
@@ -38,11 +39,6 @@ with connect() as db:
       requested_time TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'requested');
     """)
 
-def authorize(x_admin_token: str | None = Header(default=None)):
-    expected = os.getenv("ADMIN_TOKEN", "")
-    if not expected or not x_admin_token or not hmac.compare_digest(expected, x_admin_token):
-        raise HTTPException(401, "Admin token required")
-
 def uid(): return str(uuid.uuid4())
 def ts(): return datetime.now(timezone.utc).isoformat()
 def business_or_404(db, business_id):
@@ -74,11 +70,6 @@ class BookingInput(BaseModel):
     phone: str = Field(min_length=3, max_length=100)
     service: str = Field(min_length=1, max_length=200)
     requested_time: str = Field(min_length=4, max_length=100)
-
-PRICE = re.compile(r"\b(price|prices|pricing|cost|costs|fee|fees|quote|estimate|charge|charges|rate|rates|discount|how much|ballpark|dollars?|usd)\b|\$", re.I)
-MONEY = re.compile(r"\$\s*\d|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|bucks)\b", re.I)
-NO_PRICE = "I can't quote prices or estimates. I can arrange for a team member to follow up."
-UNKNOWN = "I don't have verified information about that. I can ask a team member to follow up."
 
 @app.get("/health")
 def health(): return {"status":"ok","mode":"internal-demo"}
@@ -327,6 +318,10 @@ app.include_router(billing_router)
 @app.get('/app',response_class=HTMLResponse)
 def customer_app():
     return (ROOT/'static'/'customer.html').read_text()
+
+@app.get('/legal',response_class=HTMLResponse)
+def legal_page():
+    return (ROOT/'static'/'legal.html').read_text()
 
 @app.get('/operator',response_class=HTMLResponse)
 def operator_app():
