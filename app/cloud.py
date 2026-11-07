@@ -169,6 +169,20 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
         if booking_enabled else
         "You cannot directly book an appointment for this business yet. Do not claim one is booked. "
     )
+    catalog_policy=(
+        "Use lookup_catalog_item for SKU, recorded quantity and product questions. "
+        "Only describe owner-approved catalog records; no supplier feed is connected. "
+        if flags.get("voice_catalog_enabled") else
+        "Do not claim to check real-time stock because catalog lookup is not enabled. "
+    )
+    order_policy=(
+        "For customer orders, you may submit a REQUEST for staff approval, not a completed purchase. "
+        "Ask for product SKU, quantity, name and contact, read the details back and ask explicitly "
+        "for consent to submit. Only then call submit_order_request with confirmed true. "
+        "Do not claim payment, shipment, stock reservation or an accepted order. "
+        if flags.get("voice_order_requests_enabled") else
+        "Do not claim to place, accept or charge for orders. "
+    )
     return (
         f"You are {agent_name}, the helpful AI receptionist for {business_name}. "
         "Introduce yourself as AI once, then speak naturally. "
@@ -189,7 +203,7 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
         "do not repeatedly ask for the same details. If interrupted, address the "
         "interruption instead of restarting. Avoid repetitive introductions, filler, "
         "loops, or unwarranted requests for contact information. "
-        + price_policy + lead_policy + booking_policy +
+        + price_policy + lead_policy + booking_policy + catalog_policy + order_policy +
         "If information is unavailable, explain briefly and offer a next step. "
         "Do not promise a callback, booking, order, or transfer that a tool has not confirmed. "
         "Ask once whether there is anything else when the caller is finished. "
@@ -204,7 +218,7 @@ def provision_test_agent(oid:str):
     key=os.getenv("VAPI_API_KEY","")
     if not key:raise HTTPException(503,"Set private VAPI_API_KEY on server")
     agents=api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"agent_name,greeting,voice_provider,voice_id,voice_consent_verified_at,provider_agent_id,voice_leads_enabled,voice_booking_enabled"})
+        "select":"agent_name,greeting,voice_provider,voice_id,voice_consent_verified_at,provider_agent_id,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled"})
     if not agents:raise HTTPException(409,"Missing business agent configuration")
     a=agents[0]
     if a.get("provider_agent_id"):
