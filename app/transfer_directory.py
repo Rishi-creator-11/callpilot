@@ -75,22 +75,32 @@ def get_directory(oid: UUID, user=Depends(current_user)):
     return {"destinations": rows[0]["transfer_directory"] if rows else [], "can_manage": True}
 
 
+def validate_destinations(workspace: str, items: list[Destination]) -> list[dict]:
+    """Shared by every path that writes a transfer directory."""
+    if len({item.label.casefold() for item in items}) != len(items):
+        raise HTTPException(422, "Use a different label for each transfer destination.")
+    numbers = {item.number for item in items}
+    if len(numbers) != len(items):
+        raise HTTPException(422, "List each number only once.")
+    if any(number.startswith("+1900") or (number.startswith("+1") and number[5:8] == "976") for number in numbers):
+        raise HTTPException(422, "Premium-rate numbers cannot be used for transfers.")
+    destinations = [item.model_dump() for item in items]
+    reject_loops(workspace, destinations)
+    return destinations
+
+
+def persist_directory(workspace: str, previous: list[Destination], destinations: list[dict]) -> None:
+    if rpc("save_workspace_transfer_directory", {
+        "p_workspace": workspace, "p_previous": [item.model_dump() for item in previous],
+        "p_directory": destinations,
+    }) is not True:
+        raise HTTPException(409, "The saved directory changed. Refresh and review it again.")
+
+
 @router.put("")
 def save_directory(oid: UUID, body: DirectoryEdit, user=Depends(current_user)):
     workspace = str(oid)
     membership(workspace, user, MANAGERS)
-    if len({item.label.casefold() for item in body.destinations}) != len(body.destinations):
-        raise HTTPException(422, "Use a different label for each transfer destination.")
-    numbers = {item.number for item in body.destinations}
-    if len(numbers) != len(body.destinations):
-        raise HTTPException(422, "List each number only once.")
-    if any(number.startswith("+1900") or (number.startswith("+1") and number[5:8] == "976") for number in numbers):
-        raise HTTPException(422, "Premium-rate numbers cannot be used for transfers.")
-    destinations = [item.model_dump() for item in body.destinations]
-    reject_loops(workspace, destinations)
-    if rpc("save_workspace_transfer_directory", {
-        "p_workspace": workspace, "p_previous": [item.model_dump() for item in body.previous],
-        "p_directory": destinations,
-    }) is not True:
-        raise HTTPException(409, "The saved directory changed. Refresh and review it again.")
+    destinations = validate_destinations(workspace, body.destinations)
+    persist_directory(workspace, body.previous, destinations)
     return {"destinations": destinations}

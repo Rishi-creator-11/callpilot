@@ -92,14 +92,27 @@ def test_provision_failure_and_sync_failure_are_reported_not_hidden(make):
     assert result["synced"] is False and any(n["key"] == "sync" for n in result["needs"])
 
 
-def test_transfer_number_is_saved_once_or_requested(make, monkeypatch):
+def test_transfer_number_uses_the_shared_validation_and_atomic_save(make, monkeypatch):
     env = make()
+    saved = []
     monkeypatch.setattr("app.transfer_directory.reject_loops", lambda w, d: None)
+    monkeypatch.setattr("app.transfer_directory.rpc", lambda name, payload: saved.append((name, payload)) or True)
     client.post(URL, json={"goals": ["transfer"], "transfer_number": "+12125550100", "transfer_label": "Front desk"})
-    assert env.patched[0]["transfer_directory"][0]["number"] == "+12125550100"
+    assert saved[0][0] == "save_workspace_transfer_directory" and saved[0][1]["p_previous"] == []
+    assert saved[0][1]["p_directory"][0]["number"] == "+12125550100" and "transfer_directory" not in env.patched[0]
     env = make()
     result = client.post(URL, json={"goals": ["transfer"]}).json()
     assert any(n["key"] == "transfer" for n in result["needs"]) and "transfer_directory" not in env.patched[0]
+
+
+@pytest.mark.parametrize("number", ["+19005550100", "+12129765550"])
+def test_premium_rate_transfer_numbers_are_refused_like_the_channels_page(make, monkeypatch, number):
+    env = make()
+    saved = []
+    monkeypatch.setattr("app.transfer_directory.reject_loops", lambda w, d: None)
+    monkeypatch.setattr("app.transfer_directory.rpc", lambda name, payload: saved.append(payload) or True)
+    response = client.post(URL, json={"goals": ["transfer"], "transfer_number": number})
+    assert response.status_code == 422 and saved == []
 
 
 def test_invalid_input_is_rejected(make):

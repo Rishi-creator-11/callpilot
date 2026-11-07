@@ -131,12 +131,12 @@ def build(oid: UUID, body: QuickSetup, user=Depends(current_user)):
     updates = dict(plan["flags"])
     if "transfer" in body.goals:
         if body.transfer_number and not config.get("transfer_directory"):
-            from app.transfer_directory import reject_loops
-            destination = {"label": (body.transfer_label or "Front desk").strip() or "Front desk",
-                           "number": body.transfer_number, "when": "The caller asks for a person or the issue is urgent.",
-                           "enabled": True}
-            reject_loops(workspace, [destination])
-            updates["transfer_directory"] = [destination]
+            # Same validation and atomic save as the Channels transfer directory (premium-rate and loop checks).
+            from app.transfer_directory import Destination, persist_directory, validate_destinations
+            destination = Destination(label=(body.transfer_label or "Front desk").strip() or "Front desk",
+                                      number=body.transfer_number,
+                                      when="The caller asks for a person or the issue is urgent.")
+            persist_directory(workspace, [], validate_destinations(workspace, [destination]))
         elif not body.transfer_number and not config.get("transfer_directory"):
             needs.append({"key": "transfer", "text": "Add a phone number to connect callers to a person.", "page": "channels"})
     api("agent_configs", "PATCH", params={"organization_id": "eq." + workspace}, data=updates, prefer="return=minimal")
