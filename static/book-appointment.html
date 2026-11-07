@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Book an appointment | CallPilot</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f7f4;color:#152e26;font:16px/1.5 system-ui,sans-serif}
+main{width:min(640px,calc(100% - 36px));margin:clamp(24px,8vw,84px) auto}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#1a513f;text-decoration:none;font-weight:800}
+.brand span{display:grid;place-items:center;width:32px;height:32px;background:#bcf1df;border-radius:9px}
+article{margin-top:20px;padding:clamp(22px,5vw,42px);background:white;border:1px solid #d4e3da;border-radius:18px;box-shadow:0 15px 38px #14372b12}
+h1{font-size:clamp(2rem,6vw,3rem);line-height:1.1;margin:12px 0}.muted{color:#476055}p{margin:12px 0}
+label{display:block;font-weight:650;margin:16px 0 5px}input{display:block;width:100%;min-height:45px;padding:10px;border:1px solid #9cb1a6;border-radius:7px;color:inherit;font:inherit}
+.consent{display:flex;align-items:start;gap:9px;font-weight:500}.consent input{width:auto;min-height:0;margin-top:6px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}button{border:1px solid transparent;min-height:44px;padding:8px 15px;border-radius:8px;background:#195744;color:white;font:inherit;font-weight:700;cursor:pointer}
+button.secondary{background:#e6f2eb;color:#225344;border-color:#d5e7dc}button:disabled{opacity:.6;cursor:wait}
+:focus-visible{outline:3px solid #247c60;outline-offset:3px}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<a href="/" class="brand"><span aria-hidden="true">✦</span>CallPilot</a>
+<article>
+ <h1 id="business">Book an appointment</h1>
+ <p id="summary" class="muted"></p>
+ <p id="status" role="status">Opening appointment link…</p>
+ <form id="booking" hidden>
+  <label for="start">Your preferred date and time</label><input id="start" type="datetime-local" required>
+  <p class="muted" id="time-zone"></p>
+  <button id="check" type="button" class="secondary">Check availability</button>
+  <label for="name">Your name</label><input id="name" autocomplete="name" minlength="2" maxlength="100" required>
+  <label for="contact">Email or callback number</label><input id="contact" minlength="3" maxlength="100" required>
+  <label class="consent"><input id="consent" type="checkbox" required> I want to book this time and share my contact details with the business for this appointment.</label>
+  <div class="actions"><button id="submit" type="submit">Book appointment</button></div>
+ </form>
+</article>
+</main>
+<script>
+const $=id=>document.getElementById(id),token=location.hash.slice(1),root="/api/public/booking-link";
+const form=$("booking"),status=$("status"),check=$("check"),submit=$("submit");
+async function call(path="",body){
+ const res=await fetch(root+path,{method:body?"POST":"GET",cache:"no-store",
+  headers:{Authorization:"Bearer "+token,...(body?{"Content-Type":"application/json"}:{})},
+  body:body?JSON.stringify(body):undefined});
+ const data=await res.json();
+ if(!res.ok)throw Error(typeof data.detail==="string"?data.detail:"Unable to load the appointment.");
+ return data;
+}
+function selectedStart(){
+ const date=new Date($("start").value);
+ if(Number.isNaN(date.getTime()))throw Error("Choose a date and time.");
+ return date.toISOString();
+}
+function booked(data){
+ form.hidden=true;
+ const time=data.start?new Date(data.start).toLocaleString():"";
+ status.textContent=data.appointment_status==="cancelled"?"This appointment was cancelled. Contact the business for a new time.":
+  "Your appointment is confirmed"+(time?" for "+time:"")+". Contact the business if you need to change it.";
+}
+async function initialize(){
+ if(!/^[a-f0-9]{32}\.[a-f0-9]{64}$/.test(token)){
+  status.textContent="This appointment link is incomplete. Ask the business for the full link.";return;
+ }
+ try{
+  const data=await call();
+  $("business").textContent=data.business;
+  $("summary").textContent=data.service+" · "+data.duration_minutes+" minutes";
+  $("time-zone").textContent="Your device time zone: "+Intl.DateTimeFormat().resolvedOptions().timeZone+
+   (data.timezone?" · Business time zone: "+data.timezone:"");
+  if(data.status==="booked"){booked(data);return}
+  status.textContent=data.status==="pending"?"An earlier request is pending. Enter the same details to check its status.":"Choose a time and check availability.";
+  check.hidden=data.status==="pending";form.hidden=false;
+ }catch(e){status.textContent=e.message}
+}
+check.addEventListener("click",async()=>{
+ check.disabled=submit.disabled=true;
+ try{
+  status.textContent="Checking availability…";
+  const result=await call("/check",{start:selectedStart()});
+  status.textContent=result.message;
+ }catch(e){status.textContent=e.message}
+ finally{check.disabled=submit.disabled=false}
+});
+form.addEventListener("submit",async event=>{
+ event.preventDefault();submit.disabled=check.disabled=true;
+ try{
+  status.textContent="Requesting your appointment…";
+  const result=await call("/book",{start:selectedStart(),name:$("name").value,contact:$("contact").value,confirm:$("consent").checked});
+  if(!result.start){await initialize();return}
+  booked(result);
+ }catch(e){status.textContent=e.message}
+ finally{submit.disabled=check.disabled=false}
+});
+void initialize();
+</script>
+</body>
+</html>

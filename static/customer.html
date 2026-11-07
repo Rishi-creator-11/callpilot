@@ -1295,6 +1295,21 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  <p id="rescheduleStatus" role="status" class="muted"></p>
 </form>
 <p id="calendarResult" role="status" class="muted"></p>
+<details id="bookingLinksPanel" class="cp-section-box" hidden>
+ <summary>Customer booking links</summary>
+ <p>Give a customer seven days to reserve one appointment on your calendar. Share the link only with the intended recipient.</p>
+ <form id="bookingLinkForm">
+  <div class="cp-form-grid">
+   <div><label for="bookingLinkService">Service</label><input id="bookingLinkService" minlength="2" maxlength="150" placeholder="Consultation" required></div>
+   <div><label for="bookingLinkDuration">Duration in minutes</label><input id="bookingLinkDuration" type="number" min="15" max="120" value="30" required></div>
+  </div>
+  <label class="cp-studio-check"><input id="bookingLinkConsent" type="checkbox" required> The recipient may book this service directly.</label>
+  <div class="cp-inline-actions"><button type="submit">Create link</button>
+   <button id="bookingLinkRefresh" class="secondary" type="button">Refresh links</button></div>
+ </form>
+ <p id="bookingLinkStatus" role="status" class="muted"></p>
+ <div id="bookingLinkList" aria-live="polite"></div>
+</details>
 <div class="cp-section-box"><div class="cp-panel-heading"><div><h3>Booking history</h3><p>See bookings made by your receptionist and your team.</p></div>
 <div><label for="bookingFilter">Status</label><select id="bookingFilter"><option value="">All appointments</option><option value="confirmed">Confirmed</option><option value="requested">Requested</option><option value="cancelled">Cancelled</option><option value="rejected">Rejected</option></select></div></div>
 <div id="bookings" aria-live="polite">Loading appointments…</div></div></section>
@@ -1900,6 +1915,8 @@ window.loadWorkspace=async({destination}={})=>{
     $("studioOrderList").textContent="Loading order requests…";
     $("studioTestResult").textContent="Ask a question to check the approved knowledge for this workspace.";
     calendarCanManage=false;appointmentRows=[];appointmentRequestId=null;
+    $("bookingLinksPanel").hidden=true;$("bookingLinksPanel").open=false;
+    $("bookingLinkForm").reset();$("bookingLinkList").replaceChildren();$("bookingLinkStatus").textContent="";
     $("appointmentForm").reset();
     $("appointmentForm").hidden=true;
     closeReschedule();
@@ -2683,6 +2700,9 @@ async function loadCalendar(){
  const c=await request("/organizations/"+oid+"/calendar");
  if(oid!==organization())return;
  calendarCanManage=c.connected&&c.can_manage;
+ $("bookingLinksPanel").hidden=!c.can_manage;
+ $("bookingLinkForm").hidden=!calendarCanManage;
+ if(c.can_manage)void loadBookingLinks(oid);
  $("openBookingForm").hidden=!calendarCanManage;
  $("connectAppointmentCalendar").hidden=!c.configured||!c.can_manage||c.connected;
  $("disconnectAppointmentCalendar").hidden=!calendarCanManage;
@@ -3444,6 +3464,67 @@ async function loadBuilderHistory(){
   }
  }catch(e){if(oid===organization())list.textContent=e.message}
 }
+const bookingLinksPath=oid=>"/organizations/"+oid+"/calendar/booking-links";
+async function loadBookingLinks(oid){
+ const list=$("bookingLinkList");
+ list.textContent="Loading booking links…";
+ try{
+  const rows=await request(bookingLinksPath(oid));
+  if(oid!==organization())return;
+  list.replaceChildren();
+  if(!rows.length){list.textContent="No customer links yet.";return}
+  for(const row of rows){
+   const item=document.createElement("article"),title=document.createElement("strong"),details=document.createElement("p");
+   item.className="item";
+   title.textContent=row.service;
+   const labels={open:"Ready to share",pending:"Booking in progress",booked:"Used",revoked:"Revoked",expired:"Expired"};
+   details.textContent=row.duration_minutes+" minutes · "+(labels[row.status]||row.status)+
+    " · Expires "+new Date(row.expires_at).toLocaleDateString();details.className="muted";
+   item.append(title,details);
+   if(row.url){
+    const url=document.createElement("input"),controls=document.createElement("div"),copy=document.createElement("button");
+    controls.className="cp-inline-actions";url.readOnly=true;url.value=row.url;
+    url.setAttribute("aria-label",row.service+" booking link");
+    copy.type="button";copy.className="secondary";copy.textContent="Copy link";
+    copy.addEventListener("click",async()=>{
+     try{await navigator.clipboard.writeText(url.value);copy.textContent="Copied"}
+     catch{url.focus();url.select();copy.textContent="Select and copy"}
+    });
+    controls.append(copy);
+    if(row.status==="open"){
+     const revoke=document.createElement("button");revoke.type="button";revoke.className="secondary";revoke.textContent="Revoke";
+     revoke.addEventListener("click",async()=>{
+      if(oid!==organization()||!window.confirm("Revoke this unused booking link?"))return;
+      revoke.disabled=true;
+      try{
+       await request(bookingLinksPath(oid)+"/"+encodeURIComponent(row.id),"DELETE");
+       if(oid===organization())await loadBookingLinks(oid);
+      }catch(e){if(oid===organization())$("bookingLinkStatus").textContent=e.message}
+      finally{revoke.disabled=false}
+     });
+     controls.append(revoke);
+    }
+    item.append(url,controls);
+   }
+   list.append(item);
+  }
+ }catch(e){if(oid===organization())list.textContent=e.message}
+}
+$("bookingLinkRefresh").addEventListener("click",()=>loadBookingLinks(organization()));
+$("bookingLinkForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,form=event.currentTarget;
+ if(!calendarCanManage||button.disabled)return;
+ button.disabled=true;$("bookingLinkStatus").textContent="Creating a booking link…";
+ try{
+  await request(bookingLinksPath(oid),"POST",{service:v("bookingLinkService").trim(),
+   duration_minutes:Number(v("bookingLinkDuration")),confirm:$("bookingLinkConsent").checked});
+  if(oid!==organization())return;
+  form.reset();$("bookingLinkStatus").textContent="Booking link ready to share.";
+  await loadBookingLinks(oid);
+ }catch(e){if(oid===organization())$("bookingLinkStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
 let calendarCanManage=false,appointmentRows=[],appointmentRequestId=null;
 let moveAppointment=null,moveRequestId=null;
 function closeReschedule(){
