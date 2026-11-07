@@ -333,19 +333,22 @@ def set_verified_pricing(oid:str,body:PricingCapabilities,user=Depends(current_u
 class VoiceCapabilities(BaseModel):
     leads_enabled:bool=False
     booking_enabled:bool=False
+    catalog_enabled:bool=False
+    order_requests_enabled:bool=False
 
 @router.get("/organizations/{oid}/voice-capabilities")
 def voice_capabilities(oid:str,user=Depends(current_user)):
-    """Show the capabilities actually enabled for this business."""
+    """Only explicitly approved capabilities are exposed to the AI."""
     membership(oid,user)
     rows=api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,voice_leads_enabled,voice_booking_enabled","limit":1})
+        "select":"provider_agent_id,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled","limit":1})
     if not rows:raise HTTPException(404,"Assistant configuration not found")
     from app.calendar import connection
-    from app.voice_actions import feature_flags
     cfg=rows[0]
     return {"leads_enabled":bool(cfg.get("voice_leads_enabled")),
         "booking_enabled":bool(cfg.get("voice_booking_enabled")),
+        "catalog_enabled":bool(cfg.get("voice_catalog_enabled")),
+        "order_requests_enabled":bool(cfg.get("voice_order_requests_enabled")),
         "calendar_connected":bool(connection(oid)),
         "assistant_connected":bool(cfg.get("provider_agent_id")),
         "voice_booking_is_live":bool(cfg.get("voice_booking_enabled") and connection(oid)
@@ -353,12 +356,14 @@ def voice_capabilities(oid:str,user=Depends(current_user)):
 
 @router.put("/organizations/{oid}/voice-capabilities")
 def set_voice_capabilities(oid:str,body:VoiceCapabilities,user=Depends(current_user)):
-    """Explicit owner approval; synchronize and verify the managed Vapi assistant."""
+    """Owner approval, per-tenant ownership verification, provider synchronization."""
     membership(oid,user,("owner","admin"))
     from app.calendar import connection
     from app.call_intel import refresh_receptionist_prompt,owns_assistant,vapi
+    keys=("voice_leads_enabled","voice_booking_enabled",
+          "voice_catalog_enabled","voice_order_requests_enabled")
     rows=api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,voice_leads_enabled,voice_booking_enabled","limit":1})
+        "select":"provider_agent_id,"+",".join(keys),"limit":1})
     if not rows or not rows[0].get("provider_agent_id"):
         raise HTTPException(409,"Connect a managed Vapi assistant before enabling voice actions")
     aid=rows[0]["provider_agent_id"]
@@ -367,22 +372,29 @@ def set_voice_capabilities(oid:str,body:VoiceCapabilities,user=Depends(current_u
         raise HTTPException(409,"This assistant is not owned by the selected workspace")
     if body.booking_enabled and not connection(oid):
         raise HTTPException(409,"Connect your business Google Calendar before enabling voice booking")
+    if body.order_requests_enabled and not body.catalog_enabled:
+        raise HTTPException(422,"Enable approved catalog lookup before accepting order requests")
+    if body.order_requests_enabled:
+        approved=api("catalog_items",params={"organization_id":"eq."+oid,
+            "active":"eq.true","approved_at":"not.is.null","select":"id","limit":1})
+        if not approved:raise HTTPException(409,"Approve at least one product before enabling order requests")
     old=rows[0]
-    updates={"voice_leads_enabled":body.leads_enabled,"voice_booking_enabled":body.booking_enabled}
+    updates=dict(zip(keys,(body.leads_enabled,body.booking_enabled,
+                            body.catalog_enabled,body.order_requests_enabled)))
     api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
         data=updates,prefer="return=minimal")
     try:
         result=refresh_receptionist_prompt(oid)
-        if result.get("reason") in ("no_assistant","not_managed_assistant","missing_semantic_tool"):
-            raise HTTPException(502,"Could not synchronize the business voice assistant")
+        if result.get("reason") not in ("already_current","voice_policy_and_one_second_opening_synced"):
+            raise HTTPException(502,"Could not verify synchronization with your voice assistant")
     except Exception:
         api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
-            data={"voice_leads_enabled":old["voice_leads_enabled"],
-                  "voice_booking_enabled":old["voice_booking_enabled"]},
-            prefer="return=minimal")
+            data={key:old[key] for key in keys},prefer="return=minimal")
         raise
-    return {"saved":True,"provider_synced":True,**{
-        "leads_enabled":body.leads_enabled,"booking_enabled":body.booking_enabled}}
+    return {"saved":True,"provider_synced":True,"leads_enabled":body.leads_enabled,
+            "booking_enabled":body.booking_enabled,
+            "catalog_enabled":body.catalog_enabled,
+            "order_requests_enabled":body.order_requests_enabled}
 
 @router.get("/organizations/{oid}/bookings")
 def bookings(oid:str,user=Depends(current_user)):
