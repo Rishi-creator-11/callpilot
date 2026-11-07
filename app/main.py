@@ -335,20 +335,3 @@ app.include_router(calendar_router)
 
 from app.usage import router as usage_router
 app.include_router(usage_router)
-
-
-# Provision the internal CallPilot marketing demo once using the same
-# server-side business provisioning flow as ordinary customers. No number is
-# purchased or attached, and no outbound call is made.
-@app.on_event("startup")
-def provision_callpilot_demo_once():
-    import logging
-    log = logging.getLogger("uvicorn.error")
-    demo_org = "d4d04caa-e532-44e8-b692-0c821d912ef5"
-    try:
-        from app.cloud import provision_test_agent
-        result = provision_test_agent(demo_org)
-        log.info("callpilot_demo_provision assistant_available=%s created=%s phone_active=%s",
-                 bool(result.get("assistant_id")),result.get("created"),result.get("phone_active"))
-    except Exception as error:
-        log.warning("callpilot_demo_provision_failed error_type=%s",type(error).__name__)
