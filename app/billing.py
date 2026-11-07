@@ -12,7 +12,7 @@ router=APIRouter(tags=["billing"])
 PLANS={"starter":{"name":"Starter","monthly_cents":4900,"included_minutes":100},
        "growth":{"name":"Growth","monthly_cents":9900,"included_minutes":300},
        "business":{"name":"Business","monthly_cents":17900,"included_minutes":600}}
-SETUP_FEE_CENTS=10000
+SETUP_FEE_CENTS=2500
 
 def billing_mode():
     mode=os.getenv("STRIPE_MODE","test").lower()
@@ -270,7 +270,7 @@ def handle_stripe_event(e_type,obj):
                         patch["setup_session_id"]=obj.get("id")
                     elif rows[0].get("setup_session_id")!=obj.get("id"):
                         # A second setup fee was somehow paid. Never auto-refund; flag for the operator.
-                        patch["billing_review_note"]=("Duplicate $100 setup fee paid in checkout session "
+                        patch["billing_review_note"]=("Duplicate setup fee paid in checkout session "
                             +str(obj.get("id"))+"; manual refund review required")
                 api("billing_accounts","PATCH",
                     params={"organization_id":"eq."+str(oid),"stripe_customer_id":"eq."+str(customer)},
