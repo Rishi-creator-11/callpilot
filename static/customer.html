@@ -519,6 +519,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 <div class="cp-side-scroll">
 <div class="cp-nav-group">WORKSPACE</div>
 <button data-section="studio" onclick="window.section('studio')"><span class="cp-nav-icon">✦</span> Launch studio</button>
+<button data-section="builder" onclick="window.section('builder')"><span class="cp-nav-icon">✧</span> Agent builder</button>
 <button data-section="calls" class="cp-active" onclick="window.section('calls')"><span class="cp-nav-icon">▦</span> Calls &amp; leads</button>
 <button data-section="knowledge" onclick="window.section('knowledge')"><span class="cp-nav-icon">▤</span> Knowledge base</button>
 <button data-section="voice" onclick="window.section('voice')"><span class="cp-nav-icon">◉</span> AI receptionist</button>
@@ -607,6 +608,34 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
  </div>
 </section>
 
+<section id="builder" class="panel card" style="display:none">
+ <div class="cp-panel-heading"><div><h2>Agent builder</h2><p>Describe how your receptionist should sound and handle a conversation.</p></div></div>
+ <div class="cp-studio-grid">
+  <article class="cp-studio-step">
+   <h3>Tell us what to change</h3>
+   <ol id="builderConversation" aria-label="Builder conversation" aria-live="polite"></ol>
+   <form id="builderRequest">
+    <label for="builderPrompt">Message to the builder</label>
+    <textarea id="builderPrompt" minlength="5" maxlength="1200" required placeholder="Make the greeting shorter and ask one question at a time."></textarea>
+    <p class="muted">Draft requests use our AI provider. Leave out passwords and customer information.</p>
+    <button type="submit">Draft changes</button>
+   </form>
+  </article>
+  <article class="cp-studio-step"><h3>Review your configuration</h3>
+   <form id="builderSettings">
+    <label for="builderName">Receptionist name</label><input id="builderName" required maxlength="80">
+    <label for="builderGreeting">Opening greeting</label><textarea id="builderGreeting" required minlength="10" maxlength="500"></textarea>
+    <label for="builderInstructions">Conversation instructions</label><textarea id="builderInstructions" maxlength="2400" rows="5"></textarea>
+    <p class="muted">Save your edits to the workspace. The next sync applies them to the connected managed assistant.</p>
+    <div class="cp-inline-actions"><button type="submit">Save configuration</button><button id="builderSync" type="button" class="secondary" disabled>Sync live assistant</button></div>
+   </form>
+   <p id="builderStatus" role="status" class="muted"></p>
+   <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Manage approved knowledge →</button>
+   <button class="cp-studio-textbtn" onclick="window.section('simulator')">Open assistant practice →</button>
+  </article>
+ </div>
+</section>
+
 <div id="studio" class="panel card" style="display:none">
  <div class="cp-studio-hero">
   <span class="cp-studio-eyebrow">CALLPILOT / LAUNCH STUDIO</span>
@@ -614,6 +643,7 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
   <p>Teach your front desk, give it a voice, check its answers, and connect your tools. No code needed.</p>
   <div class="cp-studio-meter"><div id="studioProgressBar" style="width:0%"></div></div>
   <div class="cp-studio-progressline"><strong id="studioProgressText">Checking your setup…</strong><span id="studioProgressNote">Nothing goes live without your review.</span></div>
+  <button class="secondary" onclick="window.section('builder')">Open agent builder</button>
  </div>
  <div class="cp-studio-grid">
   <article class="cp-studio-step"><div class="cp-studio-step-head"><span class="cp-studio-num">01</span><div><h3>Know your business</h3><p>One private workspace per business.</p></div></div>
@@ -1132,6 +1162,7 @@ document.addEventListener("click",e=>{
 const pageMeta={
  onboarding:["Business setup","Create a workspace and get your receptionist ready to learn."],
  studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
+ builder:["Agent builder","Draft, review and sync your receptionist’s configuration."],
  calls:["Call intelligence","See every conversation and turn customer intent into next steps."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
  knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
@@ -1147,7 +1178,7 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   studio:()=>window.loadStudio(),builder:()=>loadBuilder(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
@@ -1446,6 +1477,7 @@ window.loadWorkspace=async({destination}={})=>{
     $("calendarResult").textContent="";
     $("bookings").textContent="Loading appointments…";
     clearHighLevel();
+    resetBuilder();
    }
    $("headerWorkspace").textContent=o?.name||"Your business";
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
@@ -2125,6 +2157,103 @@ $("highlevelLookup").addEventListener("submit",async event=>{
    "No exact match in this sub-account.";
  }catch(e){if(oid===organization())$("highlevelResult").textContent=e.message}
  finally{button.disabled=false}
+});
+const builderPath=oid=>"/organizations/"+oid+"/agent";
+let builderLoaded="",builderCanEdit=false,builderDirty=false;
+function resetBuilder(){
+ builderLoaded="";
+ builderCanEdit=builderDirty=false;
+ $("builderConversation").replaceChildren();
+ $("builderRequest").reset();
+ $("builderSettings").reset();
+ $("builderSync").disabled=true;
+ $("builderStatus").textContent="Loading receptionist configuration…";
+}
+function setBuilderFields(agent){
+ $("builderName").value=agent.agent_name||"";
+ $("builderGreeting").value=agent.greeting||"";
+ $("builderInstructions").value=agent.call_instructions||"";
+}
+function builderFields(){
+ return {agent_name:v("builderName").trim(),greeting:v("builderGreeting").trim(),
+  call_instructions:v("builderInstructions").trim()};
+}
+async function loadBuilder(){
+ const oid=organization();
+ if(builderLoaded===oid)return;
+ builderCanEdit=false;
+ $("builderRequest").hidden=true;
+ try{
+  const agent=await request(builderPath(oid));
+  if(oid!==organization())return;
+  setBuilderFields(agent);
+  builderLoaded=oid;
+  builderCanEdit=["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role);
+  $("builderRequest").hidden=!builderCanEdit;
+  for(const field of $("builderSettings").elements)field.disabled=!builderCanEdit;
+  $("builderStatus").textContent=builderCanEdit?"Your saved configuration is loaded.":"Only workspace owners and admins can edit this configuration.";
+ }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+}
+$("builderSettings").addEventListener("input",()=>{
+ builderDirty=true;
+ $("builderSync").disabled=true;
+});
+function addBuilderMessage(label,text){
+ const row=document.createElement("li"),heading=document.createElement("strong"),body=document.createElement("p");
+ heading.textContent=label;
+ body.textContent=text;
+ row.append(heading,body);
+ $("builderConversation").append(row);
+}
+$("builderRequest").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,prompt=v("builderPrompt").trim(),fields=builderFields();
+ if(!builderCanEdit||button.disabled)return;
+ button.disabled=true;
+ $("builderStatus").textContent="Drafting changes…";
+ try{
+  const proposal=await request(builderPath(oid)+"/draft","POST",{...fields,request:prompt});
+  if(oid!==organization())return;
+  if(JSON.stringify(fields)!==JSON.stringify(builderFields())){
+   $("builderStatus").textContent="Your edits changed during generation. Submit again to use the latest configuration.";
+   return;
+  }
+  addBuilderMessage("You",prompt);
+  addBuilderMessage("CallPilot",proposal.explanation);
+  setBuilderFields(proposal);
+  $("builderPrompt").value="";
+  builderDirty=true;
+  $("builderSync").disabled=true;
+  $("builderStatus").textContent="Draft ready. Review the fields and save if you want to use them.";
+ }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("builderSettings").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,fields=builderFields();
+ if(!builderCanEdit||button.disabled)return;
+ button.disabled=true;
+ try{
+  await request(builderPath(oid),"PUT",fields);
+  if(oid!==organization())return;
+  builderDirty=JSON.stringify(fields)!==JSON.stringify(builderFields());
+  $("builderSync").disabled=builderDirty;
+  $("studioAgentName").value=fields.agent_name;
+  $("studioGreeting").value=fields.greeting;
+  $("builderStatus").textContent=builderDirty?"Saved the previous version. Save again to include your latest edits.":"Configuration saved. Sync when you are ready to update the live assistant.";
+ }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
+$("builderSync").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget;
+ if(button.disabled||builderDirty||!window.confirm("Apply the saved configuration to the live assistant for this workspace?"))return;
+ button.disabled=true;
+ $("builderStatus").textContent="Syncing live assistant…";
+ try{
+  await request(builderPath(oid)+"/sync","POST");
+  if(oid===organization())$("builderStatus").textContent="The managed assistant is synced.";
+ }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+ finally{if(oid===organization())button.disabled=builderDirty}
 });
 let calendarCanManage=false,appointmentRows=[],appointmentRequestId=null;
 function appointmentSlot(){

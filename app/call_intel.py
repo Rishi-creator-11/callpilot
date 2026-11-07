@@ -431,7 +431,7 @@ def analyze_past_call(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
     if not rows:raise HTTPException(404,"Call not found")
     return request_call_analysis(oid,rows[0]["provider_call_id"])
 
-def refresh_receptionist_prompt(oid:str):
+def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     """Synchronize platform conversation policy to already-created managed assistants.
 
     Preserve the existing voice, tools, recording/analysis settings, and other
@@ -439,7 +439,7 @@ def refresh_receptionist_prompt(oid:str):
     """
     from app.cloud import org_or_404,api as cloud_api,receptionist_prompt
     cfg=cloud_api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,agent_name,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled","limit":1})
+        "select":"provider_agent_id,agent_name,greeting,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled","limit":1})
     if not cfg or not cfg[0].get("provider_agent_id"):
         return {"updated":False,"reason":"no_assistant"}
     aid=cfg[0]["provider_agent_id"]
@@ -489,7 +489,7 @@ def refresh_receptionist_prompt(oid:str):
     # Defer only the opening greeting, not ordinary conversational responses.
     # The scheduled hook uses the exact existing business-specific greeting.
     from app.common import opening_hook, OPENING_HOOK_NAME
-    greeting=assistant.get("firstMessage")
+    greeting=(cfg[0].get("greeting") if use_saved_greeting else assistant.get("firstMessage"))
     if not isinstance(greeting,str) or not greeting.strip():
         return {"updated":False,"reason":"missing_first_greeting"}
     prior_hooks=assistant.get("hooks") or []
@@ -499,6 +499,7 @@ def refresh_receptionist_prompt(oid:str):
         isinstance(h,dict) and h.get("name")==OPENING_HOOK_NAME)]
     next_hooks.insert(0,opening_hook(greeting))
     if (next_messages==messages and next_tools==existing_tools
+            and assistant.get("firstMessage")==greeting
             and assistant.get("endCallMessage")==goodbye
             and assistant.get("firstMessageMode")=="assistant-waits-for-user"
             and next_hooks==prior_hooks
@@ -508,6 +509,7 @@ def refresh_receptionist_prompt(oid:str):
     new_model=dict(model,messages=next_messages,tools=next_tools)
     vapi("PATCH","/assistant/"+aid,body={
         "model":new_model,"endCallMessage":goodbye,
+        "firstMessage":greeting,
         "firstMessageMode":"assistant-waits-for-user",
         "transcriber":transcriber,"voice":desired_voice,
         "hooks":next_hooks})
@@ -519,6 +521,7 @@ def refresh_receptionist_prompt(oid:str):
                 for m in saved if isinstance(m,dict))
         or not any(t.get("type")=="endCall" for t in saved_tools if isinstance(t,dict))
         or verified.get("endCallMessage")!=goodbye
+        or verified.get("firstMessage")!=greeting
         or verified.get("firstMessageMode")!="assistant-waits-for-user"
         or (verified.get("transcriber") or {}).get("language")!="multi"
         or (desired_voice.get("provider")=="vapi" and desired_voice.get("version")==2

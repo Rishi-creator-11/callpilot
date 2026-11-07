@@ -75,6 +75,7 @@ class Question(BaseModel):
 class AgentEdit(BaseModel):
     agent_name:str=Field(min_length=1,max_length=80)
     greeting:str=Field(min_length=10,max_length=500)
+    call_instructions:str|None=Field(default=None,max_length=2400)
 
 @router.get("/config")
 def config():
@@ -128,14 +129,15 @@ def rpc(name,payload):
 @router.get("/organizations/{oid}/agent")
 def get_agent(oid:str,user=Depends(current_user)):
     membership(oid,user)
-    a=api("agent_configs",params={"organization_id":"eq."+oid,"select":"agent_name,greeting,voice_provider,voice_id,voice_consent_verified_at"})
+    a=api("agent_configs",params={"organization_id":"eq."+oid,"select":"agent_name,greeting,call_instructions,voice_provider,voice_id,voice_consent_verified_at"})
     return a[0] if a else {}
 
 @router.put("/organizations/{oid}/agent")
 def update_agent(oid:str,body:AgentEdit,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
-    api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
-        data={"agent_name":body.agent_name,"greeting":body.greeting},prefer="return=minimal")
+    rows=api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
+        data=body.model_dump(exclude_none=True),prefer="return=representation")
+    if not rows:raise HTTPException(404,"No receptionist is configured for this workspace")
     return {"saved":True}
 
 @router.get("/organizations/{oid}/knowledge")

@@ -41,7 +41,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 | Done | Goodcall page, tab, or dialog | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
-| [ ] | `/agent/dashboard` and persistent Gabi composer | Observed | `/app#studio` covers manual setup. Conversational workspace and draft suggestions missing. |
+| [ ] | `/agent/dashboard` and persistent Gabi composer | Observed | `/app#builder` includes a text composer, suggested edits, review, save and managed assistant sync. Persistent builder, voice input and worker generation remain. |
 | [ ] | `/agent/performance`, date presets/custom range and empty results | Observed | `/app#calls` has summary metrics and dates. Separate reporting, custom metrics and populated chart verification remain. |
 | [ ] | `/agent/calls`, search and session list | Observed | `/app#calls` search and date controls verified. Goodcall populated session-detail screens remain uninspected in the empty reference account. |
 | [ ] | Session detail, transcript, recording, and tags | Documented, populated Goodcall detail pending | CallPilot detail panel exists. Verify playback, edits and error states. |

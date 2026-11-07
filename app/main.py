@@ -475,6 +475,9 @@ app.include_router(calendar_router)
 from app.highlevel import router as highlevel_router
 app.include_router(highlevel_router)
 
+from app.agent_builder import router as agent_builder_router
+app.include_router(agent_builder_router)
+
 from app.booking_hours import router as booking_hours_router
 app.include_router(booking_hours_router)
 
