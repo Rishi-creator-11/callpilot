@@ -16,14 +16,15 @@ from fastapi import HTTPException
 from app.cloud import api, public_base
 
 MANAGED_TOOLS = frozenset({
-    "capture_customer_lead", "check_appointment_availability", "book_appointment"
+    "capture_customer_lead", "check_appointment_availability", "book_appointment",
+    "lookup_catalog_item", "submit_order_request",
 })
 
 
 def feature_flags(oid: str) -> dict:
     rows = api("agent_configs", params={
         "organization_id": "eq." + oid,
-        "select": "provider_agent_id,voice_leads_enabled,voice_booking_enabled,allow_price_quotes",
+        "select": "provider_agent_id,voice_leads_enabled,voice_booking_enabled,allow_price_quotes,voice_catalog_enabled,voice_order_requests_enabled",
         "limit": 1,
     })
     return rows[0] if rows else {}
@@ -90,6 +91,33 @@ def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
                               "description": "True only after the caller explicitly agreed to the read-back."},
             },
             ["start", "duration_minutes", "caller_name", "caller_contact", "service", "confirmed"],
+            oid, credential,
+        ))
+    if flags.get("voice_catalog_enabled"):
+        tools.append(_definition(
+            "lookup_catalog_item",
+            "Read-only lookup of an owner-approved SKU or exact product name. "
+            "Never claim live upstream inventory if no quantity is configured. "
+            "Prices may be quoted only with the owner's separate pricing permission.",
+            {"item": s("Product SKU or exact product name stated by the caller.")},
+            ["item"], oid, credential,
+        ))
+    if flags.get("voice_order_requests_enabled"):
+        tools.append(_definition(
+            "submit_order_request",
+            "Save a pending order request for business staff review only. No payment "
+            "is taken, no stock is deducted, and no order is placed with a supplier. "
+            "Use only after reading back the exact product, quantity, contact and "
+            "getting explicit caller agreement to SUBMIT A REQUEST.",
+            {
+                "sku": s("Exact approved product SKU."),
+                "quantity": {"type":"integer","minimum":1,"maximum":100000},
+                "caller_name": s("Customer-stated name."),
+                "caller_contact": s("Customer-confirmed phone number or email."),
+                "confirmed": {"type":"boolean",
+                              "description":"True only when caller agreed to submit a pending request."},
+            },
+            ["sku","quantity","caller_name","caller_contact","confirmed"],
             oid, credential,
         ))
     return tools
@@ -303,6 +331,85 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
             + " for " + service + ". Caller contact: " + contact + ".")
 
 
+def _catalog_match(oid: str, item: str) -> dict | None:
+    items=api("catalog_items",params={
+        "organization_id":"eq."+oid,"active":"eq.true",
+        "select":"id,sku,name,description,unit_price_cents,stock_quantity",
+        "limit":200,
+    })
+    query=item.casefold().strip()
+    exact=[p for p in items if p["sku"].casefold()==query or p["name"].casefold()==query]
+    if len(exact)==1:return exact[0]
+    if len(exact)>1:raise ValueError("Multiple catalog items matched. Ask for the SKU.")
+    candidates=[p for p in items if query in p["name"].casefold() and len(query)>=4]
+    if len(candidates)==1:return candidates[0]
+    if candidates:raise ValueError("Several catalog items match. Ask for the SKU.")
+    return None
+
+
+def lookup_catalog_item(oid: str,message: dict,args: dict) -> str:
+    _call_context(oid,message)
+    flags=feature_flags(oid)
+    if not flags.get("voice_catalog_enabled"):
+        raise ValueError("The business has not enabled catalog lookup")
+    item=_text(args.get("item",""),maximum=160,minimum=2)
+    product=_catalog_match(oid,item)
+    if not product:
+        return "I cannot find that product in the business's approved catalog. Ask for a SKU or offer a staff follow-up."
+    stock=product.get("stock_quantity")
+    availability=("Stock on record: "+str(stock)+" units. " if stock is not None
+                  else "Live stock availability is not configured. ")
+    price=product.get("unit_price_cents")
+    pricing=(" Approved unit price: $"+format(price/100,".2f")+" USD. "
+             if flags.get("allow_price_quotes") and price is not None else
+             " Price must be confirmed by staff. ")
+    description=_text(product.get("description") or "",maximum=1200)[:250]
+    return ("SKU "+product["sku"]+": "+product["name"]+". "+description+". "
+            +availability+pricing+"Do not call this a confirmed order.")
+
+
+def submit_order_request(oid: str,message: dict,args: dict) -> str:
+    call_id,_=_call_context(oid,message)
+    flags=feature_flags(oid)
+    if not flags.get("voice_order_requests_enabled"):
+        raise ValueError("Pending order requests are not enabled")
+    if args.get("confirmed") is not True:
+        raise ValueError("Get caller agreement before submitting an order request")
+    sku=_text(args.get("sku",""),maximum=60,minimum=2).upper()
+    qty=args.get("quantity")
+    if not isinstance(qty,int) or isinstance(qty,bool) or not 1<=qty<=100000:
+        raise ValueError("Quantity must be a positive whole number")
+    name=_text(args.get("caller_name",""),maximum=100,minimum=2)
+    contact=_text(args.get("caller_contact",""),maximum=100,minimum=3)
+    if "@" in contact:
+        if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+",contact):
+            raise ValueError("Invalid contact email")
+    else:
+        _phone(contact)
+    product=_catalog_match(oid,sku)
+    if not product or product.get("sku")!=sku:
+        raise ValueError("Product SKU is not in the approved catalog")
+    stock=product.get("stock_quantity")
+    if stock is not None and qty>stock:
+        return "The requested quantity exceeds recorded stock. No order request was submitted. Offer human assistance."
+    key=hashlib.sha256((oid+"|"+call_id+"|"+sku+"|"+str(qty)+"|"+contact.casefold()).encode()).hexdigest()
+    existing=api("order_requests",params={"organization_id":"eq."+oid,
+        "idempotency_key":"eq."+key,"select":"id,status","limit":1})
+    if existing:
+        return "Pending order request already saved with reference "+existing[0]["id"]+". Staff must still approve it."
+    rows=api("order_requests","POST",params={"on_conflict":"organization_id,idempotency_key"},
+        data={"organization_id":oid,"provider_call_id":call_id,
+              "idempotency_key":key,"item_id":product["id"],"sku":sku,
+              "quantity":qty,"caller_name":name,"caller_contact":contact,"status":"requested"},
+        prefer="resolution=ignore-duplicates,return=representation")
+    if rows:
+        return "Pending order request "+str(rows[0]["id"])+" saved for "+qty.__str__()+" units of "+product["name"]+". No payment or final order was placed. Staff approval is required."
+    found=api("order_requests",params={"organization_id":"eq."+oid,
+        "idempotency_key":"eq."+key,"select":"id","limit":1})
+    if not found:raise ValueError("Could not verify the order request was recorded")
+    return "Pending order request "+str(found[0]["id"])+" already recorded. Staff approval is required."
+
+
 def execute_voice_action(oid: str, message: dict, name: str, args: dict) -> str:
     if not isinstance(args, dict):
         raise ValueError("Invalid action arguments")
@@ -310,6 +417,8 @@ def execute_voice_action(oid: str, message: dict, name: str, args: dict) -> str:
         "capture_customer_lead": capture_customer_lead,
         "check_appointment_availability": check_appointment_availability,
         "book_appointment": book_appointment,
+        "lookup_catalog_item": lookup_catalog_item,
+        "submit_order_request": submit_order_request,
     }
     if name not in handlers:
         raise ValueError("Unknown voice action")
