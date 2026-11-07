@@ -584,6 +584,15 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 .wk-chev{margin-left:auto;color:var(--cp-muted)}
 .wk-actions{display:flex;gap:10px}
 .wk-actions button{width:46px;height:46px;padding:0;font-size:20px;border-radius:14px}
+.su-dots{display:flex;gap:8px;justify-content:center;margin:4px 0 18px}
+.su-dots i{width:8px;height:8px;border-radius:50%;background:#d5dde0}
+.su-dots i.on{width:26px;border-radius:6px;background:#0b1831}
+.su-rules{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:3px;font-size:13px;color:#667085}
+.su-rules li::before{content:"○ ";color:#9aa7b4}
+.su-rules li.ok{color:#145a4a}
+.su-rules li.ok::before{content:"✓ ";color:#145a4a}
+.su-back{background:transparent;color:#344e65;box-shadow:none;padding:4px 0;font-weight:700}
+.su-note{font-size:12px;color:#667085;margin:10px 0 0}
 .id-card{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#fff;color:var(--cp-text);border:1px solid var(--cp-border);border-radius:16px;padding:16px 18px;margin:0 0 12px;box-shadow:none;cursor:pointer;font:inherit}
 .id-card:hover{border-color:#b9cbc3}
 .id-card small{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:11px;color:var(--cp-muted)}
@@ -623,6 +632,40 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 </div>
 <div class="card" id="authBox"><div class="cp-overline">WELCOME TO CALLPILOT</div>
 <h2 id="authTitle">Welcome back</h2><p id="authSubtitle" class="muted">Sign in to manage your business and conversations.</p>
+<div id="signupWizard" hidden>
+ <div class="su-dots" aria-hidden="true"><i id="suDot1" class="on"></i><i id="suDot2"></i><i id="suDot3"></i></div>
+ <form id="suStep1" novalidate>
+  <h3 style="margin:0 0 4px">Tell us about your business</h3>
+  <p class="muted">We use this to build your receptionist. You can change it later.</p>
+  <label for="suBusiness">Business name</label><input id="suBusiness" autocomplete="organization" minlength="2" maxlength="120" required placeholder="Northline Heating">
+  <label for="suIndustry">Industry <span class="muted">(optional)</span></label><input id="suIndustry" maxlength="80" placeholder="Home services">
+  <div class="row" style="margin-top:20px"><button type="submit" style="width:100%">Continue</button></div>
+ </form>
+ <form id="suStep2" novalidate hidden>
+  <button type="button" class="su-back" id="suBack2">← Back</button>
+  <h3 style="margin:0 0 4px">Let’s learn from your website</h3>
+  <p class="muted">We’ll read one public page as a draft you review before callers hear anything.</p>
+  <label for="suWebsite">Website address</label><input id="suWebsite" type="text" inputmode="url" maxlength="2048" placeholder="example.com">
+  <div class="row" style="margin-top:20px;display:grid;gap:10px"><button type="submit">Continue</button><button type="button" class="secondary" id="suNoWebsite">I don’t have a website</button></div>
+ </form>
+ <form id="suStep3" novalidate hidden>
+  <button type="button" class="su-back" id="suBack3">← Back</button>
+  <h3 style="margin:0 0 4px">Create your account</h3>
+  <p class="muted">Almost there. Create your account to save your receptionist.</p>
+  <div class="cp-form-grid"><div><label for="suFirst">First name</label><input id="suFirst" autocomplete="given-name" maxlength="60" required></div>
+  <div><label for="suLast">Last name</label><input id="suLast" autocomplete="family-name" maxlength="60" required></div></div>
+  <label for="suEmail">Work email</label><input id="suEmail" type="email" autocomplete="email" required placeholder="you@company.com">
+  <label for="suPassword">Password</label><input id="suPassword" type="password" autocomplete="new-password" minlength="8" required aria-describedby="suRules">
+  <ul class="su-rules" id="suRules"><li data-rule="len">At least 8 characters</li><li data-rule="upper">One uppercase letter</li><li data-rule="lower">One lowercase letter</li><li data-rule="num">One number</li></ul>
+  <label class="cp-studio-check" style="margin-top:14px"><input id="suMarketing" type="checkbox"> Send me product updates and tips from CallPilot</label>
+  <div class="row" style="margin-top:16px"><button id="suCreate" type="submit" style="width:100%">Create account</button></div>
+  <p id="suExists" role="alert" class="muted" hidden>An account with this email already exists. <button type="button" class="cp-top-link" onclick="window.authMode('signin')">Log in instead</button></p>
+  <div style="display:flex;align-items:center;gap:12px;margin:15px 0;color:#99a5b7;font-size:11px"><span style="height:1px;flex:1;background:#e9eaf1"></span>or<span style="height:1px;flex:1;background:#e9eaf1"></span></div>
+  <button id="suGoogle" class="secondary cp-google-signin" type="button"><span class="cp-google-mark" aria-hidden="true">G</span> Sign up with Google</button>
+  <p class="su-note">By creating an account you agree to the <a href="/legal" target="_blank" rel="noopener noreferrer">Terms of Service and Privacy Policy</a>.</p>
+ </form>
+ <p class="su-note" style="text-align:center">Already have an account? <button type="button" class="cp-top-link" onclick="window.authMode('signin')">Sign in</button></p>
+</div>
 <div id="authFields">
 <label for="email">Work email</label><input id="email" type="email" autocomplete="email" required placeholder="you@company.com">
 <div id="passwordRow"><label for="password">Password</label><input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="Enter your password"></div>
@@ -1483,6 +1526,10 @@ window.authMode=mode=>{
  const isSignUp=mode==="signup",isReset=mode==="reset";
  $("authTitle").textContent=isSignUp?"Create your CallPilot account":isReset?"Reset your password":"Welcome back";
  $("authSubtitle").textContent=isSignUp?"Create your secure workspace and start building your AI front desk.":isReset?"We'll email you a password reset link.":"Sign in to manage your business and conversations.";
+ $("signupWizard").hidden=!isSignUp;
+ $("authFields").style.display=isSignUp?"none":"";
+ $("authTitle").hidden=$("authSubtitle").hidden=isSignUp;
+ if(isSignUp)showSignupStep(signupStep||1);
  $("passwordRow").style.display=isReset?"none":"block";
  $("authSubmit").textContent=isSignUp?"Create account":isReset?"Send reset link":"Sign in";
  $("authSubmit").setAttribute("onclick",isSignUp?"window.authAction('signup')":isReset?"window.sendReset(false)":"window.authAction('signin')");
@@ -1494,6 +1541,124 @@ window.authMode=mode=>{
  $("authmsg").textContent="";
  $("password").setAttribute("autocomplete",isSignUp?"new-password":"current-password");
 };
+const DRAFT_KEY="callpilot.onboardingDraft";
+function readDraft(){
+ try{
+  const draft=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+  if(!draft||typeof draft.name!=="string"||Date.now()-draft.at>7*864e5){localStorage.removeItem(DRAFT_KEY);return null}
+  return draft;
+ }catch{return null}
+}
+function writeDraft(patch){
+ try{localStorage.setItem(DRAFT_KEY,JSON.stringify({name:"",industry:"",website:"",...(readDraft()||{}),...patch,at:Date.now()}))}catch{}
+}
+function clearDraft(){try{localStorage.removeItem(DRAFT_KEY)}catch{}}
+let signupStep=1;
+function showSignupStep(step){
+ signupStep=step;
+ for(const n of [1,2,3]){
+  $("suStep"+n).hidden=n!==step;
+  $("suDot"+n).className=n===step?"on":"";
+ }
+ const draft=readDraft();
+ if(draft){
+  if(!$("suBusiness").value)$("suBusiness").value=draft.name;
+  if(!$("suIndustry").value)$("suIndustry").value=draft.industry||"";
+  if(!$("suWebsite").value)$("suWebsite").value=draft.website||"";
+ }
+ $("authmsg").textContent="";
+ $("suExists").hidden=true;
+}
+function normalizeWebsite(raw){
+ const text=raw.trim();
+ if(!text)return "";
+ try{
+  const url=new URL(/^https?:\/\//i.test(text)?text:"https://"+text);
+  if(!url.hostname.includes(".")||!/^https?:$/.test(url.protocol))return null;
+  return url.href;
+ }catch{return null}
+}
+$("suStep1").addEventListener("submit",event=>{
+ event.preventDefault();
+ const name=v("suBusiness").trim();
+ if(name.length<2){$("authmsg").textContent="Enter your business name.";return}
+ writeDraft({name,industry:v("suIndustry").trim()});
+ showSignupStep(2);$("suWebsite").focus();
+});
+$("suStep2").addEventListener("submit",event=>{
+ event.preventDefault();
+ const website=normalizeWebsite(v("suWebsite"));
+ if(website===null){$("authmsg").textContent="Enter a website like example.com, or choose I don’t have a website.";return}
+ writeDraft({website});
+ showSignupStep(3);$("suFirst").focus();
+});
+$("suNoWebsite").addEventListener("click",()=>{$("suWebsite").value="";writeDraft({website:""});showSignupStep(3);$("suFirst").focus()});
+$("suBack2").addEventListener("click",()=>showSignupStep(1));
+$("suBack3").addEventListener("click",()=>showSignupStep(2));
+function passwordChecks(value){
+ return {len:value.length>=8,upper:/[A-Z]/.test(value),lower:/[a-z]/.test(value),num:/[0-9]/.test(value)};
+}
+$("suPassword").addEventListener("input",()=>{
+ const checks=passwordChecks(v("suPassword"));
+ for(const item of $("suRules").children)item.classList.toggle("ok",checks[item.dataset.rule]);
+});
+$("suStep3").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const button=$("suCreate");
+ if(button.disabled)return;
+ const email=v("suEmail").trim(),password=v("suPassword"),first=v("suFirst").trim(),last=v("suLast").trim();
+ $("suExists").hidden=true;
+ try{
+  if(!first||!last)throw Error("Enter your first and last name.");
+  if(!email.includes("@"))throw Error("Enter a valid email address.");
+  if(!Object.values(passwordChecks(password)).every(Boolean))throw Error("Your password does not meet every requirement yet.");
+  if(!sb)throw Error("Sign-up is still loading. Please try again.");
+  button.disabled=true;button.textContent="Creating account…";
+  $("authmsg").textContent="Working…";
+  const result=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+"/app",
+   data:{first_name:first,last_name:last,marketing_opt_in:$("suMarketing").checked}}});
+  if(result.error){
+   if(/already|registered/i.test(result.error.message||"")){$("suExists").hidden=false;$("authmsg").textContent="";return}
+   throw result.error;
+  }
+  if(result.data?.user&&Array.isArray(result.data.user.identities)&&result.data.user.identities.length===0){
+   $("suExists").hidden=false;$("authmsg").textContent="";return;
+  }
+  $("authmsg").textContent=result.data?.session?"Account created.":"Check your inbox to verify your account. Your business details are saved and will be set up when you sign in.";
+  if(result.data?.session)await render();
+ }catch(e){$("authmsg").textContent=e.message||"Unable to create your account"}
+ finally{button.disabled=false;button.textContent="Create account"}
+});
+$("suGoogle").addEventListener("click",()=>{
+ writeDraft({name:v("suBusiness").trim()||(readDraft()?.name||""),industry:v("suIndustry").trim(),website:normalizeWebsite(v("suWebsite"))||""});
+ window.googleSignIn();
+});
+let draftApplying=false;
+async function applyOnboardingDraft(){
+ const draft=readDraft();
+ if(!draft||draft.name.trim().length<2)return false;
+ if(draftApplying)return true;
+ draftApplying=true;
+ try{
+  const workspace=await request("/organizations","POST",{name:draft.name.trim(),industry:draft.industry?.trim()||"General"});
+  clearDraft();
+  writeWorkspacePreference("workspace",workspace.id);
+  await loadOrganizations({select:workspace.id,destination:"studio"});
+  if(draft.website){
+   try{
+    await request("/organizations/"+encodeURIComponent(workspace.id)+"/descriptions/import-website","POST",{url:draft.website});
+    window.section("knowledge");
+    msg("Website draft saved. Review the imported text before approving it.");
+   }catch(e){msg("Your business was created, but the website could not be imported: "+e.message,true)}
+  }
+  return true;
+ }catch(e){
+  $("setupBusinessName").value=draft.name;
+  $("setupIndustry").value=draft.industry||"";
+  $("businessSetupStatus").textContent="We could not finish setup automatically: "+e.message;
+  return false;
+ }finally{draftApplying=false}
+}
 window.authAction=async mode=>{
  const button=$("authSubmit");
  if(button.disabled)return;
@@ -1829,6 +1994,7 @@ async function loadOrganizations({select,destination}={}){
     $("wsSaveButton").disabled=false;
     $("wsName").disabled=false;
     $("wsIndustry").disabled=false;
+    if(!pendingInvite&&await applyOnboardingDraft())return;
     window.section(pendingInvite?"workspace":"onboarding");
  }
 }

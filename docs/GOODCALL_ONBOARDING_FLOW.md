@@ -18,3 +18,8 @@ Progress is shown as a six-dot stepper with a small mascot above the heading and
 - Verified owner notification number (SMS code, resend cooldown, change number). Requires a consent-aware SMS provider; defer sending until authorized.
 - Account form fields: organization name, first and last name, live password rules, marketing opt-in kept separate from terms consent, duplicate-email handling.
 - Step 6 onward (build progress, first practice prompt, dashboard) to be recorded once observed.
+
+## CallPilot status (2026-11-07)
+- Implemented but untested live: `/app?mode=signup` is a three-step get-started wizard (business, website, account) with progress dots and back links. Account step has first and last name, work email, live password rules, product-updates checkbox, Google sign-up, terms link and a duplicate-email message with a Log in instead link.
+- Business and website answers are saved as a non-sensitive draft in the browser for seven days. After the first sign-in with no workspace, the draft creates the workspace and imports the website as an unapproved draft in Knowledge.
+- Not built: business lookup by phone before the account exists (the Maps search needs a signed-in user to protect paid API usage), the scanning welcome screen, and the 4-digit SMS verification (needs an approved SMS provider and consent text).
