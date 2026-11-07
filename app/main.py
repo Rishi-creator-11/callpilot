@@ -333,6 +333,7 @@ def metroprint_free_phone_once():
     log=logging.getLogger("uvicorn.error")
     oid="0e7de94e-d12f-4a9a-96f9-5d3b91588a5a"
     aid="7eb2a057-c5ff-4243-bed6-37f175cfb695"
+    stage="validate"
     try:
         from app.cloud import api as db
         from app.call_intel import vapi,owns_assistant
@@ -345,10 +346,12 @@ def metroprint_free_phone_once():
         if db("phone_assignments",params={"organization_id":"eq."+oid,"select":"id","limit":1}):
             log.warning("metroprint_free_phone result=blocked_existing_number")
             return
+        stage="get_assistant"
         assistant=vapi("GET","/assistant/"+aid)
         if not owns_assistant(assistant,oid):
             log.warning("metroprint_free_phone result=blocked_assistant_ownership")
             return
+        stage="list_numbers"
         phones=vapi("GET","/phone-number",params={"limit":100})
         listings=phones if isinstance(phones,list) else (phones.get("results") or [])
         # Reuse a previously-created, not-yet-persisted phone to avoid accidental
@@ -360,6 +363,7 @@ def metroprint_free_phone_once():
         phone=(candidates[0] if candidates else None)
         if phone is None:
             # Vapi's free-telephony API, not its paid Twilio import/buy API.
+            stage="create_free_number"
             phone=vapi("POST","/phone-number",body={
                 "provider":"vapi","assistantId":aid,"numberDesiredAreaCode":"201"})
         if phone.get("assistantId")!=aid or not phone.get("id") or not phone.get("number"):
@@ -371,10 +375,12 @@ def metroprint_free_phone_once():
         if claimed and claimed[0]["organization_id"]!=oid:
             log.warning("metroprint_free_phone result=blocked_number_in_use")
             return
+        stage="save_assignment"
         db("phone_assignments","POST",params={"on_conflict":"provider_phone_id"},
            data={"organization_id":oid,"provider_phone_id":pid,
                  "provider_number":phone["number"],"status":"linked"},
            prefer="resolution=ignore-duplicates,return=minimal")
+        stage="save_agent_link"
         db("agent_configs","PATCH",params={"organization_id":"eq."+oid,
            "provider_agent_id":"eq."+aid,"provider_phone_id":"is.null"},
            data={"provider_phone_id":pid},prefer="return=minimal")
@@ -385,8 +391,8 @@ def metroprint_free_phone_once():
                  else "database_link_unconfirmed")
     except Exception as exc:
         # Only log status/error types; never log provider credentials.
-        log.warning("metroprint_free_phone result=failed error_type=%s",
-                    type(exc).__name__)
+        log.warning("metroprint_free_phone result=failed stage=%s error_type=%s detail=%s",
+                    stage,type(exc).__name__,str(getattr(exc,"detail","unavailable"))[:120])
 
 
 from app.account import router as account_router
