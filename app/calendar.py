@@ -149,6 +149,98 @@ class StaffBooking(BookSlot):
     request_id:UUID
 
 
+class AppointmentMove(Slot):
+    request_id: UUID
+
+
+def event_bounds(event: dict):
+    return tuple(datetime.fromisoformat(event[key]["dateTime"].replace("Z", "+00:00")) for key in ("start", "end"))
+
+
+def calendar_slot_clear(client, headers, start, end, ignore_id):
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    params = {"timeMin": start.isoformat(), "timeMax": end.isoformat(), "singleEvents": "true",
+              "maxResults": 250, "fields": "nextPageToken,items(id,status,transparency)"}
+    for _ in range(4):
+        response = client.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        payload = response.json()
+        if any(item["id"] != ignore_id and item.get("status") != "cancelled" and item.get("transparency") != "transparent"
+               for item in payload.get("items", [])):
+            return False
+        if not payload.get("nextPageToken"):
+            return True
+        params["pageToken"] = payload["nextPageToken"]
+    raise HTTPException(502, "Google returned too many events to verify this time safely.")
+
+
+@router.post("/api/account/organizations/{oid}/calendar/appointments/{aid}/reschedule")
+def reschedule_appointment(oid: UUID, aid: UUID, body: AppointmentMove, user=Depends(current_user)):
+    workspace, appointment, operation = str(oid), str(aid), str(body.request_id)
+    membership(workspace, user, ("owner", "admin"))
+    start, end = check_slot(body)
+    key = {"p_workspace": workspace, "p_appointment": appointment, "p_operation": operation}
+    filter_ = {"organization_id": "eq." + workspace, "id": "eq." + appointment}
+    rows = api("appointment_requests", params={**filter_, "select": "status,calendar_event_id,requested_time,duration_minutes,move_id,move_start"})
+    if not rows or rows[0]["status"] != "confirmed" or not rows[0].get("calendar_event_id"):
+        raise HTTPException(404, "Confirmed appointment not found.")
+    row = rows[0]
+    headers = {"Authorization": "Bearer " + google_token(workspace)}
+    event_id = row["calendar_event_id"]
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + urllib.parse.quote(event_id, safe="")
+    result = {"rescheduled": True, "start": start.isoformat(), "duration_minutes": body.duration_minutes}
+    try:
+        with httpx.Client(timeout=8) as client:
+            current = client.get(url, headers=headers)
+            if current.status_code in (404, 410):
+                raise HTTPException(409, "The original event could not be verified in the connected calendar.")
+            current.raise_for_status()
+            event = current.json()
+            extended = event.get("extendedProperties") or {}
+            marker = extended.get("private") or {}
+            if (event.get("status") == "cancelled" or marker.get("callpilot_org") != workspace
+                    or marker.get("callpilot_reservation_id") != appointment):
+                raise HTTPException(409, "Manage this appointment directly in Google Calendar.")
+            old_start = datetime.fromisoformat(row["requested_time"].replace("Z", "+00:00"))
+            old_end = old_start + timedelta(minutes=row["duration_minutes"])
+            bounds = event_bounds(event)
+            if marker.get("callpilot_move_id") == operation and bounds == (start, end):
+                if rpc("finish_appointment_move", {**key, "p_applied": True}) is not True:
+                    raise HTTPException(409, "The event moved in Google Calendar. Refresh the appointment before making another change.")
+                return result
+            if bounds != (old_start, old_end):
+                raise HTTPException(409, "The event changed in Google Calendar. Retry the pending move or manage it directly in Calendar.")
+            if not within_booking_hours(workspace, start, end):
+                raise HTTPException(409, OUTSIDE_HOURS)
+            if bounds == (start, end):
+                return result
+            if not event.get("etag"):
+                raise HTTPException(502, "Google Calendar did not provide an event version.")
+            if not calendar_slot_clear(client, headers, start, end, event_id):
+                if row.get("move_id") == operation:
+                    rpc("finish_appointment_move", {**key, "p_applied": False})
+                raise HTTPException(409, "The new appointment time is unavailable.")
+            hold = rpc("hold_appointment_move", {**key, "p_start": start.isoformat(), "p_minutes": body.duration_minutes})
+            if hold == "completed":
+                return result
+            if hold != "held":
+                raise HTTPException(409, "Another appointment or pending change is using this time. Refresh and try again.")
+            updated = client.patch(url, headers={**headers, "If-Match": event["etag"]}, params={"sendUpdates": "all"},
+                                   json={"start": {"dateTime": start.isoformat()}, "end": {"dateTime": end.isoformat()},
+                                         "extendedProperties": {**extended, "private": {**marker, "callpilot_move_id": operation}}})
+            if updated.status_code == 412:
+                raise HTTPException(409, "Google Calendar changed while saving. Retry the same reschedule to check its outcome.")
+            updated.raise_for_status()
+            saved = updated.json()
+            if event_bounds(saved) != (start, end):
+                raise HTTPException(502, "Google Calendar did not confirm the requested time. Retry the same reschedule.")
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(502, "Google Calendar did not confirm the change. Retry the same reschedule.") from exc
+    if rpc("finish_appointment_move", {**key, "p_applied": True}) is not True:
+        raise HTTPException(502, "The calendar changed but the workspace could not update. Retry the same reschedule.")
+    return result
+
+
 @router.post("/api/account/organizations/{oid}/calendar/book")
 def book_from_dashboard(oid:UUID,body:StaffBooking,user=Depends(current_user)):
     from app.voice_actions import confirm_calendar_booking
@@ -179,12 +271,14 @@ def cancel_appointment(oid:UUID,aid:UUID,user=Depends(current_user)):
     workspace=str(oid)
     membership(workspace,user,("owner","admin"))
     filter_={"organization_id":"eq."+workspace,"id":"eq."+str(aid)}
-    rows=api("appointment_requests",params={**filter_,"select":"status,calendar_event_id"})
+    rows=api("appointment_requests",params={**filter_,"select":"status,calendar_event_id,move_start"})
     if not rows:
         raise HTTPException(404,"Appointment not found.")
     row=rows[0]
     if row["status"]=="cancelled":
         return {"status":"cancelled"}
+    if row.get("move_start"):
+        raise HTTPException(409,"Retry the pending reschedule before cancelling this appointment.")
     event_id=row.get("calendar_event_id")
     if row["status"]!="confirmed" or not event_id:
         raise HTTPException(409,"Only confirmed Google Calendar appointments can be cancelled here.")

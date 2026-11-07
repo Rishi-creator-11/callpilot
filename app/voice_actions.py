@@ -282,10 +282,10 @@ def confirm_calendar_booking(oid, call_id, start, end, duration, name, contact, 
     if status == "confirmed":
         prior = api("appointment_requests", params={
             "organization_id": "eq." + oid, "id": "eq." + str(rid),
-            "select": "calendar_event_id", "limit": 1,
+            "select": "calendar_event_id,requested_time", "limit": 1,
         })
         if prior and prior[0].get("calendar_event_id"):
-            return {"confirmed": True, "appointment_id": str(rid), "message": "Already confirmed: appointment " + str(rid) + " on " + start.isoformat()}
+            return {"confirmed": True, "appointment_id": str(rid), "message": "Already confirmed: appointment " + str(rid) + " on " + (prior[0].get("requested_time") or start.isoformat())}
         raise ValueError("Appointment is marked confirmed but its event reference is missing")
     if status not in ("reserved", "requested") or not rid:
         raise ValueError("Unexpected booking reservation status")

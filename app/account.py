@@ -527,12 +527,14 @@ def set_voice_capabilities(oid:str,body:VoiceCapabilities,user=Depends(current_u
 def bookings(oid:str,user=Depends(current_user)):
     membership(oid,user)
     rows=api("appointment_requests",params={"organization_id":"eq."+oid,
-        "select":"id,caller_name,service,requested_time,duration_minutes,status,created_at,calendar_event_id,idempotency_key",
+        "select":"id,caller_name,service,requested_time,duration_minutes,status,created_at,calendar_event_id,idempotency_key,move_id,move_start,move_minutes",
         "order":"created_at.desc","limit":50})
     for row in rows:
         event=row.pop("calendar_event_id",None)
         reservation=row.pop("idempotency_key",None)
         row["calendar_managed"]=bool(event and reservation)
+        if not row["move_start"]:
+            row.pop("move_id", None)
     return rows
 
 @router.post("/organizations/{oid}/test-assistant")

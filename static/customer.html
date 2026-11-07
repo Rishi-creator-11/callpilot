@@ -1215,6 +1215,13 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <label for="cduration">Duration</label><select id="cduration"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option><option value="120">120 minutes</option></select>
 <div class="cp-inline-actions" style="margin-top:12px"><button type="button" class="secondary" onclick="window.checkAvailability()">Check availability</button>
 <button type="submit">Create appointment</button><button id="closeBookingForm" type="button" class="secondary">Close</button></div></form>
+<form id="rescheduleForm" class="cp-section-box" hidden>
+ <h3>Reschedule appointment</h3><p id="rescheduleSummary"></p>
+ <div class="cp-form-grid"><div><label for="rescheduleStart">New date and time (your device’s time zone)</label><input id="rescheduleStart" type="datetime-local" required></div>
+ <div><label for="rescheduleMinutes">Duration (minutes)</label><input id="rescheduleMinutes" type="number" min="15" max="120" required></div></div>
+ <div class="cp-inline-actions"><button type="submit">Save new time</button><button id="rescheduleClose" type="button" class="secondary">Close</button></div>
+ <p id="rescheduleStatus" role="status" class="muted"></p>
+</form>
 <p id="calendarResult" role="status" class="muted"></p>
 <div class="cp-section-box"><div class="cp-panel-heading"><div><h3>Booking history</h3><p>See bookings made by your receptionist and your team.</p></div>
 <div><label for="bookingFilter">Status</label><select id="bookingFilter"><option value="">All appointments</option><option value="confirmed">Confirmed</option><option value="requested">Requested</option><option value="cancelled">Cancelled</option><option value="rejected">Rejected</option></select></div></div>
@@ -1817,6 +1824,7 @@ window.loadWorkspace=async({destination}={})=>{
     calendarCanManage=false;appointmentRows=[];appointmentRequestId=null;
     $("appointmentForm").reset();
     $("appointmentForm").hidden=true;
+    closeReschedule();
     $("openBookingForm").hidden=true;
     $("disconnectAppointmentCalendar").hidden=true;
     $("connectAppointmentCalendar").hidden=true;
@@ -2593,6 +2601,7 @@ async function loadCalendar(){
  $("connectAppointmentCalendar").hidden=!c.configured||!c.can_manage||c.connected;
  $("disconnectAppointmentCalendar").hidden=!calendarCanManage;
  if(!calendarCanManage)$("appointmentForm").hidden=true;
+ if(!calendarCanManage)closeReschedule();
  renderBookings();
  const statuses={
   connected:"Google Calendar connected successfully.",
@@ -3110,6 +3119,49 @@ async function loadBuilderHistory(){
  }catch(e){if(oid===organization())list.textContent=e.message}
 }
 let calendarCanManage=false,appointmentRows=[],appointmentRequestId=null;
+let moveAppointment=null,moveRequestId=null;
+function closeReschedule(){
+ moveAppointment=null;moveRequestId=null;
+ $("rescheduleForm").hidden=true;
+}
+function openReschedule(row){
+ moveAppointment=row.id;moveRequestId=row.move_id||null;
+ const start=new Date(row.move_start||row.requested_time);
+ $("rescheduleStart").value=new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ $("rescheduleMinutes").value=row.move_minutes||row.duration_minutes;
+ $("rescheduleStart").readOnly=$("rescheduleMinutes").readOnly=Boolean(row.move_start);
+ $("rescheduleStatus").textContent=row.move_start?"Retry the saved time to reconcile the pending calendar change.":"";
+ $("rescheduleSummary").textContent=row.service+" · "+row.caller_name;
+ $("rescheduleForm").hidden=false;
+ $("rescheduleStart").focus();
+}
+$("rescheduleClose").addEventListener("click",closeReschedule);
+$("rescheduleForm").addEventListener("input",()=>{moveRequestId=null});
+$("rescheduleForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),id=moveAppointment,button=event.submitter,status=$("rescheduleStatus");
+ if(!calendarCanManage||!id||button.disabled)return;
+ button.disabled=true;status.textContent="Saving new time…";
+ try{
+  moveRequestId??=crypto.randomUUID();
+  const result=await request("/organizations/"+oid+"/calendar/appointments/"+encodeURIComponent(id)+"/reschedule","POST",{
+   request_id:moveRequestId,start:new Date(v("rescheduleStart")).toISOString(),duration_minutes:Number(v("rescheduleMinutes"))
+  });
+  if(oid!==organization()||id!==moveAppointment)return;
+  closeReschedule();
+  $("calendarResult").textContent="Appointment rescheduled for "+new Date(result.start).toLocaleString()+".";
+  await loadBookings();
+ }catch(e){
+  if(oid!==organization()||id!==moveAppointment)return;
+  status.textContent=e.message;
+  await loadBookings();
+  const row=appointmentRows.find(item=>item.id===id);
+  if(row?.move_id&&row.move_start){
+   openReschedule(row);
+   status.textContent=e.message;
+  }else $("rescheduleStart").readOnly=$("rescheduleMinutes").readOnly=false;
+ }finally{button.disabled=false}
+});
 function appointmentSlot(){
  const start=new Date(v("cstart"));
  if(Number.isNaN(start.getTime()))throw Error("Choose a date and time.");
@@ -3173,6 +3225,11 @@ function renderBookings(){
   description.className="muted";
   details.append(title,description);item.append(details);
   if(calendarCanManage&&row.status==="confirmed"&&row.calendar_managed){
+   const actions=document.createElement("div"),move=document.createElement("button");
+   actions.className="cp-inline-actions";
+   move.type="button";move.className="secondary";move.textContent=row.move_start?"Retry reschedule":"Reschedule";
+   move.addEventListener("click",()=>openReschedule(row));
+   actions.append(move);
    const button=document.createElement("button");
    button.type="button";button.className="secondary";button.textContent="Cancel appointment";
    button.addEventListener("click",async()=>{
@@ -3187,7 +3244,8 @@ function renderBookings(){
     }catch(e){if(oid===organization())$("calendarResult").textContent=e.message}
     finally{button.disabled=false}
    });
-   item.append(button);
+   button.disabled=Boolean(row.move_start);
+   actions.append(button);item.append(actions);
   }
   list.append(item);
  }
