@@ -105,7 +105,23 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
         if isinstance(args,str):
             try:args=__import__("json").loads(args)
             except ValueError:args={}
-        if func.get("name")!="lookup_approved_knowledge":
+        name=func.get("name")
+        if name in ("capture_customer_lead","check_appointment_availability","book_appointment"):
+            from app.voice_actions import execute_voice_action
+            try:
+                answer=execute_voice_action(organization_id,msg,name,args)
+                results.append({"toolCallId":call_id,"result":" ".join(answer.split())})
+            except (ValueError,HTTPException) as exc:
+                # Vapi requires HTTP 200 and a per-tool error, never a partial
+                # success. Do not leak provider credentials or internal errors.
+                safe_message=(exc.detail if isinstance(exc,HTTPException) else str(exc))
+                results.append({"toolCallId":call_id,"error":" ".join(str(safe_message).split())[:240]})
+            except Exception:
+                __import__("logging").getLogger("uvicorn.error").exception(
+                    "callpilot_voice_action_failed type=%s",name)
+                results.append({"toolCallId":call_id,"error":"This action is temporarily unavailable. Please offer a human follow-up."})
+            continue
+        if name!="lookup_approved_knowledge":
             results.append({"toolCallId":call_id,"error":"Unsupported tool"});continue
         question=args.get("question","") if isinstance(args,dict) else ""
         if not isinstance(question,str) or not (1<=len(question)<=500):
