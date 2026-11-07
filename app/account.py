@@ -135,10 +135,16 @@ def get_agent(oid:str,user=Depends(current_user)):
 @router.put("/organizations/{oid}/agent")
 def update_agent(oid:str,body:AgentEdit,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
-    rows=api("agent_configs","PATCH",params={"organization_id":"eq."+oid},
-        data=body.model_dump(exclude_none=True),prefer="return=representation")
-    if not rows:raise HTTPException(404,"No receptionist is configured for this workspace")
+    save_agent_configuration(oid,body)
     return {"saved":True}
+
+
+def save_agent_configuration(oid:str,body:AgentEdit):
+    saved=rpc("save_agent_configuration",{
+        "p_organization_id":oid,"p_agent_name":body.agent_name,"p_greeting":body.greeting,
+        "p_call_instructions":body.call_instructions,
+    })
+    if saved is not True:raise HTTPException(404,"No receptionist is configured for this workspace")
 
 @router.get("/organizations/{oid}/knowledge")
 def list_knowledge(oid:str,user=Depends(current_user)):

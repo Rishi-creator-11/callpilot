@@ -473,6 +473,22 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
 .cp-onboarding-steps li{padding:5px 10px;border:1px solid #dbe7e0;border-radius:999px;color:#405768;font-size:12px;font-weight:700}
 .cp-onboarding-steps li[aria-current="step"]{background:#ddf5ea;color:#155d4d;border-color:#a5d9ca}
 #onboarding [hidden]{display:none!important}
+#builder [hidden],#connections [hidden],#appointments [hidden]{display:none!important}
+#builder .cp-studio-grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px}
+#builder .cp-studio-step{box-shadow:none}
+#builderConversation{list-style:none;margin:16px 0;padding:0;max-height:360px;overflow:auto}
+#builderConversation:empty{display:none}
+#builderConversation li{border:1px solid var(--cp-border);padding:12px 14px;border-radius:12px;background:#f6fbf8;margin:0 14px 10px 0}
+#builderConversation li:nth-child(odd){background:#edf3fa;margin:0 0 10px 14px}
+#builderConversation p{margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+#builderHistory{margin-top:20px}
+#builderHistory summary{font-weight:700;cursor:pointer;padding-block:5px}
+#connections .cp-studio-connection{background:#fff;border-color:var(--cp-border);padding:18px}
+#connections form{border-top:1px solid var(--cp-border);padding-top:4px;margin-top:14px}
+#connections form button{margin-top:10px}
+#bookings .item:last-child,#orderReviewList .item:last-child{border-bottom:0}
+#bookings .item p,#orderReviewList .item p{margin:4px 0 0}
+@media(max-width:760px){#builder .cp-studio-grid{grid-template-columns:1fr}}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
@@ -654,6 +670,11 @@ body[data-app-state="guest"] footer,body[data-app-state="guest"] footer a{color:
    <button class="cp-studio-textbtn" onclick="window.section('simulator')">Open assistant practice →</button>
   </article>
  </div>
+ <details id="builderHistory" class="cp-section-box" hidden>
+  <summary>Configuration history</summary>
+  <p class="muted">Review earlier saved settings. Restoring changes the saved configuration. Sync to update the live assistant.</p>
+  <div id="builderRevisions" aria-live="polite"></div>
+ </details>
 </section>
 
 <div id="studio" class="panel card" style="display:none">
@@ -2271,6 +2292,9 @@ function resetBuilder(){
  $("builderRequest").reset();
  $("builderSettings").reset();
  $("builderSync").disabled=true;
+ $("builderHistory").open=false;
+ $("builderHistory").hidden=true;
+ $("builderRevisions").replaceChildren();
  $("builderStatus").textContent="Loading receptionist configuration…";
 }
 function setBuilderFields(agent){
@@ -2294,6 +2318,7 @@ async function loadBuilder(){
   builderLoaded=oid;
   builderCanEdit=["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role);
   $("builderRequest").hidden=!builderCanEdit;
+  $("builderHistory").hidden=!builderCanEdit;
   for(const field of $("builderSettings").elements)field.disabled=!builderCanEdit;
   $("builderStatus").textContent=builderCanEdit?"Your saved configuration is loaded.":"Only workspace owners and admins can edit this configuration.";
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
@@ -2345,6 +2370,7 @@ $("builderSettings").addEventListener("submit",async event=>{
   $("studioAgentName").value=fields.agent_name;
   $("studioGreeting").value=fields.greeting;
   $("builderStatus").textContent=builderDirty?"Saved the previous version. Save again to include your latest edits.":"Configuration saved. Sync when you are ready to update the live assistant.";
+  if($("builderHistory").open)await loadBuilderHistory();
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
  finally{button.disabled=false}
 });
@@ -2359,6 +2385,48 @@ $("builderSync").addEventListener("click",async event=>{
  }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
  finally{if(oid===organization())button.disabled=builderDirty}
 });
+$("builderHistory").addEventListener("toggle",()=>{
+ if($("builderHistory").open)void loadBuilderHistory();
+});
+async function loadBuilderHistory(){
+ const oid=organization(),list=$("builderRevisions");
+ if(!builderCanEdit)return;
+ list.textContent="Loading previous configurations…";
+ try{
+  const rows=await request(builderPath(oid)+"/history");
+  if(oid!==organization())return;
+  list.replaceChildren();
+  if(!rows.length){list.textContent="Previous versions appear here after you change the saved configuration.";return}
+  for(const row of rows){
+   const entry=document.createElement("details"),summary=document.createElement("summary"),greeting=document.createElement("p");
+   const notes=document.createElement("p"),button=document.createElement("button");
+   entry.className="item";
+   summary.textContent=row.agent_name+" · "+new Date(row.created_at).toLocaleString();
+   greeting.textContent=row.greeting;
+   notes.textContent=row.call_instructions||"No additional conversation instructions.";
+   notes.style.whiteSpace="pre-wrap";
+   button.type="button";button.className="secondary";button.textContent="Restore saved settings";
+   button.addEventListener("click",async()=>{
+    if(oid!==organization()||button.disabled||!window.confirm("Restore these settings and replace the current draft? Your live assistant changes only after sync."))return;
+    button.disabled=true;
+    try{
+     const restored=await request(builderPath(oid)+"/history/"+encodeURIComponent(row.id)+"/restore","POST");
+     if(oid!==organization())return;
+     setBuilderFields(restored);
+     $("studioAgentName").value=restored.agent_name;
+     $("studioGreeting").value=restored.greeting;
+     builderDirty=false;
+     $("builderSync").disabled=false;
+     $("builderStatus").textContent="Saved configuration restored. Sync to apply it to the live assistant.";
+     await loadBuilderHistory();
+    }catch(e){if(oid===organization())$("builderStatus").textContent=e.message}
+    finally{button.disabled=false}
+   });
+   entry.append(summary,greeting,notes,button);
+   list.append(entry);
+  }
+ }catch(e){if(oid===organization())list.textContent=e.message}
+}
 let calendarCanManage=false,appointmentRows=[],appointmentRequestId=null;
 function appointmentSlot(){
  const start=new Date(v("cstart"));

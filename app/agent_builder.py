@@ -10,9 +10,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 
-from app.account import AgentEdit, current_user, membership
+from app.account import AgentEdit, current_user, membership, save_agent_configuration
 from app.call_intel import refresh_receptionist_prompt, vapi
-from app.cloud import org_or_404
+from app.cloud import api, org_or_404
 
 router = APIRouter(prefix="/api/account/organizations/{oid}/agent")
 _requests = deque()
@@ -80,3 +80,30 @@ def sync(oid: UUID, user=Depends(current_user)):
     if result["reason"] not in ("already_current", "voice_policy_and_one_second_opening_synced"):
         raise HTTPException(409, "The connected assistant cannot be updated here.")
     return {"synced": True}
+
+
+@router.get("/history")
+def history(oid: UUID, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    return api("agent_configuration_history", params={
+        "organization_id": "eq." + workspace,
+        "select": "id,agent_name,greeting,call_instructions,created_at",
+        "order": "created_at.desc", "limit": 30,
+    })
+
+
+@router.post("/history/{revision_id}/restore")
+def restore(oid: UUID, revision_id: UUID, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    rows = api("agent_configuration_history", params={
+        "organization_id": "eq." + workspace, "id": "eq." + str(revision_id),
+        "select": "agent_name,greeting,call_instructions", "limit": 1,
+    })
+    if not rows:
+        raise HTTPException(404, "Saved configuration not found.")
+    # Historical values may predate current form validation. Restore the recorded values.
+    saved = AgentEdit.model_construct(**rows[0])
+    save_agent_configuration(workspace, saved)
+    return rows[0]
