@@ -158,6 +158,13 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
     )
     if preview:
         flags={"allow_price_quotes":flags.get("allow_price_quotes")}
+    transfer_policy=(
+        "For human transfers, identify the configured department matching the caller’s request, "
+        "ask the caller for consent, and only then invoke transferCall in the same turn as a short acknowledgment. "
+        "Never read internal destination numbers aloud or claim the destination answered. "
+        "If no destination matches or the transfer fails, offer the available next step. "
+        if any(item.get("enabled") for item in (flags.get("transfer_directory") or [])) else ""
+    )
     lead_enabled=bool(flags.get("voice_leads_enabled"))
     booking_enabled=bool(flags.get("voice_booking_enabled"))
     price_policy=(
@@ -219,7 +226,7 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "do not repeatedly ask for the same details. If interrupted, address the "
         "interruption instead of restarting. Avoid repetitive introductions, filler, "
         "loops, or unwarranted requests for contact information. "
-        + price_policy + lead_policy + booking_policy + catalog_policy + order_policy +
+        + price_policy + lead_policy + booking_policy + catalog_policy + order_policy + transfer_policy +
         ("This is a practice call. Never ask for private information or take real actions. " if preview else "") +
         "If information is unavailable, explain briefly and offer a next step. "
         "Do not promise a callback, booking, order, or transfer that a tool has not confirmed. "

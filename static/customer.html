@@ -776,7 +776,8 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  <div class="cp-panel-heading"><div><h2>Workers</h2><p>Give your receptionist a playbook for each kind of call.</p></div></div>
  <div class="cp-section-box"><h3>Default receptionist</h3>
  <p>When no playbook matches, the receptionist follows its general instructions and approved tools.</p>
- <button class="secondary" onclick="window.section('builder')">Edit general instructions</button></div>
+ <div class="cp-inline-actions"><button class="secondary" onclick="window.section('builder')">Edit general instructions</button>
+ <button class="secondary" onclick="window.section('channels');$('transferDirectory').open=true">Transfer directory</button></div></div>
  <form id="workerForm">
   <p class="muted">The assistant considers enabled playbooks in order. Configure voice tools separately in Launch Studio.</p>
   <div id="workerList">Loading playbooks…</div>
@@ -921,6 +922,17 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <p id="channelDemoStatus" class="muted" role="status"></p>
   <div id="channelDemoLinks" aria-live="polite"></div>
  </div>
+ <details class="cp-section-box" id="transferDirectory" hidden>
+  <summary>Human transfer directory</summary>
+  <p>List the people or departments the receptionist can route to after the caller agrees. Save and sync to apply the directory.</p>
+  <form id="transferForm">
+   <div id="transferRows"></div>
+   <div class="cp-inline-actions"><button id="addTransferRoute" class="secondary" type="button">Add destination</button>
+    <button type="submit">Save directory</button><button id="syncTransferRoutes" class="secondary" type="button" disabled>Sync live assistant</button>
+    <button id="reloadTransferRoutes" class="secondary" type="button">Refresh</button></div>
+  </form>
+  <p id="transferStatus" class="muted" role="status"></p>
+ </details>
 </section>
 <div id="calls" class="panel">
   <div class="ci-head">
@@ -1801,6 +1813,7 @@ window.loadWorkspace=async({destination}={})=>{
     $("channelDemoForm").reset();
     $("channelDemoLinks").replaceChildren();
     $("channelDemoStatus").textContent="";
+    resetTransfers();
     resetWorkers();
     orderReviewRows=[];
     $("orderQuery").value="";
@@ -3505,8 +3518,107 @@ async function loadChannels(){
    const state=await request("/organizations/"+oid+path);
    if(oid===organization())$(id).textContent=describe(state);
   }catch(e){if(oid===organization())$(id).textContent=e.message}
- }),loadDemoLinks(oid)]);
+ }),loadDemoLinks(oid),loadTransfers(oid)]);
 }
+const transferPath=oid=>"/organizations/"+oid+"/transfer-directory";
+let transferWorkspace="",transferSaved=[],transferDraft=[],transferDirty=false;
+function resetTransfers(){
+ transferWorkspace="";
+ transferSaved=[];transferDraft=[];transferDirty=false;
+ $("transferDirectory").hidden=true;
+ $("transferDirectory").open=false;
+ $("transferRows").replaceChildren();
+ $("transferStatus").textContent="";
+ $("syncTransferRoutes").disabled=true;
+}
+async function loadTransfers(oid,refresh=false){
+ if(!["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role))return;
+ if(!refresh&&transferWorkspace===oid)return;
+ $("transferDirectory").hidden=false;
+ const status=$("transferStatus");
+ status.textContent="Loading directory…";
+ try{
+  const state=await request(transferPath(oid));
+  if(oid!==organization())return;
+  $("transferDirectory").hidden=!state.can_manage;
+  if(!state.can_manage)return;
+  transferWorkspace=oid;
+  transferSaved=state.destinations;
+  transferDraft=structuredClone(state.destinations);
+  transferDirty=false;
+  $("syncTransferRoutes").disabled=false;
+  status.textContent="";
+  renderTransfers();
+ }catch(e){if(oid===organization())status.textContent=e.message}
+}
+function transferChanged(){transferDirty=true;$("syncTransferRoutes").disabled=true}
+function renderTransfers(){
+ const list=$("transferRows");
+ list.replaceChildren();
+ $("addTransferRoute").disabled=transferDraft.length>=8;
+ if(!transferDraft.length){list.textContent="No destinations. Add a team member or department to get started.";return}
+ transferDraft.forEach((route,index)=>{
+  const group=document.createElement("fieldset"),legend=document.createElement("legend");
+  group.className="cp-section-box";
+  legend.textContent=route.label||"New destination";group.append(legend);
+  for(const [key,label,max] of [["label","Name or department",60],["number","Phone number with country code",16],["when","When to transfer",240]]){
+   const caption=document.createElement("label"),field=document.createElement("input");
+   field.id="route-"+index+"-"+key;caption.htmlFor=field.id;
+   caption.textContent=label;field.required=true;field.maxLength=max;field.value=route[key];
+   if(key==="number"){field.type="tel";field.placeholder="+12125550100"}
+   field.addEventListener("input",()=>{
+    route[key]=field.value;
+    if(key==="label")legend.textContent=field.value||"New destination";
+    transferChanged();
+   });
+   group.append(caption,field);
+  }
+  const toggle=document.createElement("input"),label=document.createElement("label"),remove=document.createElement("button");
+  label.className="cp-studio-check";
+  toggle.type="checkbox";toggle.checked=route.enabled;
+  toggle.addEventListener("change",()=>{route.enabled=toggle.checked;transferChanged()});
+  label.append(toggle," Enabled");
+  remove.type="button";remove.className="secondary";remove.textContent="Remove";
+  remove.addEventListener("click",()=>{
+   if(!window.confirm("Remove this destination from the directory draft?"))return;
+   transferDraft.splice(index,1);transferChanged();renderTransfers();
+  });
+  group.append(label,remove);list.append(group);
+ });
+}
+$("addTransferRoute").addEventListener("click",()=>{
+ if(transferWorkspace!==organization()||transferDraft.length>=8)return;
+ transferDraft.push({label:"",number:"",when:"",enabled:true});transferChanged();renderTransfers();
+ $("route-"+(transferDraft.length-1)+"-label").focus();
+});
+$("reloadTransferRoutes").addEventListener("click",()=>{
+ if(!transferDirty||window.confirm("Discard unsaved directory changes?"))void loadTransfers(organization(),true);
+});
+$("transferForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.submitter,status=$("transferStatus"),sent=structuredClone(transferDraft);
+ if(transferWorkspace!==oid||button.disabled)return;
+ button.disabled=true;
+ try{
+  const result=await request(transferPath(oid),"PUT",{previous:transferSaved,destinations:sent});
+  if(oid!==organization())return;
+  transferSaved=result.destinations;
+  transferDirty=JSON.stringify(transferDraft)!==JSON.stringify(sent);
+  $("syncTransferRoutes").disabled=transferDirty;
+  status.textContent=transferDirty?"Saved the earlier directory. Save again to include the latest edits.":"Directory saved. Sync to apply it to the live assistant.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{button.disabled=false}
+});
+$("syncTransferRoutes").addEventListener("click",async event=>{
+ const oid=organization(),button=event.currentTarget,status=$("transferStatus");
+ if(transferWorkspace!==oid||transferDirty||button.disabled||!window.confirm("Apply the saved settings and transfer directory to your managed assistant?"))return;
+ button.disabled=true;status.textContent="Syncing transfer settings…";
+ try{
+  await request("/organizations/"+oid+"/agent/sync","POST");
+  if(oid===organization())status.textContent="Saved settings synced.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{if(oid===organization())button.disabled=transferDirty}
+});
 const demoLinksPath=oid=>"/organizations/"+oid+"/demo-links";
 async function loadDemoLinks(oid){
  if(!["owner","admin"].includes(orgs.find(workspace=>workspace.id===oid)?.role))return;

@@ -439,8 +439,9 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     """
     from app.cloud import org_or_404,api as cloud_api,receptionist_prompt
     from app.identity import SPEECH_FIELDS, transcriber as speech_transcriber, voice_config
+    from app.transfer_directory import is_managed_transfer, native_transfer_tool
     cfg=cloud_api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,agent_name,greeting,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled,"+SPEECH_FIELDS,"limit":1})
+        "select":"provider_agent_id,agent_name,greeting,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled,transfer_directory,"+SPEECH_FIELDS,"limit":1})
     if not cfg or not cfg[0].get("provider_agent_id"):
         return {"updated":False,"reason":"no_assistant"}
     aid=cfg[0]["provider_agent_id"]
@@ -476,11 +477,16 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     if any(flags.get(k) for k in ("voice_leads_enabled","voice_booking_enabled","voice_catalog_enabled","voice_order_requests_enabled")) and not credential:
         raise HTTPException(503,"Vapi private tool credential is not configured")
     base_tools=[t for t in existing_tools if not (isinstance(t,dict) and
-                (t.get("function") or {}).get("name") in MANAGED_TOOLS)]
+                (t.get("function") or {}).get("name") in MANAGED_TOOLS) and not is_managed_transfer(t)]
     end_tool=next((t for t in base_tools if isinstance(t,dict) and t.get("type")=="endCall"),
                   {"type":"endCall"})
     next_tools=[t for t in base_tools if not (isinstance(t,dict) and t.get("type")=="endCall")]
     next_tools.extend(voice_tool_definitions(oid,credential,flags))
+    transfer=native_transfer_tool(oid,flags.get("transfer_directory") or [])
+    if transfer:
+        if any(isinstance(t,dict) and t.get("type")=="transferCall" for t in base_tools):
+            raise HTTPException(409,"This assistant already has a separate transfer tool. Keep a single managed transfer directory.")
+        next_tools.append(transfer)
     next_tools.append(end_tool)
     transcriber=speech_transcriber(cfg[0])
     def matches_transcriber(candidate):
@@ -526,6 +532,9 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     saved_model=verified.get("model") or {}
     saved=saved_model.get("messages") or []
     saved_tools=saved_model.get("tools") or []
+    saved_transfers=[t for t in saved_tools if is_managed_transfer(t)]
+    def transfer_routes(tool):
+        return [(item.get("number"),item.get("description")) for item in tool["destinations"]]
     if (not any(m.get("role")=="system" and m.get("content")==desired
                 for m in saved if isinstance(m,dict))
         or not any(t.get("type")=="endCall" for t in saved_tools if isinstance(t,dict))
@@ -534,6 +543,8 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
         or verified.get("firstMessageMode")!="assistant-waits-for-user"
         or not matches_transcriber(verified.get("transcriber"))
         or not matches_voice(verified.get("voice"))
+        or (transfer is None and bool(saved_transfers))
+        or (transfer is not None and (len(saved_transfers)!=1 or transfer_routes(saved_transfers[0])!=transfer_routes(transfer)))
         or any((t.get("function") or {}).get("name") not in [
             (z.get("function") or {}).get("name") for z in saved_tools if isinstance(z,dict)]
             for t in next_tools if isinstance(t,dict) and (t.get("function") or {}).get("name") in MANAGED_TOOLS)

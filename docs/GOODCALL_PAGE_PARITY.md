@@ -59,7 +59,7 @@ Order requests have a dedicated CallPilot review page at `/app#orders`. Provider
 | [ ] | Identity read-only/edit state and History drawer | Observed | Identity includes edit/view mode and links to previous saved greeting and instructions. Versioning for all identity fields and a dedicated history drawer remain. |
 | [ ] | `/agent/workers`, worker list and Add worker | List and Create Worker dialog observed, including Free Prompt and Structured Form | Build worker CRUD, validations, and assignment. |
 | [ ] | Operator detail, Greeting tab | Observed | `/app#voice` supports greeting. Add open/closed greeting and routing rules. |
-| [ ] | Operator detail, Directory tab | Observed | Build contact directory, escalation defaults and fallback routing. |
+| [ ] | Operator detail, Directory tab | Observed | Channels stores human transfer destinations with routing descriptions, enable controls and managed assistant sync. Escalation defaults, failure behavior and live verification remain. |
 | [ ] | Worker detail, specialist and tool configuration | Some workers observed, detail forms pending | Build worker-specific panels and supported tools. |
 | [ ] | Workers, Knowledge tab and source list | Observed | `/app#knowledge` has source attribution, editable drafts, approval, and search testing. |
 | [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link and PDF import verified in the authenticated sandbox. PDF extraction creates a reviewable draft. Scanned-document OCR remains open. |
