@@ -36,7 +36,13 @@ def billing_ready():
     return True
 
 def fixed_price(name):
-    """Fixed Stripe Price ID for a plan or the setup fee, when configured."""
+    """Use fixed production Price IDs ONLY in live mode.
+
+    A live Price ID is invalid in Stripe's test environment. Test Checkout
+    uses inline test-mode prices and must never reference live products.
+    """
+    if billing_mode()!="live":
+        return None
     value=os.getenv("STRIPE_PRICE_"+name.upper(),"")
     return value if value.startswith("price_") else None
 
