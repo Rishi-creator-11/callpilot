@@ -153,7 +153,12 @@ _SYNONYMS={"subscriptions":"plan","subscription":"plan","plans":"plan","packages
            "delivery":"shipping","deliver":"shipping","deliveries":"shipping",
            "shipped":"shipping","ships":"shipping","shipping":"shipping",
            "sell":"product","sells":"product","selling":"product","products":"product",
-           "returns":"return","refunds":"refund"}
+           "returns":"return","refunds":"refund",
+           "ship":"shipping","ships":"shipping","shipped":"shipping",
+           "close":"hours","closing":"hours","closed":"hours",
+           "opening":"hours","open":"hours","hours":"hours",
+           "carry":"product","carried":"product","stock":"product",
+           "selling":"product","sells":"product","sell":"product"}
 def _terms(text:str)->set[str]:
     tokens=re.findall(r"[a-z0-9]+",text.casefold())
     return {_SYNONYMS.get(w,w[:-1] if w.endswith("s") and len(w)>5 else w)
@@ -237,10 +242,20 @@ def retrieve(organization_id:str,question:str):
     # Require strong semantic evidence AND the requested topic or recognized
     # conversational intent. Entity names alone are not evidence that an
     # unrelated service/product is covered by approved knowledge.
-    if similarity<0.82:
+    is_description=best["question"].startswith("Business description — ")
+    # Descriptions have much richer language than FAQ prompts. Permit a slightly
+    # lower similarity only when the approved passage actually mentions the topic.
+    evidence=(content_terms & (_terms(best["question"]) | _terms(best["answer"])))
+    min_similarity=0.78 if is_description and evidence else 0.82
+    if similarity<min_similarity:
         return None,{"reason":"below_confidence_threshold","similarity":round(similarity,3)}
     if content_terms and not question_overlap and not answer_overlap:
         return None,{"reason":"topic_not_supported","similarity":round(similarity,3)}
+    # Generic nouns alone cannot justify answering a specific unknown product query.
+    generic={"product","service","business","company","item","good","thing"}
+    specific=content_terms-generic
+    if is_description and specific and (specific & evidence)==set() and similarity<0.9:
+        return None,{"reason":"unsupported_specific_topic","similarity":round(similarity,3)}
     if not content_terms and not intent_match and not (
         query_terms and query_terms & _terms(best["question"])):
         return None,{"reason":"insufficient_topic_evidence","similarity":round(similarity,3)}
@@ -248,7 +263,6 @@ def retrieve(organization_id:str,question:str):
     # They have more detailed text than a short query; allow retrieval when
     # a strong vector match and a supported topic align. Still reject unrelated
     # questions rather than making up company policies.
-    is_description=best["question"].startswith("Business description — ")
     if len(ranked)>1 and score-ranked[1][0]<0.015 and not (
         question_overlap>ranked[1][3] or intent_match and not ranked[1][5]
         or is_description and (question_overlap>0 or answer_overlap>0)
