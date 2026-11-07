@@ -923,7 +923,14 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  <div class="cp-panel-heading"><div><h2>Channels</h2><p>Choose how people reach your receptionist.</p></div></div>
  <div class="cp-studio-connections">
   <article class="cp-studio-connection"><h3>Phone</h3><p>Link your managed number, set forwarding and review your fallback.</p>
-   <p id="channelPhone" role="status">Checking connection…</p><button class="secondary" onclick="window.section('usage')">Manage phone</button></article>
+   <p id="channelPhone" role="status">Checking connection…</p><button class="secondary" onclick="window.section('usage')">Manage phone</button>
+   <form id="phoneReserveForm" hidden>
+    <label for="phoneReserveArea">U.S. area code</label><input id="phoneReserveArea" inputmode="numeric" pattern="[2-9][0-9]{2}" minlength="3" maxlength="3" placeholder="212" required>
+    <label class="cp-fallback-check"><input id="phoneReserveConfirm" type="checkbox" required> Reserve an inbound number for this workspace</label>
+    <button type="submit">Reserve number</button>
+   </form>
+   <button type="button" id="phoneReserveCheck" class="secondary" hidden>Check pending number</button>
+   <p id="phoneReserveStatus" role="status"></p></article>
   <article class="cp-studio-connection"><h3>Browser practice</h3><p>Try the assistant from your workspace before routing calls.</p>
    <p id="channelPractice" role="status">Checking availability…</p><button class="secondary" onclick="window.section('simulator')">Open practice</button></article>
  </div>
@@ -1276,6 +1283,11 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-section-box"><h3>Your business phone number</h3>
 <p>Each business has its own AI assistant and number. You can use an imported provider number, or forward your existing business number.</p>
 <div class="cp-help" id="usagePhoneStatus" role="status">Checking your business number…</div>
+<form id="usageActivateForm" hidden>
+ <label class="cp-fallback-check"><input id="usageActivateConfirm" type="checkbox" required> Route new calls through this workspace's receptionist and plan limits</label>
+ <button type="submit">Activate incoming calls</button>
+ <p id="usageActivateStatus" role="status"></p>
+</form>
 <label for="usagePhoneOptions">Available numbers for this assistant</label><select id="usagePhoneOptions"><option value="">Choose a linked Vapi number…</option></select><div class="cp-inline-actions"><button class="secondary" onclick="window.findBusinessPhones()">Refresh available numbers</button><button onclick="window.linkBusinessPhone()">Connect selected number</button></div><details style="margin-top:15px"><summary style="font-size:12px;cursor:pointer;color:#64718c">Advanced: connect with provider phone ID</summary><label for="usagePhoneId">Vapi phone-number ID</label><input id="usagePhoneId" maxlength="150" placeholder="Enter an existing ID"></details>
 <div class="cp-divider"></div>
 <h3>When your AI minutes run out</h3>
@@ -1866,6 +1878,10 @@ window.loadWorkspace=async({destination}={})=>{
     $("channelDemoStatus").textContent="";
     resetTransfers();
     resetRouting();
+    $("phoneReserveForm").reset();$("phoneReserveForm").hidden=true;
+    $("phoneReserveCheck").hidden=true;$("phoneReserveStatus").textContent="";
+    $("usageActivateForm").reset();$("usageActivateForm").hidden=true;
+    $("usageActivateStatus").textContent="";
     setConnectionGroup("all");
     resetWorkers();
     orderReviewRows=[];
@@ -3358,7 +3374,10 @@ window.loadUsage=async()=>{
   $("usageGuardStatus").textContent=u.enforcement_enabled?
    "Inbound monthly allowance enforcement is active.":
    "Usage tracking is active. Automatic limits are NOT yet enforcing calls on this number. Setup and billing must be validated first.";
-  $("usagePhoneStatus").textContent=p.connected?
+  const reserved=p.provisioning==="provisioned";
+  $("usageActivateForm").hidden=!reserved||orgs.find(workspace=>workspace.id===organization())?.role!=="owner";
+  $("usagePhoneStatus").textContent=reserved?
+   "Reserved number "+(p.phone_number||"")+" · waiting for activation":p.connected?
    "Connected Vapi number"+(p.phone_number?": "+p.phone_number:" (number ID linked)")+
    ". Inbound quota enforcement is separate from number assignment.":
    "No provider number is linked here yet. Existing test calling may still work in Vapi.";
@@ -3372,6 +3391,20 @@ window.loadUsage=async()=>{
   $("usageGuardStatus").textContent="Automatic calling limits could not be verified.";
  }
 };
+$("usageActivateForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),button=event.currentTarget.querySelector("button");
+ button.disabled=true;
+ $("usageActivateStatus").textContent="Activating incoming calls…";
+ try{
+  await request("/organizations/"+oid+"/phone/activate-limits","POST",{confirm:$("usageActivateConfirm").checked});
+  if(oid===organization()){
+   $("usageActivateConfirm").checked=false;
+   await window.loadUsage();
+  }
+ }catch(e){if(oid===organization())$("usageActivateStatus").textContent=e.message}
+ finally{button.disabled=false}
+});
 window.saveFallback=()=>safe(async()=>{
  const enabled=$("usageFallbackEnabled").checked;
  const number=v("usageFallbackNumber").trim();
@@ -3619,7 +3652,7 @@ $("analyticsMetricForm").addEventListener("submit",async event=>{
 async function loadChannels(){
  const oid=organization();
  const items=[
-  ["channelPhone","/phone",state=>state.connected?(state.phone_number||"Managed number linked"):"No number connected"],
+  ["channelPhone","/phone",state=>state.provisioning==="provisioned"?((state.phone_number||"Number reserved")+" · awaiting activation"):state.connected?(state.phone_number||"Managed number linked"):"No number connected"],
   ["channelPractice","/voice-preview",state=>state.available?"Voice practice available":"Voice practice unavailable"]
  ];
  await Promise.all([...items.map(async([id,path,describe])=>{
@@ -3628,8 +3661,43 @@ async function loadChannels(){
    const state=await request("/organizations/"+oid+path);
    if(oid===organization())$(id).textContent=describe(state);
   }catch(e){if(oid===organization())$(id).textContent=e.message}
- }),loadDemoLinks(oid),loadTransfers(oid),loadRouting(oid)]);
+ }),loadDemoLinks(oid),loadTransfers(oid),loadRouting(oid),loadPhoneReservation(oid)]);
 }
+const phoneReservePath=oid=>"/organizations/"+oid+"/phone/provision";
+async function loadPhoneReservation(oid,message=""){
+ const form=$("phoneReserveForm"),check=$("phoneReserveCheck"),status=$("phoneReserveStatus");
+ form.hidden=true;check.hidden=true;
+ if(orgs.find(workspace=>workspace.id===oid)?.role!=="owner")return;
+ try{
+  const [state,phone]=await Promise.all([request(phoneReservePath(oid)),request("/organizations/"+oid+"/phone")]);
+  if(oid!==organization())return;
+  const pending=state.job?.status==="pending";
+  check.hidden=!pending;
+  form.hidden=!state.available||phone.connected||pending||state.job?.status==="provisioned";
+  status.textContent=message||(pending?"Checking with the provider. You can return here to recover the number.":
+   phone.provisioning==="provisioned"?"Open Manage phone to activate incoming calls.":
+   state.job?.status==="failed"?"The reservation was declined. You can try another area code.":"");
+ }catch(e){if(oid===organization())status.textContent=message||e.message}
+}
+async function reservePhone(event,reconcile=false){
+ event.preventDefault();
+ const oid=organization(),control=reconcile?event.currentTarget:event.currentTarget.querySelector("button");
+ control.disabled=true;$("phoneReserveStatus").textContent="Checking with Vapi…";
+ let message="";
+ try{
+  const state=await request(phoneReservePath(oid)+(reconcile?"/reconcile":""),"POST",
+   reconcile?{}:{area_code:v("phoneReserveArea"),confirm:$("phoneReserveConfirm").checked});
+  if(oid!==organization())return;
+  if(state.status==="provisioned"){
+   $("phoneReserveForm").reset();await loadChannels();return;
+  }
+  message=state.status==="pending"?"The provider has not confirmed the number yet. Check again shortly.":"The provider declined the reservation.";
+ }catch(e){message=e.message}
+ finally{control.disabled=false}
+ if(oid===organization())await loadPhoneReservation(oid,message);
+}
+$("phoneReserveForm").addEventListener("submit",event=>reservePhone(event));
+$("phoneReserveCheck").addEventListener("click",event=>reservePhone(event,true));
 const routingPath=oid=>"/organizations/"+oid+"/inbound-routing";
 let routingWorkspace="",routingSaved=null,routingDraft=[],routingWorkers=[],routingEditable=false,routingDirty=false;
 function resetRouting(){

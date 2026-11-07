@@ -701,6 +701,8 @@ app.include_router(transfer_directory_router)
 
 from app.runtime_routing import router as runtime_routing_router
 app.include_router(runtime_routing_router)
+from app.phone_provisioning import router as phone_provisioning_router
+app.include_router(phone_provisioning_router)
 
 from app.shopify_connection import router as shopify_connection_router
 app.include_router(shopify_connection_router)

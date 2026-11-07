@@ -9,7 +9,7 @@ from datetime import datetime,timezone,timedelta
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
-from app.account import current_user, membership
+from app.account import current_user, membership, rpc
 from app.cloud import api
 from app.billing import PLANS, account
 from app.call_intel import vapi, agent_config
@@ -164,7 +164,7 @@ def business_phone(oid:str,user=Depends(current_user)):
         "phone_number":rows[0].get("provider_number") if rows else None,
         "fallback_enabled":bool(config.get("fallback_enabled")),
         "fallback_number":config.get("fallback_number"),
-        "provisioning":"linked"}
+        "provisioning":"provisioned" if rows and rows[0]["status"]=="pending" else "linked"}
 
 @router.get("/api/account/organizations/{oid}/phone/options")
 def available_business_numbers(oid:str,user=Depends(current_user)):
@@ -232,7 +232,7 @@ async def inbound_admission(oid:str,request:Request,authorization:str|None=Heade
     if not phone_id or provided!=phone_id:
         return {"error":"This number is not configured for this business."}
     assigned=api("phone_assignments",params={"provider_phone_id":"eq."+phone_id,
-        "organization_id":"eq."+oid,"select":"id,fallback_enabled,fallback_number","limit":1})
+        "organization_id":"eq."+oid,"status":"eq.linked","select":"id,fallback_enabled,fallback_number","limit":1})
     if not assigned:return {"error":"This business line is unavailable."}
     agent_id=config.get("provider_agent_id")
     if not agent_id:return {"error":"This business line is not ready."}
@@ -318,22 +318,27 @@ def activate_limits(oid:str,body:ActivateRequest,user=Depends(current_user)):
         raise HTTPException(409,"Connect a Vapi phone number and assistant first")
     rows=api("phone_assignments",params={
         "organization_id":"eq."+oid,"provider_phone_id":"eq."+phone_id,
-        "select":"provider_phone_id","limit":1})
-    if not rows:raise HTTPException(409,"Phone number ownership not verified")
+        "select":"status,fallback_enabled,fallback_number","limit":1})
+    if not rows or rows[0]["status"] not in ("linked","pending"):
+        raise HTTPException(409,"Phone number ownership not verified")
     provider=vapi("GET","/phone-number/"+phone_id)
-    if provider.get("assistantId")!=agent_id:
-        raise HTTPException(409,"Provider number routing differs from this workspace")
     base=os.getenv("PUBLIC_BASE_URL","https://callpilot-internal.onrender.com").rstrip("/")
     if not base.startswith("https://"):
         raise HTTPException(503,"Secure HTTPS application URL required")
     endpoint=base+"/webhooks/vapi-admission/"+oid
+    pending=rows[0]["status"]=="pending"
+    current_endpoint=(provider.get("server") or {}).get("url")
+    if pending:
+        if (provider.get("assistantId") or provider.get("squadId") or provider.get("workflowId")
+                or current_endpoint not in (None, "", endpoint)):
+            raise HTTPException(409,"Provider number routing differs from this workspace")
+    elif provider.get("assistantId")!=agent_id and (
+            provider.get("assistantId") or provider.get("squadId") or current_endpoint!=endpoint):
+        raise HTTPException(409,"Provider number routing differs from this workspace")
     # On webhook timeout/error, route to a human only if the owner explicitly
     # enabled it. Otherwise play a brief provider announcement rather than
     # consuming more billable AI minutes.
-    settings=api("phone_assignments",params={
-        "organization_id":"eq."+oid,"provider_phone_id":"eq."+phone_id,
-        "select":"fallback_enabled,fallback_number","limit":1})
-    fallback=settings[0] if settings else {}
+    fallback=rows[0]
     if fallback.get("fallback_enabled") and fallback.get("fallback_number"):
         failure_action={"type":"transfer","destination":{
             "type":"number","number":fallback["fallback_number"]}}
@@ -351,12 +356,12 @@ def activate_limits(oid:str,body:ActivateRequest,user=Depends(current_user)):
         "assistantId":None,"hooks":hooks,
         "server":{"url":endpoint,"credentialId":credential,"timeoutSeconds":6}})
     try:
-        api("billing_accounts","PATCH",params={"organization_id":"eq."+oid},
-            data={"enforcement_enabled":True},prefer="return=minimal")
-    except Exception:
-        try:vapi("PATCH","/phone-number/"+phone_id,body={"assistantId":agent_id})
-        except Exception:pass
-        raise HTTPException(503,"Could not save call limits; number routing rollback attempted")
+        if rpc("activate_managed_phone_assignment",{"p_workspace":oid,"p_phone_id":phone_id}) is not True:
+            raise HTTPException(409,"Workspace phone or billing record changed")
+    except Exception as exc:
+        # The database may have committed before its reply was lost. Keep the
+        # admission route and allow an idempotent retry. Admission fails closed.
+        raise HTTPException(503,"Could not confirm activation. Retry to check the saved setup.") from exc
     return {"enforced":True,"note":"Future calls must pass monthly usage admission; ongoing calls are not interrupted"}
 
 @router.get("/api/account/organizations/{oid}/phone/setup-guide")
@@ -367,7 +372,7 @@ def phone_setup_guide(oid:str,user=Depends(current_user)):
                  "Import the number into Vapi and assign the business's AI assistant.",
                  "Connect the provider phone-number ID to this workspace.",
                  "Test inbound calls before enabling billing-enforced routing."],
-        "note":"CallPilot does not buy numbers or activate enforcement without a tested configuration.",
+        "note":"Eligible workspaces can reserve a U.S. number from Channels. Incoming AI calls require owner activation and active production billing.",
         "free_vapi_numbers_per_basic_account":1,
         "paid_numbers":"Additional numbers have provider charges; usage/concurrency is separate."
     }
