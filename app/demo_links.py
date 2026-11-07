@@ -39,6 +39,21 @@ def voice_available(workspace: str) -> bool:
             and workspace in allowed and bool(os.getenv("VAPI_API_KEY")))
 
 
+def marketing_voice_path() -> str | None:
+    """Publish only a specifically selected, still-active voice demo."""
+    configured = os.getenv("MARKETING_VOICE_DEMO_LINK_ID", "").strip()
+    if not configured:
+        return None
+    try:
+        link_id = UUID(configured)
+        link = active_link(link_id)
+        if link["voice_enabled"] and voice_available(link["organization_id"]):
+            return "/demo/" + link_id.hex + "." + signature(link_id)
+    except (ValueError, HTTPException):
+        return None
+    return None
+
+
 def resolve_token(token: str) -> UUID:
     try:
         raw_id, supplied = token.split(".", 1)

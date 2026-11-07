@@ -5,7 +5,7 @@ from pathlib import Path
 from html import escape
 from datetime import datetime, timezone
 from fastapi import FastAPI, Header, HTTPException, Depends, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from app.common import authorize, MAX_CALL_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN
 
@@ -117,6 +117,50 @@ def faq():
     return marketing_page("faq", "Frequently asked questions")
 
 
+@app.get("/voice-demo", response_class=HTMLResponse, include_in_schema=False)
+def voice_demo_page():
+    from app.demo_links import PRIVATE_HEADERS, marketing_voice_path
+
+    live = marketing_voice_path()
+    action = (
+        '<a class="button" href="/voice-demo/start">Open live demo ↗</a>'
+        if live else '<a class="button" href="/#call-example">Explore the call example ↗</a>'
+    )
+    availability = (
+        "A live demo is available. You’ll choose whether to share your microphone before speaking."
+        if live else "Live public sessions are currently unavailable. Explore the sample call or try voice practice in your workspace."
+    )
+    content = f"""
+<section class="hero-shell"><div class="wrap demo-landing">
+ <div><p class="eyebrow">Meet the receptionist</p><h1>Start with a conversation.</h1>
+  <p class="lead">{availability}</p>
+  <div class="actions">{action}<a class="button quiet" href="/app#simulator">Practice with your agent</a></div>
+ </div>
+ <article class="example demo-preview" aria-label="Voice demo overview">
+  <div class="example-head"><span class="avatar" aria-hidden="true">✦</span>
+   <div><strong>CallPilot voice preview</strong><p>One minute in the browser</p></div></div>
+  <div class="example-bar">Approved answers only</div>
+  <div class="demo"><h2>Try a question you hear every day.</h2>
+   <p class="bubble">What kinds of jobs does the team handle?</p>
+   <p class="bubble">When is the business open?</p>
+   <p class="outcome">A demo session won’t create appointments, place orders, or call a phone number.</p>
+  </div>
+ </article>
+</div></section>
+<section class="band"><div class="wrap"><h2>Bring your own business details.</h2>
+<p class="lead">Open your workspace to hear a saved greeting, check approved answers, and adjust your receptionist before connecting a phone.</p>
+<a class="button dark" href="/app?mode=signup">Build your agent ↗</a></div></section>
+"""
+    return HTMLResponse(marketing_page(title="Voice demo", content=content), headers=PRIVATE_HEADERS)
+
+
+@app.get("/voice-demo/start", include_in_schema=False)
+def open_marketing_voice_demo():
+    from app.demo_links import PRIVATE_HEADERS, marketing_voice_path
+
+    return RedirectResponse(marketing_voice_path() or "/voice-demo", headers=PRIVATE_HEADERS)
+
+
 PRODUCT_PAGES = {
     "answering-services": (
         "Give callers a helpful first answer", "Set up a receptionist that knows your business and can take a message.",
@@ -128,7 +172,7 @@ PRODUCT_PAGES = {
     ),
     "local-phone-numbers": (
         "Connect a number for your business", "Bring your existing public number into your CallPilot setup with forwarding.",
-        "Use your connected CallPilot number directly or forward calls to it from your existing line. If you need a new number, check availability with your phone provider.",
+        "Use your connected CallPilot number directly or forward calls to it from your existing line. Eligible workspaces can reserve a U.S. number by area code. You can also connect a supported existing number.",
         ("Review your connected number in Usage &amp; phone.", "Choose how your carrier forwards calls from your existing line.",
          "Check the greeting, fallback destination, and what happens when a caller hangs up."),
         "An unanswered call reaches your receptionist", "A carrier can forward an unanswered call to your connected CallPilot number when that forwarding option is available.",
@@ -146,15 +190,15 @@ PRODUCT_PAGES = {
         "Make room for your next customer", "Book visits around your real calendar and business hours.",
         "Connect Google Calendar, set when you take appointments, and enable booking after reviewing your configuration.",
         ("Connect Google Calendar from Appointments.", "Set weekly booking hours and date exceptions.",
-         "Check availability and enable voice booking when you are ready."),
+         "Enable voice booking, then manage confirmed appointments, changes and cancellations from the dashboard."),
         "A caller requests a Friday visit", "The receptionist checks the slot and confirms the booking after a calendar event is created.",
         "/app#appointments", "Open appointments",
     ),
     "product-orders": (
         "Help callers find the right product", "Answer catalog questions and collect order requests for your team.",
-        "Choose recorded or Shopify inventory for each approved SKU. Your team reviews pending requests in the order queue.",
+        "Choose recorded or Shopify inventory for each approved SKU. Your team can approve requests, share a Shopify checkout link, and check payment and fulfillment status.",
         ("Add approved SKUs and choose the source for stock.", "Connect Shopify if you want live stock for an approved item.",
-         "Enable catalog lookup and manage pending requests in Order requests."),
+         "Approve a request and create its Shopify checkout link from Order requests."),
         "A caller asks for a product", "The receptionist checks the approved catalog and can save a pending request for your team to review.",
         "/app#studio", "Open catalog setup",
     ),

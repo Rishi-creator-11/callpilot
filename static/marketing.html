@@ -25,6 +25,10 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 .plan-compare{width:100%;min-width:550px;border-collapse:collapse;text-align:left}
 .plan-compare th,.plan-compare td{padding:13px 15px;border-bottom:1px solid var(--line)}
 .plan-compare thead th{background:#e4f2e9}.plan-compare tbody tr:last-child>*{border-bottom:0}
+.demo-landing{display:grid;grid-template-columns:1.12fr .88fr;align-items:center;gap:clamp(24px,6vw,90px);padding-block:clamp(52px,8vw,108px)}
+.demo-landing .eyebrow{color:var(--mint)}.demo-landing .lead{color:#cdd9e8}.demo-landing h1{max-width:12ch}
+.demo-preview h2{font-size:clamp(1.5rem,3vw,2rem);color:var(--ink)}.demo-preview .bubble{margin-block:10px}
+@media(max-width:650px){.demo-landing{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -32,7 +36,7 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <header class="site-head"><nav class="wrap site-nav" aria-label="Main navigation">
 <a class="brand" href="/" aria-label="CallPilot home"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a>
 <div class="nav-links"><details class="product-menu"><summary>Product</summary><ul>
-<li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointment scheduling</a></li>
+<li><a href="/voice-demo">Voice demo</a></li><li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointment scheduling</a></li>
 <li><a href="/lead-capture">Lead capture</a></li><li><a href="/product-orders">Products and orders</a></li>
 <li><a href="/business-productivity-ai">Integrations</a></li><li><a href="/call-history">Call history</a></li><li><a href="/local-phone-numbers">Business numbers</a></li>
 </ul></details><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/resources">Resources</a><a href="/app">Sign in</a><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div>
@@ -41,7 +45,7 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <div class="hero-shell"><section class="hero wrap">
  <div><p class="eyebrow">Your AI front desk</p><h1>Give every caller a place to start.</h1>
  <p class="lead">CallPilot answers from your approved business information, takes callback requests, and can schedule appointments on your connected calendar.</p>
- <div class="actions"><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a><a class="button quiet" href="#call-example">See a call</a></div></div>
+ <div class="actions"><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a><a class="button quiet" href="/voice-demo">Try the voice demo</a></div></div>
  <div class="example" id="call-example">
   <div class="example-head"><div class="avatar" aria-hidden="true">✦</div><div><strong>Northline Heating</strong> <span class="tag">Example</span><p>CallPilot receptionist</p></div></div>
   <div class="example-bar"><span class="dot" aria-hidden="true"></span> Front desk preview</div>
@@ -110,7 +114,7 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <footer class="site-footer"><div class="wrap footer-grid">
 <div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a><p>A front desk for businesses that work on the phone.</p></div>
 <div><h2>Product</h2><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointments</a></li></ul></div>
-<div><h2>Resources</h2><ul><li><a href="/resources">Setup guides</a></li><li><a href="/faq">FAQ</a></li><li><a href="/business-productivity-ai">Integration directory</a></li><li><a href="/local-phone-numbers">Business numbers</a></li></ul></div>
+<div><h2>Resources</h2><ul><li><a href="/voice-demo">Voice demo</a></li><li><a href="/resources">Setup guides</a></li><li><a href="/faq">FAQ</a></li><li><a href="/business-productivity-ai">Integration directory</a></li><li><a href="/local-phone-numbers">Business numbers</a></li></ul></div>
 <div><h2>CallPilot</h2><ul><li><a href="/about">About</a></li><li><a href="/news">Product updates</a></li><li><a href="/support">Help center</a></li><li><a href="/app">Sign in</a></li><li><a href="/legal">Terms and privacy</a></li></ul></div>
 </div></footer>
 <script>
