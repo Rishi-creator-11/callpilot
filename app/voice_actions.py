@@ -225,8 +225,10 @@ def check_appointment_availability(oid: str, message: dict, args: dict) -> str:
     _call_context(oid, message)
     if not feature_flags(oid).get("voice_booking_enabled"):
         raise ValueError("Voice booking has not been enabled by this business")
-    from app.calendar import google_token, free_busy
+    from app.calendar import google_token, free_busy, within_booking_hours, OUTSIDE_HOURS
     start, end, duration = _slot(args)
+    if not within_booking_hours(oid, start, end):
+        return OUTSIDE_HOURS + " No booking was made."
     available = free_busy(google_token(oid), start, end)
     when = start.strftime("%A, %B %d at %I:%M %p %z")
     return (("Available" if available else "Unavailable") + ": " + when
@@ -244,7 +246,7 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
         raise ValueError("Voice booking has not been enabled by this business")
     if args.get("confirmed") is not True:
         raise ValueError("Read the details aloud and obtain explicit caller agreement before booking")
-    from app.calendar import google_token, free_busy
+    from app.calendar import google_token, free_busy, within_booking_hours, OUTSIDE_HOURS
     from app.account import rpc
     start, end, duration = _slot(args)
     name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
@@ -296,11 +298,14 @@ def book_appointment(oid: str, message: dict, args: dict) -> str:
                     raise ValueError("Calendar event ID belongs to a different reservation")
                 provider_confirmed = True
             elif prior.status_code == 404:
-                if not free_busy(access, start, end):
+                inside_hours = within_booking_hours(oid, start, end)
+                if not inside_hours or not free_busy(access, start, end):
                     api("appointment_requests", "PATCH", params={
                         "organization_id": "eq." + oid, "id": "eq." + str(rid),
                         "status": "eq.requested",
                     }, data={"status": "rejected"}, prefer="return=minimal")
+                    if not inside_hours:
+                        return OUTSIDE_HOURS + " No booking was made; offer another time."
                     return "The calendar is busy at that time. No booking was made; offer another time."
                 event = {
                     "id": eid, "summary": service,

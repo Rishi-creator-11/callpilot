@@ -386,6 +386,9 @@ app.include_router(call_intel_router)
 from app.calendar import router as calendar_router
 app.include_router(calendar_router)
 
+from app.booking_hours import router as booking_hours_router
+app.include_router(booking_hours_router)
+
 from app.catalog import router as catalog_router
 app.include_router(catalog_router)
 

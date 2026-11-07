@@ -50,14 +50,14 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Identity configuration, Persona tab | Observed | Agent and voice configuration partial. Stock voices, samples, and avatar editing need a counterpart. |
 | [ ] | Identity configuration, Speech tab | Observed | Language, keyword, pronunciation and preview controls missing. |
 | [ ] | Identity configuration, Business Profile tab | Observed | `/app#workspace` has basic business details. Profile sync and expanded fields missing. |
-| [ ] | Identity configuration, Open Hours tab | Observed | Add timezone editing, copy-day controls, split hours, special hours and validation. |
+| [ ] | Identity configuration, Open Hours tab | Observed | `/app#workspace` has timezone editing, split appointment hours, and date overrides. Copy-day controls, spoken hours and after-hours routing remain open. |
 | [ ] | Identity read-only/edit state and History drawer | Observed | Version history and approval workflow missing. |
 | [ ] | `/agent/workers`, worker list and Add worker | List and Create Worker dialog observed, including Free Prompt and Structured Form | Build worker CRUD, validations, and assignment. |
 | [ ] | Operator detail, Greeting tab | Observed | `/app#voice` supports greeting. Add open/closed greeting and routing rules. |
 | [ ] | Operator detail, Directory tab | Observed | Build contact directory, escalation defaults and fallback routing. |
 | [ ] | Worker detail, specialist and tool configuration | Some workers observed, detail forms pending | Build worker-specific panels and supported tools. |
 | [ ] | Workers, Knowledge tab and source list | Observed | `/app#knowledge` has source attribution, editable drafts, approval, and search testing. |
-| [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link import verified. PDF upload and draft extraction implemented and covered by API tests. Authenticated browser verification remains. |
+| [ ] | Knowledge, Add document dialog, Upload PDF and Add Link tabs | Dialog, PDF tab and link form observed | Website link and PDF import verified in the authenticated sandbox. PDF extraction creates a reviewable draft. Scanned-document OCR remains open. |
 | [ ] | Knowledge source detail and lifecycle controls | Source detail, View content, Edit and History observed | CallPilot edits and approval available. Compare source detail and deletion behavior. |
 | [ ] | `/agent/connections`, Integrations tab | Observed | `/app#appointments` covers Google Calendar. Connector cards, status states and remaining providers missing. |
 | [ ] | Connections, Custom APIs tab and Add Custom API dialog | Observed | Build scoped endpoint definitions and validations. |
@@ -67,7 +67,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | Settings, Billing summary, payment method and invoices | Observed | `/app#billing` has plan entry points and Stripe portal. Verify setup, payments and invoice history in sandbox. |
 | [ ] | Account menu, agent switcher, new agent and sign-out | Menu observed, creation workflow pending | Workspace switcher and sign-out exist. Multi-agent management missing. |
 | [ ] | Support control and contextual help | Entry point observed | `/app#help` exists. Compare support dialogs and escalation. |
-| [ ] | Browser practice, microphone prompt, typing and return to setup | Entry points observed, live voice exchange pending | `/app#simulator` verified for text retrieval and now includes saved answer checks. Voice practice, share, transcript and evaluation missing. |
+| [ ] | Browser practice, microphone prompt, typing and return to setup | Entry points observed, live voice exchange pending | `/app#simulator` verified for text retrieval and repeatable saved answer checks. Voice practice, share, transcript and evaluation missing. |
 | [ ] | Mobile navigation, menus, empty/loading/error states and accessibility | Some desktop states observed, mobile inventory pending | Validate every implemented surface at mobile breakpoints and with keyboard navigation. |
 
 ## Coverage limits

@@ -102,6 +102,7 @@ def test_booked_calendar_event_is_persisted(monkeypatch):
     monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: flags(voice_booking_enabled=True))
     monkeypatch.setattr(calendar, "google_token", lambda oid: "fake-calendar-token")
     monkeypatch.setattr(calendar, "free_busy", lambda token, a, b: True)
+    monkeypatch.setattr(calendar, "within_booking_hours", lambda oid, a, b: True)
     monkeypatch.setattr(account, "rpc", lambda name, args: [{
         "reservation_status": "reserved",
         "reservation_id": "00000000-0000-4000-8000-000000000001",

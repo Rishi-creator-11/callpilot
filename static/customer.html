@@ -652,6 +652,23 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div class="cp-form-grid"><div><label for="wsName">Business name</label><input id="wsName" maxlength="120" autocomplete="organization" placeholder="Your company"></div>
 <div><label for="wsIndustry">Industry</label><input id="wsIndustry" maxlength="80" placeholder="e.g. Wholesale clothing"></div></div>
 <div id="orgInfo" class="cp-subnav" style="margin-top:13px"></div><button id="wsSaveButton" onclick="window.saveWorkspace()">Save business details</button></div>
+<div class="cp-section-box" id="bookingHoursPanel" hidden>
+ <h3>Booking hours</h3>
+ <p>Set when CallPilot can schedule appointments. A date override replaces regular hours for that date.</p>
+ <form id="bookingHoursForm">
+  <label for="bookingTimeZone">Business time zone</label>
+  <input id="bookingTimeZone" maxlength="100" placeholder="America/New_York" list="bookingTimeZones" required>
+  <datalist id="bookingTimeZones"></datalist>
+  <label><input type="checkbox" id="limitBookingHours"> Limit appointments to the hours below</label>
+  <div id="bookingHourRules" hidden>
+   <h4>Weekly hours</h4><div id="weeklyBookingHours"></div>
+   <h4>Date overrides</h4><div id="bookingDateOverrides"></div>
+   <button id="addBookingOverride" type="button" class="secondary">Add date override</button>
+  </div>
+  <button type="submit">Save booking hours</button>
+ </form>
+ <p id="bookingHoursStatus" class="muted" role="status"></p>
+</div>
 <div class="cp-section-box"><h3>Team access</h3><p>Your workspace is private. Access is limited to authorized team members.</p>
 <div id="wsTeam" class="muted">Loading team members...</div></div>
 <div class="cp-section-box"><h3>Additional businesses</h3><p>Manage multiple business workspaces independently.</p>
@@ -753,7 +770,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div class="cp-form-grid"><div><label for="cname">Customer name</label><input id="cname" placeholder="Test customer"></div>
 <div><label for="cservice">Appointment type</label><input id="cservice" placeholder="Consultation"></div>
 <div><label for="ccontact">Contact</label><input id="ccontact" placeholder="test@example.com"></div>
-<div><label for="cstart">Date and time</label><input type="datetime-local" id="cstart"></div></div>
+<div><label for="cstart">Date and time in your device’s time zone</label><input type="datetime-local" id="cstart"></div></div>
 <label for="cduration">Duration</label><select id="cduration"><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select>
 <div class="cp-inline-actions" style="margin-top:12px"><button class="secondary" onclick="window.checkAvailability()">Check availability</button>
 <button onclick="window.bookTest()">Create test booking</button></div><pre id="calendarResult" role="status">No calendar tests yet.</pre></div>
@@ -996,7 +1013,7 @@ function loadActivePage(id){
  const load={
    studio:()=>window.loadStudio(),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
-   billing:()=>loadBilling(),workspace:()=>window.fillWorkspace()
+   billing:()=>loadBilling(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours()])
  }[id];
  if(load)Promise.resolve().then(load).catch(e=>msg(e?.message||"Unable to load this section.",true));
 }
@@ -1114,6 +1131,7 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("websiteImportStatus").textContent="";
    $("websiteImportButton").disabled=false;
    window.cancelDescriptionEdit();
+   $("bookingHoursPanel").hidden=true;
    pdfImportRun++;
    $("pdfImportFile").value="";
    $("pdfImportStatus").textContent="";
@@ -1163,6 +1181,104 @@ window.changePassword=()=>safe(async()=>{
  $("newPassword").value="";$("confirmPassword").value="";
  return "Password updated successfully.";
 });
+const weekdays=[["mon","Monday"],["tue","Tuesday"],["wed","Wednesday"],["thu","Thursday"],["fri","Friday"],["sat","Saturday"],["sun","Sunday"]];
+const timeZoneOptions=Intl.supportedValuesOf?.("timeZone")||["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","Europe/London","UTC"];
+for(const zone of timeZoneOptions){
+ const option=document.createElement("option");option.value=zone;$("bookingTimeZones").append(option);
+}
+$("limitBookingHours").addEventListener("change",()=>{
+ $("bookingHourRules").hidden=!$("limitBookingHours").checked;
+});
+function scheduleButton(label,action){
+ const button=document.createElement("button");
+ button.type="button";button.className="secondary";button.textContent=label;
+ button.addEventListener("click",action);
+ return button;
+}
+function scheduleInput(type,label,value){
+ const input=document.createElement("input");
+ input.type=type;input.setAttribute("aria-label",label);input.value=value;
+ return input;
+}
+function scheduleWindows(container,windows,label){
+ const list=document.createElement("div");
+ const add=scheduleButton("Add time window",()=>append({start:"09:00",end:"17:00"}));
+ function append(window){
+  const row=document.createElement("div");row.className="cp-inline-actions";
+  row.append(scheduleInput("time",label+" opening time",window.start),
+    scheduleInput("time",label+" closing time",window.end),
+    scheduleButton("Remove time window",()=>{row.remove();update()}));
+  list.append(row);update();
+ }
+ function update(){add.disabled=list.children.length>=3}
+ windows.forEach(append);container.append(list,add);
+ return ()=>Array.from(list.children,row=>{
+  const [start,end]=Array.from(row.querySelectorAll("input"),input=>input.value);
+  if(!start||!end)throw Error("Fill in both times for each time window.");
+  return {start,end};
+ });
+}
+let bookingWeekReaders={},bookingOverrideReaders=new Map();
+function addBookingOverride(day="",windows=[]){
+ const container=$("bookingDateOverrides");
+ if(bookingOverrideReaders.size>=50)return;
+ const row=document.createElement("div");row.className="item";
+ const date=scheduleInput("date","Override date",day);
+ const note=document.createElement("p");note.className="muted";note.textContent="Leave the time windows empty to close bookings on this date.";
+ row.append(date,note);
+ const readWindows=scheduleWindows(row,windows,"Override");
+ row.append(scheduleButton("Remove date override",()=>{
+  bookingOverrideReaders.delete(row);row.remove();$("addBookingOverride").disabled=false;
+ }));
+ bookingOverrideReaders.set(row,()=>[date.value,readWindows()]);
+ container.append(row);
+ $("addBookingOverride").disabled=bookingOverrideReaders.size>=50;
+}
+$("addBookingOverride").addEventListener("click",()=>addBookingOverride());
+async function loadBookingHours(){
+ const oid=organization(),panel=$("bookingHoursPanel"),status=$("bookingHoursStatus");
+ panel.hidden=true;
+ if(!["owner","admin"].includes(orgs.find(org=>org.id===oid)?.role))return;
+ const data=await request("/organizations/"+encodeURIComponent(oid)+"/booking-hours");
+ if(oid!==organization())return;
+ $("bookingTimeZone").value=data.timezone;
+ $("limitBookingHours").checked=data.hours!==null;
+ $("bookingHourRules").hidden=data.hours===null;
+ $("weeklyBookingHours").replaceChildren();
+ $("bookingDateOverrides").replaceChildren();
+ bookingOverrideReaders.clear();
+ $("addBookingOverride").disabled=false;
+ bookingWeekReaders={};
+ for(const [key,label] of weekdays){
+  const row=document.createElement("div"),title=document.createElement("strong");
+  row.className="item";title.textContent=label;row.append(title);
+  bookingWeekReaders[key]=scheduleWindows(row,data.hours?.week?.[key]||[],label);
+  $("weeklyBookingHours").append(row);
+ }
+ for(const [day,windows] of Object.entries(data.hours?.exceptions||{}))addBookingOverride(day,windows);
+ status.textContent="";
+ panel.hidden=false;
+}
+$("bookingHoursForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const oid=organization(),status=$("bookingHoursStatus"),button=event.submitter;
+ if(!oid||button.disabled)return;
+ button.disabled=true;
+ try{
+  let hours=null;
+  if($("limitBookingHours").checked){
+   const week=Object.fromEntries(Object.entries(bookingWeekReaders).map(([day,read])=>[day,read()]));
+   const entries=Array.from(bookingOverrideReaders.values(),read=>read());
+   if(entries.some(([day])=>!day))throw Error("Choose a date for every override.");
+   if(new Set(entries.map(([day])=>day)).size!==entries.length)throw Error("Each date can have only one override.");
+   hours={week,exceptions:Object.fromEntries(entries)};
+  }
+  await request("/organizations/"+encodeURIComponent(oid)+"/booking-hours","PUT",{timezone:v("bookingTimeZone").trim(),hours});
+  if(oid===organization())status.textContent="Booking hours saved.";
+ }catch(e){if(oid===organization())status.textContent=e.message}
+ finally{button.disabled=false}
+});
+
 window.fillWorkspace=async()=>{
  const o=orgs.find(x=>x.id===organization());
  if(!o)return;
@@ -1469,7 +1585,10 @@ async function loadCalendar(){
 }
 window.connectCalendar=()=>safe(async()=>{let r=await request("/organizations/"+organization()+"/calendar/connect","POST");location.href=r.url});
 const slot=()=>({start:new Date(v("cstart")).toISOString(),duration_minutes:Number(v("cduration"))});
-window.checkAvailability=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/availability","POST",slot()),null,2)});
+window.checkAvailability=()=>safe(async()=>{
+ const result=await request("/organizations/"+organization()+"/calendar/availability","POST",slot());
+ $("calendarResult").textContent=result.available?"This time is available.":result.reason||"The connected calendar is busy at this time.";
+});
 window.bookTest=()=>safe(async()=>{$("calendarResult").textContent=JSON.stringify(await request("/organizations/"+organization()+"/calendar/book-test","POST",{...slot(),caller_name:v("cname"),caller_contact:v("ccontact"),service:v("cservice")}),null,2);await loadBookings()});
 async function loadBookings(){$("bookings").textContent=JSON.stringify(await request("/organizations/"+organization()+"/bookings"),null,2)}
 

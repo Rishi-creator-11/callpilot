@@ -8,6 +8,7 @@ from pydantic import BaseModel,Field
 from cryptography.fernet import Fernet,InvalidToken
 from app.account import current_user,membership,rpc
 from app.cloud import api
+from app.booking_hours import OUTSIDE_HOURS, within_booking_hours
 
 router=APIRouter(tags=["calendar"])
 REDIRECT="https://callpilot-internal.onrender.com/api/oauth/google/callback"
@@ -95,9 +96,14 @@ def free_busy(access:str,start:datetime,end:datetime):
                 json={"timeMin":start.isoformat(),"timeMax":end.isoformat(),
                       "items":[{"id":"primary"}]})
         if r.status_code!=200:raise HTTPException(502,"Could not verify calendar availability")
-        calendar=r.json().get("calendars",{}).get("primary",{})
-        if calendar.get("errors"):raise HTTPException(502,"Calendar availability unavailable")
-        return not calendar.get("busy")
+        try:
+            calendars = r.json().get("calendars")
+            calendar = calendars.get("primary") if isinstance(calendars, dict) else None
+        except (ValueError, AttributeError):
+            calendar = None
+        if not isinstance(calendar, dict) or calendar.get("errors") or not isinstance(calendar.get("busy"), list):
+            raise HTTPException(502, "Calendar availability unavailable")
+        return not calendar["busy"]
     except httpx.RequestError:raise HTTPException(503,"Calendar unavailable")
 
 class Slot(BaseModel):
@@ -118,6 +124,8 @@ def check_slot(body:Slot):
 def availability(oid:str,body:Slot,user=Depends(current_user)):
     membership(oid,user)
     start,end=check_slot(body)
+    if not within_booking_hours(oid, start, end):
+        return {"available": False, "reason": OUTSIDE_HOURS, "start": start.isoformat(), "end": end.isoformat()}
     return {"available":free_busy(google_token(oid),start,end),"start":start.isoformat(),"end":end.isoformat()}
 
 class BookSlot(Slot):
@@ -129,6 +137,7 @@ class BookSlot(Slot):
 def book_test(oid:str,body:BookSlot,user=Depends(current_user)):
     membership(oid,user,("owner","admin"))
     start,end=check_slot(body)
+    if not within_booking_hours(oid, start, end):raise HTTPException(409,OUTSIDE_HOURS)
     access=google_token(oid)
     if not free_busy(access,start,end):raise HTTPException(409,"This slot is unavailable")
     event={"summary":"CallPilot test: "+body.service,
