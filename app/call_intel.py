@@ -424,7 +424,7 @@ def refresh_receptionist_prompt(oid:str):
     """
     from app.cloud import org_or_404,api as cloud_api,receptionist_prompt
     cfg=cloud_api("agent_configs",params={"organization_id":"eq."+oid,
-        "select":"provider_agent_id,agent_name,voice_leads_enabled,voice_booking_enabled","limit":1})
+        "select":"provider_agent_id,agent_name,voice_leads_enabled,voice_booking_enabled,voice_catalog_enabled,voice_order_requests_enabled","limit":1})
     if not cfg or not cfg[0].get("provider_agent_id"):
         return {"updated":False,"reason":"no_assistant"}
     aid=cfg[0]["provider_agent_id"]
@@ -457,7 +457,7 @@ def refresh_receptionist_prompt(oid:str):
     from app.voice_actions import MANAGED_TOOLS,voice_tool_definitions
     flags=cfg[0]
     credential=os.getenv("VAPI_CREDENTIAL_ID","")
-    if (flags.get("voice_leads_enabled") or flags.get("voice_booking_enabled")) and not credential:
+    if any(flags.get(k) for k in ("voice_leads_enabled","voice_booking_enabled","voice_catalog_enabled","voice_order_requests_enabled")) and not credential:
         raise HTTPException(503,"Vapi private tool credential is not configured")
     base_tools=[t for t in existing_tools if not (isinstance(t,dict) and
                 (t.get("function") or {}).get("name") in MANAGED_TOOLS)]
