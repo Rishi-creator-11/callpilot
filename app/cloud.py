@@ -145,9 +145,13 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str)->str:
         "You may quote only CallPilot's verified published plan pricing returned by the tool. "
         "Do not negotiate rates or imply unapproved discounts. "
         if oid==CALLPILOT_ORG else
-        "Do not invent prices or estimates. If exact prices are not in an approved source, "
-        "ask for the product and relevant specifications, then offer a human quote. "
-        "Do not repeat this refusal when the caller has already understood it. "
+        "For this business, the owner has approved exact price answers. Only state a price "
+        "when lookup_approved_knowledge returns an explicitly verified amount for the "
+        "exact product, quantity, and configuration. Never interpolate, calculate "
+        "a different quote, invent discounts, or claim the price is final otherwise. "
+        if flags.get("allow_price_quotes") else
+        "Do not invent or quote unapproved prices. Ask for the product and relevant "
+        "specifications, then offer a human quote without repeating the refusal. "
     )
     lead_policy=(
         "For callbacks, ask for the name and preferred callback number, repeat them back, "
