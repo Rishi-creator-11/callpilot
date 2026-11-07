@@ -39,7 +39,8 @@ def status(oid: UUID, user=Depends(current_user)):
     return {"available": workspace_enabled(str(oid)) and role in ("owner", "admin")}
 
 
-def preview_assistant(oid: str) -> dict:
+def preview_assistant(oid: str, *, knowledge_url: str | None = None,
+                      knowledge_token: str | None = None, max_seconds: int = 90) -> dict:
     from app.identity import SPEECH_FIELDS, transcriber, voice_config
 
     business = org_or_404(oid)
@@ -58,8 +59,8 @@ def preview_assistant(oid: str) -> dict:
             },
         },
         "server": {
-            "url": f"{public_base()}/webhooks/vapi-preview/{oid}",
-            "headers": {"Authorization": "Bearer " + preview_token(oid)},
+            "url": knowledge_url or f"{public_base()}/webhooks/vapi-preview/{oid}",
+            "headers": {"Authorization": "Bearer " + (knowledge_token or preview_token(oid))},
             "timeoutSeconds": 15,
         },
     }
@@ -75,7 +76,7 @@ def preview_assistant(oid: str) -> dict:
         },
         "voice": voice_config(agent, {"provider": "vapi", "voiceId": "Elliot", "version": 2}),
         "transcriber": transcriber(agent),
-        "maxDurationSeconds": 90,
+        "maxDurationSeconds": max_seconds,
         "silenceTimeoutSeconds": 25,
         "artifactPlan": {"recordingEnabled": False, "videoRecordingEnabled": False,
                          "transcriptPlan": {"enabled": False}},
@@ -93,6 +94,11 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
     assistant = preview_assistant(workspace)
     if rpc("reserve_voice_preview", {"p_organization_id": workspace, "p_user_id": user["id"]}) is not True:
         raise HTTPException(429, "Practice limit reached. Wait a few minutes, or try again tomorrow.")
+    response.headers["Cache-Control"] = "no-store"
+    return create_preview_room(assistant)
+
+
+def create_preview_room(assistant: dict) -> dict:
     result = vapi("POST", "/call/web", body={"assistant": assistant, "roomDeleteOnUserLeaveEnabled": True})
     if not isinstance(result, dict):
         raise HTTPException(502, "The voice provider returned an invalid practice response.")
@@ -108,7 +114,6 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
             raise ValueError
     except ValueError:
         raise HTTPException(502, "The voice provider did not return a valid practice room.") from None
-    response.headers["Cache-Control"] = "no-store"
     safe_result = {"webCallUrl": room, "id": result.get("id")}
     if isinstance(transport.get("callToken"), str):
         safe_result["transport"] = {"callToken": transport["callToken"]}
@@ -120,6 +125,10 @@ async def preview_knowledge(oid: UUID, request: Request, authorization: str | No
     workspace = str(oid)
     if not workspace_enabled(workspace) or not hmac.compare_digest(authorization or "", "Bearer " + preview_token(workspace)):
         raise HTTPException(401, "Invalid preview credential.")
+    return await answer_preview_tools(workspace, request)
+
+
+async def answer_preview_tools(workspace: str, request: Request):
     body = bytearray()
     async for chunk in request.stream():
         if len(body) + len(chunk) > 65536:

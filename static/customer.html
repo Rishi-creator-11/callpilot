@@ -932,6 +932,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <form id="channelDemoForm">
    <label for="channelDemoLabel">Link label</label><input id="channelDemoLabel" required minlength="2" maxlength="70" placeholder="Sales walkthrough">
    <label class="cp-studio-check"><input id="channelDemoConsent" type="checkbox" required> Anyone with this link may ask questions and see approved answers.</label>
+   <label id="channelDemoVoiceOption" class="cp-studio-check" hidden><input id="channelDemoVoice" type="checkbox"> Include one-minute voice sessions, subject to daily limits</label>
    <button type="submit">Create demo link</button>
   </form>
   <p id="channelDemoStatus" class="muted" role="status"></p>
@@ -3718,8 +3719,10 @@ async function loadDemoLinks(oid){
  $("channelShare").hidden=false;
  list.textContent="Loading demo links…";
  try{
-  const {links}=await request(demoLinksPath(oid));
+  const {links,voice_available}=await request(demoLinksPath(oid));
   if(oid!==organization())return;
+  $("channelDemoVoiceOption").hidden=!voice_available;
+  if(!voice_available)$("channelDemoVoice").checked=false;
   list.replaceChildren();
   if(!links.length){list.textContent="No demo links yet.";return}
   for(const link of links){
@@ -3727,7 +3730,7 @@ async function loadDemoLinks(oid){
    row.className="item";
    name.textContent=link.label;
    details.className="muted";
-   details.textContent=(link.revoked_at?"Revoked":link.url?"Expires "+new Date(link.expires_at).toLocaleDateString():"Expired")+" · "+link.question_count+" questions submitted";
+   details.textContent=(link.revoked_at?"Revoked":link.url?"Expires "+new Date(link.expires_at).toLocaleDateString():"Expired")+" · "+link.question_count+" text questions"+(link.voice_enabled?" · "+link.voice_count+" voice starts":"");
    row.append(name,details);
    if(link.url){
     const actions=document.createElement("div"),open=document.createElement("a"),copy=document.createElement("button"),revoke=document.createElement("button");
@@ -3763,7 +3766,8 @@ $("channelDemoForm").addEventListener("submit",async event=>{
  button.disabled=true;
  status.textContent="Creating link…";
  try{
-  await request(demoLinksPath(oid),"POST",{label:v("channelDemoLabel").trim(),confirm_public_knowledge:$("channelDemoConsent").checked});
+  await request(demoLinksPath(oid),"POST",{label:v("channelDemoLabel").trim(),confirm_public_knowledge:$("channelDemoConsent").checked,
+   voice_enabled:!$("channelDemoVoiceOption").hidden&&$("channelDemoVoice").checked});
   if(oid!==organization())return;
   form.reset();
   status.textContent="Demo link created.";

@@ -19,7 +19,14 @@
 <body>
  <header>✦ CallPilot</header>
  <main><p class="tag">Shared assistant demo</p><h1>{{business}}</h1>
-  <p>Explore approved answers in this text preview. The demo cannot place calls, orders, or appointments.</p>
+  <p>Explore approved answers in this demo. It cannot place orders, book appointments, or transfer you to a phone number.</p>
+  <section class="card" {{voice_visibility}} aria-labelledby="voiceDemoHeading">
+   <h2 id="voiceDemoHeading">Try by voice</h2>
+   <p>Allow microphone access to speak to the assistant for up to one minute.</p>
+   <button type="button" id="demoVoiceStart">Start voice</button>
+   <button type="button" id="demoVoiceStop" hidden>End voice</button>
+   <p id="demoVoiceStatus" role="status"></p>
+  </section>
   <ol id="conversation" aria-label="Demo conversation" aria-live="polite"></ol>
   <form class="card" id="questionForm">
    <fieldset style="border:0;padding:0;margin:0" {{disabled}}>
@@ -53,6 +60,50 @@
    }catch(error){notice.textContent=error.message}
    finally{button.disabled=false}
   });
+  const startVoice=document.getElementById("demoVoiceStart"),stopVoice=document.getElementById("demoVoiceStop");
+  const voiceStatus=document.getElementById("demoVoiceStatus");
+  let voiceRun=0,voice=null,voiceTimeout=null;
+  function endVoice(message){
+   voiceRun++;
+   clearTimeout(voiceTimeout);
+   const current=voice;voice=null;
+   current?.stop();
+   startVoice.disabled=false;stopVoice.hidden=true;voiceStatus.textContent=message;
+  }
+  stopVoice.addEventListener("click",()=>endVoice("Voice session ended."));
+  startVoice.addEventListener("click",async()=>{
+   if(startVoice.disabled)return;
+   const run=++voiceRun;
+   startVoice.disabled=true;stopVoice.hidden=false;voiceStatus.textContent="Connecting your microphone…";
+   try{
+    if(!navigator.mediaDevices?.getUserMedia)throw Error("Microphone access is unavailable in this browser.");
+    const microphone=await navigator.mediaDevices.getUserMedia({audio:true});
+    microphone.getTracks().forEach(track=>track.stop());
+    if(run!==voiceRun)return;
+    const {default:sdk}=await import("https://cdn.jsdelivr.net/npm/@vapi-ai/web@3.1.0/+esm");
+    if(run!==voiceRun)return;
+    const response=await fetch(location.pathname.replace(/\/$/,"")+"/voice",{method:"POST"});
+    const room=await response.json();
+    if(run!==voiceRun)return;
+    if(!response.ok)throw Error(typeof room.detail==="string"?room.detail:"Voice could not start.");
+    const Vapi=sdk.default??sdk;
+    const instance=new Vapi("");
+    voice=instance;
+    instance.on("call-end",()=>{if(run===voiceRun)endVoice("Voice session ended.")});
+    instance.on("error",()=>{if(run===voiceRun)endVoice("Voice disconnected. Try the text demo below.")});
+    instance.on("message",event=>{
+     if(run===voiceRun&&event.type==="transcript"&&event.transcriptType==="final"&&event.transcript)
+      append(event.role==="user"?"question":"answer",event.role==="user"?"You":"Assistant",event.transcript);
+    });
+    await instance.reconnect(room);
+    if(run!==voiceRun){instance.stop();return}
+    voiceStatus.textContent="Voice is connected. Ask your question.";
+    voiceTimeout=setTimeout(()=>{if(run===voiceRun)endVoice("The one-minute demo ended.")},60000);
+   }catch(error){
+    if(run===voiceRun)endVoice(error.name==="NotAllowedError"?"Allow microphone access to use voice.":error.message);
+   }
+  });
+  window.addEventListener("pagehide",()=>{if(voice)endVoice("")});
  </script>
 </body>
 </html>
