@@ -566,6 +566,10 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 .identity-tabs button{background:transparent;color:#344e65;box-shadow:none;padding:8px 11px}
 .identity-tabs button[aria-selected="true"]{background:#dcefe7;color:#145a4a}
 #voice details>summary{cursor:pointer;font-weight:700}
+.settings-subnav{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 18px;border-bottom:1px solid #dce4df;padding-bottom:8px}
+.settings-subnav button,.connection-filters button{background:transparent;color:#344e65;box-shadow:none;padding:8px 11px}
+.settings-subnav button[aria-current="page"],.connection-filters button[aria-pressed="true"]{background:#dcefe7;color:#145a4a}
+.connection-filters{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
@@ -623,7 +627,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <button data-section="orders" title="Order requests" onclick="window.section('orders',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▧</span> Order requests</button>
 <button data-section="studio" title="Setup" onclick="window.section('studio',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚑</span> Setup</button>
 <button data-section="simulator" title="Test assistant" onclick="window.section('simulator',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◇</span> Test assistant</button>
-<button data-section="workspace" title="Business settings" onclick="window.section('workspace',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚙</span> Business settings</button>
+<button data-section="workspace" title="Settings" onclick="window.section('workspace',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚙</span> Settings</button>
 </div>
 <div class="cp-sidebar-bottom"><div id="cpAccountMenu" class="cp-account-menu" hidden>
 <button onclick="window.openAccountSettings()"><span aria-hidden="true">♙</span> Account settings</button>
@@ -637,6 +641,11 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <span id="sideAvatar" class="cp-account-avatar">CP</span><span class="cp-account-info"><strong id="sideAccountName">My account</strong><small id="sideAccountEmail"></small><span id="sideAccountPlan" class="cp-account-plan" role="status">Checking plan…</span></span><span class="cp-account-chevron" aria-hidden="true">⋯</span>
 </button></div></aside>
 <main id="cpMainContent" class="cp-main-content" tabindex="-1">
+<div id="settingsTabs" class="settings-subnav" role="navigation" aria-label="Settings pages" hidden>
+ <button type="button" data-settings-page="account">Profile</button>
+ <button type="button" data-settings-page="workspace">Team &amp; workspace</button>
+ <button type="button" data-settings-page="billing">Plan &amp; billing</button>
+</div>
 
 <section id="onboarding" class="panel card" style="display:none">
  <div class="cp-onboarding-wrap">
@@ -674,14 +683,20 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 
 <section id="connections" class="panel card" style="display:none">
  <div class="cp-panel-heading"><div><h2>Connections</h2><p>Check what is linked to this business and open the setup for each service.</p></div></div>
+ <div class="connection-filters" role="group" aria-label="Filter connections">
+  <button type="button" data-connection-group="all" aria-pressed="true">All</button>
+  <button type="button" data-connection-group="calendar" aria-pressed="false">Calendar</button>
+  <button type="button" data-connection-group="phone" aria-pressed="false">Voice &amp; phone</button>
+  <button type="button" data-connection-group="business" aria-pressed="false">CRM &amp; commerce</button>
+ </div>
  <div class="cp-studio-connections">
-  <article class="cp-studio-connection"><h3>Google Calendar</h3><p>Check availability and create confirmed appointments.</p>
+  <article class="cp-studio-connection" data-connection-type="calendar"><h3>Google Calendar</h3><p>Check availability and create confirmed appointments.</p>
    <p id="connectionCalendar" role="status"></p><button class="secondary" onclick="window.section('appointments')">Manage calendar</button></article>
-  <article class="cp-studio-connection"><h3>Vapi voice assistant</h3><p>Connect the assistant that answers your business calls.</p>
+  <article class="cp-studio-connection" data-connection-type="phone"><h3>Vapi voice assistant</h3><p>Connect the assistant that answers your business calls.</p>
    <p id="connectionVoice" role="status"></p><button class="secondary" onclick="window.section('calls');window.showVapiSetup()">Manage voice assistant</button></article>
-  <article class="cp-studio-connection"><h3>Business phone</h3><p>Link a managed number and review your call fallback.</p>
+  <article class="cp-studio-connection" data-connection-type="phone"><h3>Business phone</h3><p>Link a managed number and review your call fallback.</p>
    <p id="connectionPhone" role="status"></p><button class="secondary" onclick="window.section('usage')">Manage business phone</button></article>
-  <article class="cp-studio-connection"><h3>HighLevel CRM</h3><p>Find contacts by exact email or phone in your connected sub-account.</p>
+  <article class="cp-studio-connection" data-connection-type="business"><h3>HighLevel CRM</h3><p>Find contacts by exact email or phone in your connected sub-account.</p>
    <p id="connectionHighLevel" role="status"></p>
    <div class="cp-inline-actions">
     <button id="highlevelConfigure" type="button" class="secondary" hidden>Connect HighLevel</button>
@@ -699,7 +714,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    </form>
    <p id="highlevelResult" role="status" class="muted"></p>
   </article>
-  <article class="cp-studio-connection"><h3>Shopify products</h3><p>Look up the available quantity for an active variant by SKU.</p>
+  <article class="cp-studio-connection" data-connection-type="business"><h3>Shopify products</h3><p>Look up the available quantity for an active variant by SKU.</p>
    <p id="connectionShopify" role="status"></p>
    <div class="cp-inline-actions">
     <button id="shopifyConfigure" type="button" class="secondary" hidden>Connect Shopify</button>
@@ -1455,9 +1470,9 @@ const pageMeta={
  appointments:["Appointments","Manage appointment requests and calendar connections."],
  orders:["Order requests","Review and resolve customer order requests."],
  connections:["Connections","Manage the services your receptionist uses."],
- billing:["Billing & plans","Subscription status, payment methods and invoices."],
- workspace:["Business settings","Profile, team and workspace management."],
- account:["My account","Your profile, security and sign-in settings."],
+ billing:["Settings","Manage your plan, payment methods and invoices."],
+ workspace:["Settings","Manage your team and business workspace."],
+ account:["Settings","Manage your account profile and sign-in."],
  help:["Help & support","Answers for using CallPilot with confidence."]
 };
 function loadActivePage(id){
@@ -1472,6 +1487,16 @@ function loadActivePage(id){
 }
 let assistantDockOpen=true;
 const dockViewport=window.matchMedia("(min-width:1080px)");
+const settingsTabs=[...document.querySelectorAll("[data-settings-page]")];
+const settingsPages=new Set(settingsTabs.map(tab=>tab.dataset.settingsPage));
+for(const tab of settingsTabs)tab.addEventListener("click",()=>window.section(tab.dataset.settingsPage,{push:true}));
+function updateSettingsTabs(page){
+ $("settingsTabs").hidden=!settingsPages.has(page);
+ for(const tab of settingsTabs){
+  if(tab.dataset.settingsPage===page)tab.setAttribute("aria-current","page");
+  else tab.removeAttribute("aria-current");
+ }
+}
 function updateAssistantDock(){
  const available=Boolean(organization())&&!["builder","onboarding"].includes(activePage);
  const docked=available&&dockViewport.matches&&assistantDockOpen;
@@ -1501,12 +1526,13 @@ window.section=(x,options={})=>{
  if(x!=="simulator"&&activePage==="simulator")endVoicePractice();
  activePage=x;
  moveIdentityHours();
+ updateSettingsTabs(x);
  window.closeSidebar();window.closeAccountMenu();
  for(const id of Object.keys(pageMeta)){
    if($(id))$(id).style.display=id===x?"block":"none";
  }
  document.querySelectorAll(".sidebar [data-section]").forEach(button=>{
-   const active=button.dataset.section===x;
+   const active=button.dataset.section===x||(button.dataset.section==="workspace"&&settingsPages.has(x));
    button.classList.toggle("cp-active",active);
    if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
  });
@@ -1814,6 +1840,7 @@ window.loadWorkspace=async({destination}={})=>{
     $("channelDemoLinks").replaceChildren();
     $("channelDemoStatus").textContent="";
     resetTransfers();
+    setConnectionGroup("all");
     resetWorkers();
     orderReviewRows=[];
     $("orderQuery").value="";
@@ -2601,6 +2628,13 @@ async function loadConnections(){
   if(oid===organization())$(id).textContent=status;
  }),loadHighLevel(),loadShopify()]);
 }
+const connectionFilters=[...document.querySelectorAll("[data-connection-group]")];
+const connectionCards=[...document.querySelectorAll("[data-connection-type]")];
+function setConnectionGroup(group){
+ for(const button of connectionFilters)button.setAttribute("aria-pressed",String(button.dataset.connectionGroup===group));
+ for(const card of connectionCards)card.hidden=group!=="all"&&card.dataset.connectionType!==group;
+}
+for(const button of connectionFilters)button.addEventListener("click",()=>setConnectionGroup(button.dataset.connectionGroup));
 const highlevelPath=oid=>"/organizations/"+oid+"/connections/highlevel";
 let highlevelConnected=false;
 function clearHighLevel(){
