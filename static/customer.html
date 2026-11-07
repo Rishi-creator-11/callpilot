@@ -901,7 +901,11 @@ async function loadOrganizations(){
    await window.loadWorkspace({preserve:!!old});
  }else{
    $("orgInfo").textContent="Create your first business to begin";
-   window.section("workspace");
+   $("wsSaveButton").textContent="Create business";
+    $("wsSaveButton").disabled=false;
+    $("wsName").disabled=false;
+    $("wsIndustry").disabled=false;
+    window.section("workspace");
  }
 }
 window.createBusiness=()=>safe(async()=>{
@@ -962,6 +966,7 @@ window.fillWorkspace=async()=>{
  if(!o)return;
  $("wsName").value=o.name||"";$("wsIndustry").value=o.industry||"";
  const canEdit=o.role==="owner"||o.role==="admin";
+  $("wsSaveButton").textContent="Save business details";
  $("wsName").disabled=!canEdit;$("wsIndustry").disabled=!canEdit;$("wsSaveButton").disabled=!canEdit;
  try{
    const t=await request("/organizations/"+organization()+"/team");
@@ -971,7 +976,14 @@ window.fillWorkspace=async()=>{
 window.saveWorkspace=()=>safe(async()=>{
  const name=v("wsName").trim(),industry=v("wsIndustry").trim();
  if(name.length<2||industry.length<2)throw Error("Business name and industry must each have at least 2 characters.");
- await request("/organizations/"+organization()+"/settings","PATCH",{name,industry});
+ if(!organization()){
+  const created=await request("/organizations","POST",{name,industry});
+  await loadOrganizations();
+  $("org").value=created.id;
+  await window.loadWorkspace();
+  return "Your first business workspace is ready.";
+ }
+ await request("/organizations/"+encodeURIComponent(organization())+"/settings","PATCH",{name,industry});
  const o=orgs.find(x=>x.id===organization());if(o){o.name=name;o.industry=industry}
  $("org").selectedOptions[0].textContent=name;$("headerWorkspace").textContent=name;
  return "Business details saved.";
