@@ -464,6 +464,39 @@ def support():
 </div></section>""")
 
 
+@app.get("/enterprise", response_class=HTMLResponse, include_in_schema=False)
+def enterprise():
+    return marketing_page(title="CallPilot for larger teams", content="""
+<section class="band"><div class="wrap"><p class="eyebrow">For larger teams</p><h1>Calls handled across many locations.</h1>
+<p class="lead">Tell us about your volume and locations. We will reply with what CallPilot can do for your team today, and what is not available yet.</p>
+<form id="enterprise-form" class="resource-search" style="display:grid;gap:12px;max-width:560px" novalidate>
+<label for="en-name">Your name</label><input id="en-name" name="name" required maxlength="100" autocomplete="name">
+<label for="en-email">Work email</label><input id="en-email" name="email" type="email" required maxlength="200" autocomplete="email">
+<label for="en-company">Company</label><input id="en-company" name="company" required maxlength="120" autocomplete="organization">
+<label for="en-phone">Phone (optional)</label><input id="en-phone" name="phone" maxlength="40" autocomplete="tel">
+<label for="en-calls">Calls per month (optional)</label><input id="en-calls" name="monthly_calls" maxlength="40" placeholder="For example 2,000">
+<label for="en-message">What would you like CallPilot to handle? (optional)</label><textarea id="en-message" name="message" maxlength="2000" rows="4"></textarea>
+<input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
+<button class="button dark" type="submit">Send inquiry</button>
+<p id="en-status" role="status"></p></form>
+<script>
+document.getElementById("enterprise-form").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const f=e.target,status=document.getElementById("en-status"),b=f.querySelector("button");
+ const data=Object.fromEntries(new FormData(f));
+ b.disabled=true;status.textContent="Sending…";
+ try{
+  const r=await fetch("/api/enterprise-inquiry",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(Array.isArray(j.detail)?"Please check your details and try again.":(j.detail||"Could not send. Please try again."));
+  f.reset();status.textContent="Thanks. We received your inquiry and will reply by email.";
+ }catch(err){status.textContent=err.message}
+ finally{b.disabled=false}
+});
+</script>
+</div></section>""")
+
+
 @app.get("/about", response_class=HTMLResponse, include_in_schema=False)
 def about():
     return marketing_page(title="About CallPilot", content="""
@@ -764,6 +797,8 @@ from app.highlevel import router as highlevel_router
 from app.sheets import router as sheets_router
 from app.account_delete import router as account_delete_router
 from app.after_hours import router as after_hours_router
+from app.enterprise import router as enterprise_router
+app.include_router(enterprise_router)
 app.include_router(after_hours_router)
 app.include_router(account_delete_router)
 app.include_router(sheets_router)

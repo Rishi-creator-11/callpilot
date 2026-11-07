@@ -81,6 +81,11 @@ body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
 .cp-danger h3{color:#a32121}
 .cp-danger-button{background:#b42318;color:#fff;margin-top:12px}
 .cp-danger-button:disabled{opacity:.45;cursor:not-allowed}
+.bs-summary{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bs-summary small{display:block;font-size:11px;letter-spacing:.08em;color:var(--cp-muted)}
+.bs-summary strong{font-size:20px}
+.bs-table [role=row]{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr;gap:10px;padding:8px 0;align-items:center}
+.bs-table .bs-head{font-size:12px;color:var(--cp-muted);border-bottom:1px solid var(--cp-border)}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -1521,6 +1526,19 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-panel-heading"><div><h2>Plans &amp; billing</h2>
 <p class="muted">Simple monthly subscriptions, with one professional setup for every business.</p></div>
 <span class="cp-billing-status" id="billingState">Checking status</span></div>
+<h3 style="margin:6px 0 10px">Billing summary</h3>
+<div class="cp-section-box bs-summary">
+ <div><small>NEXT PAYMENT</small><strong id="bsNext">—</strong></div>
+ <div><small>AMOUNT DUE</small><strong id="bsDue">$0.00</strong></div>
+</div>
+<div class="cp-section-box bs-table" role="table" aria-label="Plan by agent">
+ <div role="row" class="bs-head"><span role="columnheader">Agent</span><span role="columnheader">Plan</span><span role="columnheader">Minutes/mo</span><span role="columnheader">Cost/mo</span></div>
+ <div role="row"><span role="cell" id="bsAgent">—</span><span role="cell" id="bsPlan">—</span><span role="cell" id="bsMinutes">—</span><span role="cell" id="bsCost">—</span></div>
+</div>
+<h3 style="margin:18px 0 10px">Payment method</h3>
+<div class="cp-section-box"><p id="bsCard" class="muted" style="margin:0">A payment method is added when you start a subscription.</p></div>
+<h3 style="margin:18px 0 10px">Invoices</h3>
+<div class="cp-section-box"><p id="bsInvoices" class="muted" style="margin:0">No invoices yet. Your first invoice appears here after you subscribe.</p></div>
 <div class="cp-pricing-head">
  <span class="cp-price-eyebrow">TRANSPARENT PRICING</span>
  <h3>Choose the right amount of calling for your business.</h3>
@@ -4563,6 +4581,22 @@ async function loadBilling(){
   "Sandbox test only — no real payment is charged. Your first checkout includes $25 setup, followed by the plan's monthly charge.":
   "Plan pricing is final, but live charging remains disabled until billing and usage limits are verified.";
  $("portal").style.display=b.has_customer?"inline-block":"none";
+ {
+  const plan=active?b.plans?.[b.selected_plan]:null,dollars=cents=>"$"+(cents/100).toFixed(2);
+  $("bsAgent").textContent=orgs.find(w=>w.id===oid)?.name||"—";
+  $("bsPlan").textContent=plan?plan.name:"No plan";
+  $("bsMinutes").textContent=plan?String(plan.included_minutes):"—";
+  $("bsCost").textContent=plan?dollars(plan.monthly_cents):"Free";
+  $("bsDue").textContent=dollars(0);
+  $("bsNext").textContent="—";
+  $("bsCard").textContent=b.has_customer?"Your card is stored securely by Stripe. Open the Stripe portal to update it.":"A payment method is added when you start a subscription.";
+  $("bsInvoices").textContent=b.has_customer?"Invoices and receipts are in the Stripe portal.":"No invoices yet. Your first invoice appears here after you subscribe.";
+  if(active)request("/organizations/"+oid+"/usage").then(u=>{
+   if(oid!==organization()||!u.period_end)return;
+   $("bsNext").textContent=b.cancel_at_period_end?"Cancels "+new Date(u.period_end).toLocaleDateString():new Date(u.period_end).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});
+   $("bsDue").textContent=b.cancel_at_period_end?dollars(0):dollars(plan.monthly_cents);
+  }).catch(()=>{});
+ }
  $("verifyCheckoutButton").style.display=b.pending_confirmation?"inline-block":"none";
  if(b.selected_plan&&["starter","growth","business"].includes(b.selected_plan))billingPlan=b.selected_plan;
  updatePlanSelection();

@@ -16,7 +16,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | `/business-productivity-ai` and individual integration pages | Index observed, child enumeration pending | Directory and detail pages cover Google Calendar, HighLevel, Shopify and Vapi. Goodcall’s broader catalog remains. |
 | [ ] | `/business-phone-number` area-code lookup | Observed | CallPilot offers a public area-code preference form that carries the area code into Channels for eligible owners. Live carrier inventory browsing and country coverage remain open. |
 | [ ] | `/local-phone-numbers` | Observed | `/local-phone-numbers` explains reservation, number connection, and forwarding. Live area-code inventory and self-service reservation verification remain. |
-| [ ] | `/enterprise` | Observed | Enterprise details and lead entry point missing. |
+| [ ] | `/enterprise` | Observed | `/enterprise` has an inquiry form (validated, rate limited, honeypot) stored in `enterprise_inquiries` and a footer link. No email notification is sent yet, so the team must read the table. Enterprise connectors (HubSpot, Teams, Genesys) are not built. |
 | [ ] | `/case-study-goodcall-ai-phone-assistant` and case-study details | Index observed, details pending | CallPilot case studies and proof pages missing. |
 | [ ] | `/about` | Observed | `/about` describes CallPilot’s supported product and privacy workflow. |
 | [ ] | `/news` | Observed | `/news` lists actual CallPilot product updates. |
@@ -72,7 +72,7 @@ The `/app#orders` review page supports staff approval, Shopify checkout creation
 | [ ] | Connections, custom MCP and tool-request forms | Custom MCP name, URL, and optional bearer token fields observed. Tool-request submission pending. | No equivalent yet. |
 | [ ] | `/agent/settings`, Profile and account security | Observed | Settings uses Goodcall-style Profile, Team and Billing underline tabs, first and last name, organization and a guarded Delete account section (untested live). Recovery by email still works through the sign-in screen. |
 | [ ] | Settings, Team and Invite team member dialog | Observed, no invitation sent | Workspace team list, link creation, role selection and revocation are implemented. Email delivery, optional message, role editing and recipient acceptance verification remain open. |
-| [ ] | Settings, Billing summary, payment method and invoices | Observed | `/app#billing` has plan entry points and Stripe portal. Verify setup, payments and invoice history in sandbox. |
+| [ ] | Settings, Billing summary, payment method and invoices | Observed | `/app#billing` has plan entry points and Stripe portal. Billing page now opens with a summary (next payment, amount due), plan table, payment method and invoices blocks. Verify setup, payments and invoice history in sandbox. |
 | [ ] | Account menu, agent switcher, new agent and sign-out | Menu observed, creation workflow pending | Workspace switcher and sign-out exist. Multi-agent management missing. |
 | [ ] | Support control and contextual help | Entry point observed | `/app#help` exists. Compare support dialogs and escalation. |
 | [ ] | Browser practice, microphone prompt, typing and return to setup | Entry points observed, live voice exchange pending | `/app#simulator` verified for text retrieval and repeatable saved answer checks. Voice practice and an in-session transcript are implemented behind the provider-use flag. Spoken verification, sharing and recorded evaluations remain open. |
