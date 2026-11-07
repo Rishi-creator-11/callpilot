@@ -6,7 +6,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 | Done | Goodcall page or page family | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
-| [ ] | `/` homepage | Observed | `/` has a redesigned navigation, signup entry point, and interactive receptionist walkthrough. Live desktop walkthrough and scheduling link verified. Mobile, proof, comparison, and integration sections remain. |
+| [ ] | `/` homepage | Observed | `/` has a redesigned navigation, signup entry point, and interactive receptionist walkthrough. Live desktop walkthrough and scheduling link verified. Added selectable lead, booking, CRM, and commerce workflows, plus agent identity, call review, forwarding, and resource sections. Mobile, proof, and comparison coverage remain. |
 | [ ] | `/pricing` | Observed | `/pricing` shows current CallPilot plans. Add customer-facing plan comparison and verify checkout separately. |
 | [ ] | `/how-it-works` | Observed | `/how-it-works` covers setup, test, and connection. Expand walkthrough as setup and practice features ship. |
 | [ ] | `/faq` | Observed | `/faq` has expandable original answers. Complete topic coverage. |
@@ -20,7 +20,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | [ ] | `/case-study-goodcall-ai-phone-assistant` and case-study details | Index observed, details pending | CallPilot case studies and proof pages missing. |
 | [ ] | `/about` | Observed | Company page missing. |
 | [ ] | `/news` | Observed | News page missing. |
-| [ ] | `/blog` and article details | Index observed, child enumeration pending | Resource index and article template missing. |
+| [ ] | `/blog` and article details | Index observed, child enumeration pending | Searchable `/resources` and five original setup guides now cover core journeys. Editorial and industry coverage remains. |
 | [ ] | `/voice-ai` and article details | Index observed, child enumeration pending | Educational index and article template missing. |
 | [ ] | Help Center index, collection and article pages | Index observed, collections and articles partially documented | In-app Help & support exists. Public support search and collections missing. |
 | [ ] | Industry, geographic, comparison and campaign landing-page families | Discovery pending | Inventory linked routes and model reusable original detail pages. |

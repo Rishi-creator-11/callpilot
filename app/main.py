@@ -2,8 +2,9 @@
 from __future__ import annotations
 import os, sqlite3, uuid, hmac, re
 from pathlib import Path
+from html import escape
 from datetime import datetime, timezone
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from app.common import authorize, PRICE, MONEY, NO_PRICE, UNKNOWN
@@ -129,9 +130,9 @@ PRODUCT_PAGES = {
     ),
     "product-orders": (
         "Help callers find the right product", "Answer catalog questions and collect order requests for your team.",
-        "Teach CallPilot which products are available and which prices can be shared. Your team reviews any pending order requests.",
-        ("Add products and stock to your catalog.", "Approve the items and prices callers can hear.",
-         "Enable catalog lookup and review pending orders in Launch Studio."),
+        "Choose recorded or Shopify inventory for each approved SKU. Your team reviews pending requests in the order queue.",
+        ("Add approved SKUs and choose the source for stock.", "Connect Shopify if you want live stock for an approved item.",
+         "Enable catalog lookup and manage pending requests in Order requests."),
         "A caller asks for a product", "The receptionist checks the approved catalog and can save a pending request for your team to review.",
         "/app#studio", "Open catalog setup",
     ),
@@ -150,6 +151,15 @@ PRODUCT_PAGES = {
          "Confirm the forwarding behavior with your carrier before sending customer calls."),
         "Your existing line stays familiar", "Customers dial the number they know, and your carrier forwards calls according to the settings you choose.",
         "/app#usage", "Open phone setup",
+    ),
+    "crm-integrations": (
+        "Find the right contact before following up", "Connect your HighLevel sub-account for staff contact lookup.",
+        "Owners and admins can link a HighLevel private integration and search that sub-account by the customer's exact email or phone.",
+        ("Create a sub-account token with locations.readonly and contacts.readonly.",
+         "Open Connections, choose HighLevel, and enter the token and sub-account ID.",
+         "Look up the contact using details your customer has already provided."),
+        "Your team prepares a callback", "A teammate finds the customer's existing HighLevel record before returning the call.",
+        "/app#connections", "Open Connections",
     ),
 }
 
@@ -198,6 +208,95 @@ def product_endpoint(slug):
 for slug in PRODUCT_PAGES:
     app.add_api_route("/" + slug, product_endpoint(slug), response_class=HTMLResponse,
                       name=slug, include_in_schema=False)
+
+
+GUIDES = {
+    "build-your-receptionist": (
+        "Build your first receptionist", "Agent setup",
+        "Set your greeting and decide what information callers should hear.",
+        (
+            ("Create the workspace", "Start with the name your customers recognize. Add your public site if you want a starting draft."),
+            ("Approve your knowledge", "Read the imported text and remove stale policies, internal information, and quotes that have not been approved."),
+            ("Review the agent configuration", "Describe your greeting and conversation style in Agent builder. Review and save the changes, then sync the managed assistant when ready."),
+        ),
+        "/app#builder",
+    ),
+    "booking-hours": (
+        "Configure appointment booking", "Calendar",
+        "Set business hours and exceptions before giving your receptionist booking access.",
+        (
+            ("Connect the calendar", "Open Appointments and authorize the Google account whose primary calendar should hold the bookings."),
+            ("Set hours and exceptions", "Choose the business time zone, weekly hours and any closures in Business settings. Keep availability blocked in Google Calendar whenever your team is unavailable."),
+            ("Review confirmed bookings", "Use Appointments to check a time, create a booking, or cancel a verified CallPilot event. Staff can continue reviewing existing events directly in Google Calendar after disconnecting."),
+        ),
+        "/app#appointments",
+    ),
+    "forward-your-business-number": (
+        "Forward your business number", "Phone setup",
+        "Keep the number on your website while routing selected calls to your receptionist.",
+        (
+            ("Find your CallPilot destination", "Open Usage & phone and confirm which managed number is linked to your receptionist."),
+            ("Choose your forwarding behavior", "Use your carrier’s controls for unconditional or conditional forwarding where available. Consider when staff should answer first and what should happen outside working hours."),
+            ("Confirm with a controlled call", "Check the greeting and fallback from a separate line. Verify that the carrier forwards the calls you intended to send."),
+        ),
+        "/app#usage",
+    ),
+    "connect-highlevel": (
+        "Connect HighLevel for contact lookup", "CRM",
+        "Give authorized staff a way to look up a customer in the correct sub-account.",
+        (
+            ("Create a scoped token", "Use the intended HighLevel sub-account and allow locations.readonly and contacts.readonly."),
+            ("Save the connection", "In Connections, provide the sub-account ID and private integration token. CallPilot stores the credential on the server."),
+            ("Find a contact", "Search by the customer’s exact email or phone. Verify any details you need before using them in a follow-up."),
+        ),
+        "/app#connections",
+    ),
+    "shopify-stock": (
+        "Use Shopify stock for an approved SKU", "E-commerce",
+        "Connect a merchant-owned app and choose which products may use live inventory.",
+        (
+            ("Install a read-only app", "In your Shopify organization, install the app on the target store with read_products and read_inventory."),
+            ("Connect the store", "Enter the myshopify.com domain and app credentials in Connections. Check that the SKU has one active variant with inventory tracking enabled."),
+            ("Approve the product", "Choose Shopify inventory for the SKU in Launch Studio, approve the product, and sync the managed assistant after enabling catalog lookup. Order requests still go to staff review."),
+        ),
+        "/app#connections",
+    ),
+}
+
+
+@app.get("/resources", response_class=HTMLResponse, include_in_schema=False)
+def resources(q: str = Query(default="", max_length=120)):
+    query = " ".join(q.split())
+    cards = []
+    for slug, (title, category, summary, sections, _) in GUIDES.items():
+        searchable = " ".join([title, category, summary, *(word for section in sections for word in section)]).casefold()
+        if all(word in searchable for word in query.casefold().split()):
+            cards.append(f'<article class="card"><p class="eyebrow">{category}</p><h3>{title}</h3>'
+                         f'<p>{summary}</p><a class="card-link" href="/resources/{slug}">Read guide →</a></article>')
+    clear = '<a href="/resources">Clear search</a>' if query else ""
+    results = f'<div class="grid">{"".join(cards)}</div>' if cards else "<p>No guides match your search.</p>"
+    content = f"""
+<section class="band"><div class="wrap"><p class="eyebrow">CallPilot resources</p>
+<h1>Put your front desk to work.</h1><p class="lead">Practical guides for setup, routing, bookings and integrations.</p>
+<form class="resource-search" action="/resources" method="get" role="search"><label for="guide-query">Find a guide</label>
+<input type="search" id="guide-query" name="q" value="{escape(query, quote=True)}" maxlength="120">
+<button class="button dark" type="submit">Search</button>{clear}</form>
+<p class="price-note">{len(cards)} {"guide" if len(cards) == 1 else "guides"}</p>{results}</div></section>"""
+    return marketing_page(title="Setup guides", content=content)
+
+
+@app.get("/resources/{slug}", response_class=HTMLResponse, include_in_schema=False)
+def guide(slug: str):
+    if slug not in GUIDES:
+        raise HTTPException(404, "Guide not found")
+    title, category, summary, sections, destination = GUIDES[slug]
+    steps = "".join(f"<h2>{heading}</h2><p>{body}</p>" for heading, body in sections)
+    content = f"""
+<section class="band guide"><div class="wrap"><article>
+<p><a href="/resources">← All setup guides</a></p><p class="eyebrow">{category}</p><h1>{title}</h1>
+<p class="lead">{summary}</p>{steps}<a class="button dark" href="{destination}">Open the workspace →</a>
+</article></div></section>"""
+    return marketing_page(title=title, content=content)
 
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])

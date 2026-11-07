@@ -19,6 +19,8 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 .faq{max-width:785px}.faq details{border-bottom:1px solid var(--line);padding:16px 0}.faq summary{font-weight:740;cursor:pointer}.faq details p{margin:8px 0 0}.closing{padding-block:65px}.closing .wrap{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}.closing h2{margin-bottom:9px}.site-footer{padding-block:36px}.site-footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.site-footer .nav-links{font-size:.9rem}.detail-page h1{font-size:clamp(2.8rem,6vw,4.75rem);max-width:17ch}
 @media(max-width:850px){.hero{min-height:0;grid-template-columns:1fr 1fr;gap:25px;padding-block:45px}.hero h1{font-size:clamp(2.6rem,7vw,4.25rem)}.wrap{width:calc(100% - 40px)}.nav-links{gap:14px}.detail-layout{grid-template-columns:1fr;gap:10px}}
 @media(max-width:650px){.hero,.grid,.feature-list{grid-template-columns:1fr}.hero h1{max-width:12ch}.site-nav{padding-block:13px;gap:10px}.site-nav .nav-links{gap:11px;font-size:.87rem}.site-nav .button{min-height:38px;padding:7px 10px}.site-nav .brand{font-size:1.25rem}.brand-mark{width:27px;height:27px}.scenario{min-height:0}.site-footer .nav-links{column-gap:15px}.card{padding:20px}}
+.use-cases{margin:26px 0 0;padding:0;border:0;min-width:0}.use-cases legend{font-weight:700;margin-bottom:10px}.use-cases .choice{background:#fff;padding:9px 14px}.use-cases .choice:has(:checked){background:#d9f4eb}.use-case{display:none;min-height:210px;margin-top:15px;gap:24px;grid-template-columns:1fr .8fr;align-items:center}.use-cases:has(#use-leads:checked) .use-leads,.use-cases:has(#use-booking:checked) .use-booking,.use-cases:has(#use-crm:checked) .use-crm,.use-cases:has(#use-shop:checked) .use-shop{display:grid}.use-example{border-radius:12px;background:#eaf5ef;padding:18px}.use-example p:last-child{margin-bottom:0}.feature-split{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}.feature-split .card{box-shadow:0 12px 34px #132a1e12}.footer-grid{display:grid!important;grid-template-columns:1.3fr repeat(3,1fr);align-items:start}.footer-grid h2{font-size:1rem;margin:0 0 .7em;letter-spacing:0}.footer-grid ul{margin:0;padding:0;list-style:none}.footer-grid li{margin-bottom:.45em;font-size:.93rem}.footer-grid .brand{margin-bottom:12px}.resource-search{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:20px}.resource-search label{width:100%;font-weight:700}.resource-search input{min-width:0;flex:1;padding:12px;border:1px solid #95a7a2;border-radius:8px;font:inherit}.resource-search button{cursor:pointer}.guide article{max-width:750px}.guide article h2{font-size:1.55rem;margin-top:26px}
+@media(max-width:700px){.feature-split,.use-case{grid-template-columns:1fr;gap:14px}.footer-grid{grid-template-columns:1fr 1fr}.footer-grid>div:first-child{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -28,8 +30,8 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <div class="nav-links"><details class="product-menu"><summary>Product</summary><ul>
 <li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointment scheduling</a></li>
 <li><a href="/lead-capture">Lead capture</a></li><li><a href="/product-orders">Products and orders</a></li>
-<li><a href="/call-history">Call history</a></li><li><a href="/local-phone-numbers">Business numbers</a></li>
-</ul></details><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/app">Sign in</a><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div>
+<li><a href="/crm-integrations">CRM connections</a></li><li><a href="/call-history">Call history</a></li><li><a href="/local-phone-numbers">Business numbers</a></li>
+</ul></details><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/resources">Resources</a><a href="/app">Sign in</a><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div>
 </nav></header>
 <main id="main">
 <div class="hero-shell"><section class="hero wrap">
@@ -58,14 +60,25 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
  </div>
 </div></section>
 <section class="band shaded"><div class="wrap">
- <div class="section-head"><p class="eyebrow">What happens on the call</p><h2>Give each call a next step.</h2><p class="lead">Choose how your front desk handles the questions, leads, and requests your team gets every day.</p></div>
- <div class="feature-list">
-  <article class="card"><span class="feature-icon" aria-hidden="true">↳</span><h3>Capture leads</h3><p>Take a callback request and keep the details together in Calls &amp; leads.</p><a class="card-link" href="/lead-capture">Explore lead capture →</a></article>
-  <article class="card"><span class="feature-icon" aria-hidden="true">◷</span><h3>Book appointments</h3><p>Check your Google Calendar against your hours and date exceptions before making a booking.</p><a class="card-link" href="/appointment-scheduling">Explore scheduling →</a></article>
-  <article class="card"><span class="feature-icon" aria-hidden="true">▤</span><h3>Handle product questions</h3><p>Look up approved products and recorded stock, and collect pending orders for review.</p><a class="card-link" href="/product-orders">Explore products and orders →</a></article>
-  <article class="card"><span class="feature-icon" aria-hidden="true">◉</span><h3>Review conversations</h3><p>See when calls came in and review available recordings, transcripts, summaries, and follow-ups.</p><a class="card-link" href="/call-history">Explore call history →</a></article>
- </div>
+ <div class="section-head"><p class="eyebrow">What happens on the call</p><h2>Give each call a next step.</h2><p class="lead">Explore the jobs your team can handle from one workspace.</p></div>
+ <fieldset class="use-cases"><legend>Choose a workflow</legend>
+  <label class="choice"><input type="radio" id="use-leads" name="workflow" checked>Lead capture</label>
+  <label class="choice"><input type="radio" id="use-booking" name="workflow">Booking</label>
+  <label class="choice"><input type="radio" id="use-crm" name="workflow">CRM</label>
+  <label class="choice"><input type="radio" id="use-shop" name="workflow">E-commerce</label>
+  <article class="card use-case use-leads"><div><h3>Collect a callback request.</h3><ol><li>Ask what the caller needs.</li><li>Confirm their name and best number.</li><li>Save the request for your team.</li></ol><a class="card-link" href="/lead-capture">Explore lead capture →</a></div><div class="use-example"><p class="eyebrow">Illustrative callback request</p><p><strong>Service inquiry</strong></p><p>Heating inspection · Team follow-up requested</p></div></article>
+  <article class="card use-case use-booking"><div><h3>Book a time your team can keep.</h3><ol><li>Check booking hours and Google Calendar.</li><li>Confirm the details with the caller.</li><li>Save the appointment and review it in your workspace.</li></ol><a class="card-link" href="/appointment-scheduling">Explore scheduling →</a></div><div class="use-example"><p class="eyebrow">Illustrative appointment</p><p><strong>Maintenance visit</strong></p><p>Friday · 10:00 a.m. · Calendar confirmed</p></div></article>
+  <article class="card use-case use-crm"><div><h3>Find the right contact before you follow up.</h3><ol><li>Connect your HighLevel sub-account.</li><li>Search by the customer’s exact email or phone.</li><li>Use the matching record to prepare your follow-up.</li></ol><a class="card-link" href="/crm-integrations">Explore CRM connections →</a></div><div class="use-example"><p class="eyebrow">Illustrative staff lookup</p><p><strong>Contact match</strong></p><p>HighLevel · Exact email search</p></div></article>
+  <article class="card use-case use-shop"><div><h3>Answer product questions and review requests.</h3><ol><li>Approve the SKUs your agent can discuss.</li><li>Check recorded stock or connect Shopify for live quantities.</li><li>Send requests to the staff review queue.</li></ol><a class="card-link" href="/product-orders">Explore products and orders →</a></div><div class="use-example"><p class="eyebrow">Illustrative request</p><p><strong>Two replacement filters</strong></p><p>SKU FILTER-02 · Awaiting staff review</p></div></article>
+ </fieldset>
 </div></section>
+<section class="band"><div class="wrap feature-split"><div><p class="eyebrow">Agent identity</p><h2>Make the first hello yours.</h2><p class="lead">Describe the style you want. Review the proposed name, greeting, and instructions before syncing them to your assistant.</p><a class="button dark" href="/app#builder">Open Agent builder →</a></div><article class="card"><p class="eyebrow">Illustrative draft</p><h3>Northline front desk</h3><p class="bubble"><strong>Opening greeting</strong>Hi, thanks for calling Northline Heating. I’m the AI receptionist. What can I help you with?</p><p class="price-note">Review saved versions and restore an earlier greeting when you need it.</p></article></div></section>
+<section class="band shaded"><div class="wrap feature-split"><div><p class="eyebrow">Call review</p><h2>Pick up where the call left off.</h2><p class="lead">Search your call history, read available transcripts, and keep follow-up notes with the conversation.</p><a class="button dark" href="/call-history">Explore call history →</a></div><article class="card"><p class="eyebrow">Illustrative call review</p><h3>Service question</h3><p class="bubble"><strong>Follow-up</strong>Customer asked whether we can inspect a second unit. Confirm availability before calling back.</p></article></div></section>
+<section class="band"><div class="wrap"><p class="eyebrow">Phone setup</p><h2>Use the number customers know.</h2><div class="grid">
+ <article class="card"><h3>Review your connected number</h3><p>Use a managed number associated with your CallPilot assistant.</p></article>
+ <article class="card"><h3>Forward your existing line</h3><p>Set forwarding through your carrier and choose when calls should reach CallPilot.</p></article>
+ <article class="card"><h3>Confirm the fallback</h3><p>Review where calls go when your AI front desk is unavailable.</p><a class="card-link" href="/phone-setup">See phone setup →</a></article>
+ </div></div></section>
 <section class="band" id="pricing"><div class="wrap">
  <div class="section-head"><p class="eyebrow">Pricing</p><h2>Choose your monthly minutes.</h2><p class="lead">One-time setup fee of {{setup_fee}}. No automatic overage charges.</p></div>
  <div class="grid">{{plan_cards}}</div><p class="price-note">Create your workspace to review your setup and manage billing.</p>
@@ -79,9 +92,23 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
  <details><summary>Does a pending order request charge the caller?</summary><p>No. Your team reviews the request and handles payment and fulfillment separately.</p></details>
  <details><summary>Who can access my call history?</summary><p>Authorized workspace members can review available recordings and transcripts. See the <a href="/legal">privacy and recording notice</a>.</p></details>
 </div></section>
+<section class="band"><div class="wrap">
+ <div class="section-head"><p class="eyebrow">Resources</p><h2>Get the details right.</h2><p class="lead">Follow a guide for the part of setup you’re working on.</p></div>
+ <div class="grid">
+  <article class="card"><h3>Build your first receptionist</h3><p>Choose a greeting and review the business information your agent can share.</p><a class="card-link" href="/resources/build-your-receptionist">Read the setup guide →</a></article>
+  <article class="card"><h3>Set booking hours</h3><p>Connect your calendar and account for regular hours, closures, and exceptions.</p><a class="card-link" href="/resources/booking-hours">Read the booking guide →</a></article>
+  <article class="card"><h3>Keep your business number</h3><p>Set up forwarding and check where calls go when your receptionist is unavailable.</p><a class="card-link" href="/resources/forward-your-business-number">Read the forwarding guide →</a></article>
+ </div>
+ <p class="price-note"><a class="card-link" href="/resources">Browse all setup guides →</a></p>
+</div></section>
 </main>
 <section class="closing"><div class="wrap"><div><p class="eyebrow">Your business, your front desk</p><h2>Set up your first agent.</h2><p>Start with the information your team already uses.</p></div><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div></section>
-<footer class="site-footer"><div class="wrap"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a><div class="nav-links"><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a><a href="/app#help">Support</a><a href="/legal">Terms and privacy</a></div></div></footer>
+<footer class="site-footer"><div class="wrap footer-grid">
+<div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a><p>A front desk for businesses that work on the phone.</p></div>
+<div><h2>Product</h2><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointments</a></li></ul></div>
+<div><h2>Resources</h2><ul><li><a href="/resources">Setup guides</a></li><li><a href="/faq">FAQ</a></li><li><a href="/crm-integrations">CRM connections</a></li><li><a href="/local-phone-numbers">Business numbers</a></li></ul></div>
+<div><h2>CallPilot</h2><ul><li><a href="/app">Sign in</a></li><li><a href="/app#help">Support</a></li><li><a href="/legal">Terms and privacy</a></li></ul></div>
+</div></footer>
 <script>
 const productMenu = document.querySelector(".product-menu");
 document.addEventListener("click", event => {
