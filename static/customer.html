@@ -1217,14 +1217,31 @@ async function render(){
    }
  }finally{renderInFlight=false}
 }
+function readWorkspacePreference(kind){
+ try{return sessionStorage.getItem("callpilot."+kind+"."+current.id)||""}catch{return ""}
+}
+function writeWorkspacePreference(kind,id){
+ try{
+  const key="callpilot."+kind+"."+current.id;
+  if(id)sessionStorage.setItem(key,id);else sessionStorage.removeItem(key);
+ }catch{}
+}
 async function loadOrganizations({select,destination}={}){
  const result=await request("/me");
  orgs=result.organizations;
- const old=select||organization();
+ const old=select||organization()||readWorkspacePreference("workspace");
  $("org").innerHTML=orgs.length?orgs.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):
   '<option value="">Create a business</option>';
  if(old&&orgs.some(x=>x.id===old))$("org").value=old;
  if(orgs.length){
+   if(!destination&&!pendingInvite&&location.hash==="#onboarding"){
+    const setupId=readWorkspacePreference("websiteSetup");
+    const workspace=orgs.find(x=>x.id===setupId&&x.id===organization());
+    if(workspace){
+     setupStage(workspace);
+     destination="onboarding";
+    }
+   }
    await window.loadWorkspace({destination});
  }else{
    $("orgInfo").textContent="Create your first business to begin";
@@ -1265,6 +1282,8 @@ $("businessSetupForm").addEventListener("submit",async event=>{
   if(name.length<2)throw Error("Enter your business name.");
   const workspace=setupOrganization||await request("/organizations","POST",{name,industry});
   setupOrganization=workspace;
+  writeWorkspacePreference("workspace",workspace.id);
+  writeWorkspacePreference("websiteSetup",workspace.id);
   await loadOrganizations({select:workspace.id,destination:"onboarding"});
   setupStage(workspace);
   $("setupWebsiteUrl").focus();
@@ -1272,6 +1291,7 @@ $("businessSetupForm").addEventListener("submit",async event=>{
  finally{button.disabled=false}
 });
 function completeBusinessSetup(destination){
+ writeWorkspacePreference("websiteSetup","");
  setupStage();
  $("businessSetupForm").reset();
  $("setupWebsiteForm").reset();
@@ -1297,6 +1317,7 @@ window.loadWorkspace=async({destination}={})=>{
  if(!organization())return;
  await safe(async()=>{
    const o=orgs.find(x=>x.id===organization());
+   if(o)writeWorkspacePreference("workspace",o.id);
    $("headerWorkspace").textContent=o?.name||"Your business";
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
    $("wsName").value=o?.name||"";

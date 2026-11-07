@@ -32,7 +32,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | --- | --- | --- | --- |
 | [ ] | Sign-in, email/Google options, account recovery and errors | Login observed, recovery end-to-end pending | `/app` supports email and Google. Signed-in dashboard verified. Verify recovery and persistence across reloads. |
 | [ ] | Onboarding business lookup | Observed | Google Maps search and selection missing. |
-| [ ] | Website input and scan progress | Input observed, authorized user supplied a site | Live QA created a workspace, imported a public page, and opened the unapproved draft in Knowledge. Multi-page discovery and structured metadata review remain. |
+| [ ] | Website input and scan progress | Input observed, authorized user supplied a site | Live QA created a workspace, imported a public page, and opened the unapproved draft in Knowledge. The website step can resume after a refresh in the same browser tab. Multi-page discovery and structured metadata review remain. |
 | [ ] | Manual business details | Observed | Guided setup collects name and industry and offers a path to Launch Studio. Timezone and structured details remain. |
 | [ ] | Initial build progress and first-practice prompt | Observed | Launch Studio has a checklist. Generated agent, progress, and voice practice missing. |
 | [ ] | Welcome, finish setup and testing navigation | Observed | Launch Studio and text test partially cover this. Test with no number and publishing remain. |
