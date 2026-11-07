@@ -6,7 +6,7 @@
 .ci-head p{margin:5px 0 0}.ci-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .ci-actions button,.ci-button{padding:10px 13px;font-size:13px}
 .ci-primary{background:#766af8}.ci-quiet{background:#26344f;color:#e7edff}
-.ci-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:21px}
+.ci-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:21px}
 .ci-kpi{padding:18px 17px;background:#111b31;border:1px solid #2a3956;border-radius:14px;min-height:106px}
 .ci-kpi .num{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1.25}
 .ci-kpi .cap{font-size:12px;color:#a2b2d0;margin-top:9px}
@@ -613,6 +613,8 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
   <div id="ciNotice" class="muted" role="status" style="min-height:21px;margin-bottom:13px"></div>
   <div class="ci-kpis">
     <div class="ci-kpi"><div class="num" id="ciTotal">—</div><div class="cap">Total calls</div></div>
+    <div class="ci-kpi"><div class="num" id="ciUnique">—</div><div class="cap">Unique caller numbers</div></div>
+    <div class="ci-kpi"><div class="num" id="ciAverage">—</div><div class="cap">Average call duration</div></div>
     <div class="ci-kpi"><div class="num" id="ciHot">—</div><div class="cap">Hot leads · AI suggestion or reviewed</div></div>
     <div class="ci-kpi"><div class="num" id="ciWarm">—</div><div class="cap">Warm leads</div></div>
     <div class="ci-kpi"><div class="num" id="ciFollow">—</div><div class="cap">Follow-ups pending</div></div>
@@ -620,17 +622,23 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
   <div class="ci-panel">
     <div class="row"><h3 style="margin:0">All conversations</h3><span class="pill" id="ciReviewCount">No calls yet</span></div>
     <div class="ci-filters">
-      <input type="hidden" id="ciSearch" value="">
+      <input type="search" id="ciSearch" maxlength="120" aria-label="Search calls" placeholder="Search by caller, number or lead type" oninput="window.filterCalls()">
       <select id="ciStage" aria-label="Filter lead stage" onchange="window.filterCalls()">
         <option value="all">All lead types</option>
         <option value="hot">Hot leads</option><option value="warm">Warm leads</option>
         <option value="general">General inquiry</option><option value="not_qualified">Not qualified</option><option value="needs_review">Needs review</option>
       </select>
-      <select id="ciDays" aria-label="Date range" onchange="window.loadCalls()">
-        <option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option>
-        <option value="90">Last 90 days</option><option value="365">Last year</option>
+      <select id="ciDays" aria-label="Date range" onchange="window.changeCallRange()">
+        <option value="today">Today</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option>
+        <option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option>
+        <option value="365">Last year</option><option value="custom">Custom dates</option>
       </select>
     </div>
+    <form id="ciCustomRange" class="ci-filters" hidden style="display:none">
+      <label for="ciFrom">Start date</label><input id="ciFrom" type="date" required>
+      <label for="ciThrough">End date</label><input id="ciThrough" type="date" required>
+      <button type="submit" class="ci-quiet">Apply dates</button>
+    </form>
     <div class="ci-table-scroller" style="overflow-x:auto" role="region" tabindex="0" aria-label="Scrollable call table"><table class="ci-table" aria-label="Business call history"><thead><tr>
       <th style="width:23%">Caller</th><th style="width:23%">Lead status</th><th style="width:32%">Conversation</th><th style="width:22%">Time</th>
     </tr></thead><tbody id="ciRows"><tr><td colspan="4" class="ci-empty">Loading calls...</td></tr></tbody></table></div>
@@ -1074,6 +1082,7 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("websiteImportStatus").textContent="";
    $("websiteImportButton").disabled=false;
    window.cancelDescriptionEdit();
+   clearCallWorkspace();
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
    const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"studio";
    window.section(destination);
@@ -1472,22 +1481,89 @@ const ciStageLabels={hot:"Hot lead",warm:"Warm lead",general:"General inquiry",n
 const ciTag=(stage)=>'<span class="ci-tag '+(ciStageLabels[stage]?stage:"needs_review")+'">'+esc(ciStageLabels[stage]||"Needs review")+'</span>';
 const ciDate=(value)=>{if(!value)return "Unknown date";const d=new Date(value);return Number.isNaN(d.getTime())?"Unknown date":d.toLocaleString([], {dateStyle:"medium",timeStyle:"short"})};
 const ciDuration=(sec)=>sec==null?"—":Math.floor(sec/60)+"m "+String(sec%60).padStart(2,"0")+"s";
+let ciLoadSequence=0;
+let ciAppliedRange=null;
+function clearCallWorkspace(){
+  ciLoadSequence++;
+  ciCalls=[];
+  ciSelected=null;
+  $("ciSearch").value="";
+  $("ciRows").textContent="";
+  $("ciDetail").textContent="";
+  $("ciDetail").style.display="none";
+  clearRecording();
+}
+window.changeCallRange=()=>{
+  const custom=v("ciDays")==="custom";
+  $("ciCustomRange").hidden=!custom;
+  $("ciCustomRange").style.display=custom?"":"none";
+  if(custom)$("ciFrom").focus();
+  else{ciAppliedRange=null;window.loadCalls()}
+};
+$("ciCustomRange").addEventListener("submit",event=>{
+  event.preventDefault();
+  const start=new Date(v("ciFrom")+"T00:00:00");
+  const end=new Date(v("ciThrough")+"T00:00:00");
+  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<start){
+    $("ciNotice").textContent="Choose a start date on or before the end date.";
+    return;
+  }
+  end.setDate(end.getDate()+1);
+  if(end-start>367*86400000){
+    $("ciNotice").textContent="Choose a date range of one year or less.";
+    return;
+  }
+  ciAppliedRange={start:start.toISOString(),end:end.toISOString()};
+  window.loadCalls();
+});
 window.loadCalls=async()=>{
-  if(!organization())return;
-  $("ciNotice").textContent="Loading real call records...";
+  const oid=organization();
+  if(!oid)return;
+  const sequence=++ciLoadSequence;
+  const isCurrent=()=>sequence===ciLoadSequence&&oid===organization();
+  ciCalls=[];
+  ciSelected=null;
+  clearRecording();
+  $("ciDetail").style.display="none";
+  $("ciRows").innerHTML='<tr><td colspan="4" class="ci-empty">Loading calls…</td></tr>';
+  $("ciNotice").textContent="Loading call records…";
+  for(const id of ["ciTotal","ciUnique","ciAverage","ciHot","ciWarm","ciFollow"]){
+    $(id).textContent="—";
+  }
   try{
-    const days=Number(v("ciDays")||30);
-    const r=await request("/organizations/"+organization()+"/calls?days="+days);
+    let range=ciAppliedRange||{days:v("ciDays")==="custom"?"30":v("ciDays")};
+    if(v("ciDays")==="today"){
+      const start=new Date();
+      start.setHours(0,0,0,0);
+      const end=new Date(start);
+      end.setDate(end.getDate()+1);
+      range={start:start.toISOString(),end:end.toISOString()};
+    }
+    const r=await request("/organizations/"+encodeURIComponent(oid)+"/calls?"+new URLSearchParams(range));
+    if(!isCurrent())return;
     ciCalls=r.calls||[];
     $("ciTotal").textContent=r.total??0;
+    $("ciUnique").textContent=r.unique_callers??0;
+    $("ciAverage").textContent=ciDuration(r.average_duration_seconds);
     $("ciHot").textContent=r.counts?.hot??0;
     $("ciWarm").textContent=r.counts?.warm??0;
     $("ciFollow").textContent=r.follow_ups??0;
     $("ciReviewCount").textContent=(r.counts?.needs_review??0)+" need review";
-    $("ciNotice").textContent=ciCalls.length?"Showing "+ciCalls.length+" recorded calls. Sync to refresh.":"No calls imported yet. Connect the business assistant, then sync call history.";
+    $("ciNotice").textContent=r.truncated?"Metrics and results cover the 300 most recent calls in this period. Narrow the dates to see a smaller set.":
+      ciCalls.length?"Showing "+ciCalls.length+" calls in this period.":"No calls in this period. Try a wider date range or sync call history.";
     $("cpStartTip").style.display=ciCalls.length?"none":"flex";
     window.filterCalls();
-  }catch(e){$("ciNotice").textContent=e.message;$("ciRows").innerHTML='<tr><td colspan="4" class="ci-empty">Unable to load calls.</td></tr>'}
+  }catch(e){
+    if(!isCurrent())return;
+    $("ciNotice").textContent=e.message;
+    $("ciRows").innerHTML='<tr><td colspan="4" class="ci-empty">Unable to load calls.</td></tr>';
+  }
+};
+const callsMatchingFilters=()=>{
+  const q=v("ciSearch").trim().toLowerCase(),stage=v("ciStage");
+  return ciCalls.filter(c=>(stage==="all"||c.lead_stage===stage)&&
+    (!q||[c.caller_phone,c.caller_name,c.summary,c.product_interest,ciStageLabels[c.lead_stage]]
+      .some(x=>String(x||"").toLowerCase().includes(q))));
 };
 window.exportCalls=()=>{
   if(!ciCalls.length){msg("No calls to export yet.",true);return}
@@ -1498,9 +1574,7 @@ window.exportCalls=()=>{
     let value=String(x??"");if(/^[\s]*[=+@\-]/.test(value))value="'"+value;
     return '"'+value.replace(/"/g,'""')+'"';
   };
-  const filter=v("ciStage"),term=v("ciSearch").trim().toLowerCase();
-  const selected=ciCalls.filter(c=>(filter==="all"||c.lead_stage===filter)&&
-    (!term||[c.caller_phone,c.caller_name,c.summary,c.product_interest].some(x=>String(x||"").toLowerCase().includes(term))));
+  const selected=callsMatchingFilters();
   if(!selected.length){msg("No calls match the current filters.",true);return}
   const lines=[fields.map(x=>quote(x[0])).join(","),
     ...selected.map(c=>fields.map(x=>quote(c[x[1]])).join(","))];
@@ -1512,9 +1586,7 @@ window.exportCalls=()=>{
   msg("Call list exported. Transcript and recording links are excluded.");
 };
 window.filterCalls=()=>{
-  const q=v("ciSearch").trim().toLowerCase(),stage=v("ciStage");
-  const filtered=ciCalls.filter(c=>(stage==="all"||c.lead_stage===stage)&&
-    (!q||[c.caller_phone,c.caller_name,c.summary,c.product_interest].some(x=>String(x||"").toLowerCase().includes(q))));
+  const filtered=callsMatchingFilters();
   $("ciRows").innerHTML=filtered.length?filtered.map(c=>'<tr data-call="'+esc(c.id)+'" tabindex="0" role="button" aria-label="View call">'+
    '<td>'+esc(c.caller_name||c.caller_phone||"Unknown caller")+'<div class="call-secondary">'+esc(c.caller_name?c.caller_phone||"":"Inbound call")+'</div></td>'+
    '<td>'+ciTag(c.lead_stage)+'<div class="call-secondary">'+esc(c.lead_source==="human_reviewed"?"Human reviewed":c.lead_source==="ai_suggested"?"AI suggested":"Not yet reviewed")+'</div></td>'+

@@ -51,3 +51,57 @@ def test_unknown_recording_scheme_not_persisted():
     result=sanitize({"id":"call_456","artifact":{"recordingUrl":"javascript:alert(1)"}},
         "00000000-0000-0000-0000-000000000001")
     assert result["recording_url"] is None
+
+
+def test_custom_range_filters_tenant_and_calculates_caller_metrics(monkeypatch):
+    from app.account import current_user
+
+    queries = []
+    rows = [
+        {"caller_phone": "+12025550101", "duration_seconds": 120, "lead_stage": "hot"},
+        {"caller_phone": "+12025550101", "duration_seconds": 60, "lead_stage": "general"},
+        {"caller_phone": None, "duration_seconds": None, "lead_stage": "needs_review"},
+    ]
+    for row in rows:
+        row.update(started_at="2026-11-05T20:00:00Z", follow_up_needed=False)
+
+    def database(table, **kwargs):
+        queries.append((table, kwargs["params"]))
+        return rows
+
+    monkeypatch.setattr(ci, "membership", lambda oid, user: None)
+    monkeypatch.setattr(ci, "api", database)
+    app.dependency_overrides[current_user] = lambda: {"id": "owner"}
+    try:
+        path = "/api/account/organizations/example-tenant/calls"
+        dates = {"start": "2026-11-05T00:00:00-05:00", "end": "2026-11-06T00:00:00-05:00"}
+        result = client.get(path, params={**dates, "search": "hot"}).json()
+        assert result["total"] == 3
+        assert result["unique_callers"] == 1
+        assert result["average_duration_seconds"] == 90
+        assert result["calls"] == rows[:1]
+        assert not result["truncated"]
+        assert queries[0][1]["organization_id"] == "eq.example-tenant"
+        assert queries[0][1]["and"] == (
+            "(started_at.gte.2026-11-05T00:00:00-05:00,started_at.lt.2026-11-06T00:00:00-05:00)"
+        )
+
+        for invalid in (
+            {"start": dates["start"]},
+            {"start": dates["end"], "end": dates["start"]},
+            {"start": "2026-11-05T00:00:00", "end": dates["end"]},
+        ):
+            assert client.get(path, params=invalid).status_code == 422
+        assert len(queries) == 1
+    finally:
+        app.dependency_overrides.pop(current_user, None)
+
+
+def test_call_metrics_report_when_records_are_truncated(monkeypatch):
+    row = {"caller_phone": None, "duration_seconds": None, "lead_stage": "general",
+           "started_at": None, "follow_up_needed": False}
+    monkeypatch.setattr(ci, "membership", lambda oid, user: None)
+    monkeypatch.setattr(ci, "api", lambda *args, **kwargs: [row] * 301)
+    result = ci.calls("example-tenant", days=30, user={"id": "owner"})
+    assert result["truncated"] and result["total"] == 300
+    assert result["unique_callers"] == 0 and result["average_duration_seconds"] is None

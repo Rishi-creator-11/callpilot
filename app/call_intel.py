@@ -5,7 +5,7 @@ is verified from their statements or a model-generated score.
 """
 from __future__ import annotations
 import os, re, uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -149,36 +149,51 @@ def persist(oid:str,call:dict):
         data=data,prefer="resolution=merge-duplicates,return=minimal")
 
 @router.get("/calls")
-def calls(oid:str,stage:str="all",search:str="",days:int=Query(30,ge=1,le=365),
+def calls(oid: str, stage: str = "all", search: str = "",
+          days: int = Query(30, ge=1, le=365),
+          start: datetime | None = None, end: datetime | None = None,
           user=Depends(current_user)):
-    membership(oid,user)
-    rows=api("call_insights",params={"organization_id":"eq."+oid,
-        "select":"id,provider_call_id,caller_phone,caller_name,started_at,duration_seconds,summary,lead_stage,lead_source,lead_reason,follow_up_needed,follow_up_status,product_interest,direction",
-        "order":"started_at.desc.nullslast","limit":"300"})
-    from datetime import timedelta
-    cutoff=datetime.now(timezone.utc)-timedelta(days=days)
-    filtered=[]
-    for row in rows:
-        stamp=row.get("started_at")
-        try:
-            if stamp and datetime.fromisoformat(stamp.replace("Z","+00:00"))<cutoff:continue
-        except ValueError:continue
-        if stage!="all" and row["lead_stage"]!=stage:continue
-        q=search.casefold().strip()
-        if q and not any(q in str(row.get(field) or "").casefold() for field in
-                         ("caller_phone","caller_name","summary","product_interest")):continue
-        filtered.append(row)
-    # Counts are based on period (not the currently selected lead filter).
-    period=[r for r in rows if (not r.get("started_at") or
-        safe_after(r["started_at"],cutoff))]
-    counts={k:sum(r["lead_stage"]==k for r in period) for k in VALID_STAGES}
-    return {"calls":filtered,"total":len(period),"counts":counts,
-            "follow_ups":sum(r["follow_up_needed"] and r["follow_up_status"]!="done" for r in period),
-            "latest_sync":max((r["started_at"] for r in period if r.get("started_at")),default=None)}
+    membership(oid, user)
+    custom_range = start is not None or end is not None
+    if custom_range and (
+        start is None or end is None or start.utcoffset() is None or end.utcoffset() is None
+        or not timedelta(0) < end - start <= timedelta(days=367)
+    ):
+        raise HTTPException(422, "Choose an ordered date range of one year or less.")
 
-def safe_after(stamp,cutoff):
-    try:return datetime.fromisoformat(stamp.replace("Z","+00:00"))>=cutoff
-    except (ValueError,TypeError):return False
+    query = {
+        "organization_id": "eq." + oid,
+        "select": "id,provider_call_id,caller_phone,caller_name,started_at,duration_seconds,summary,lead_stage,lead_source,lead_reason,follow_up_needed,follow_up_status,product_interest,direction",
+        "order": "started_at.desc.nullslast,id.desc",
+        "limit": "301",
+    }
+    if custom_range:
+        query["and"] = f"(started_at.gte.{start.isoformat()},started_at.lt.{end.isoformat()})"
+    else:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        query["or"] = f"(started_at.gte.{cutoff.isoformat()},started_at.is.null)"
+    rows = api("call_insights", params=query)
+    period = rows[:300]
+    term = search.casefold().strip()
+    filtered = [
+        row for row in period
+        if (stage == "all" or row["lead_stage"] == stage)
+        and (not term or any(term in str(row.get(field) or "").casefold() for field in (
+            "caller_phone", "caller_name", "summary", "product_interest", "lead_stage",
+        )))
+    ]
+    durations = [r["duration_seconds"] for r in period if r["duration_seconds"] is not None]
+    return {
+        "calls": filtered,
+        "total": len(period),
+        "truncated": len(rows) > len(period),
+        "unique_callers": len({r["caller_phone"] for r in period if r["caller_phone"]}),
+        "average_duration_seconds": round(sum(durations) / len(durations)) if durations else None,
+        "counts": {key: sum(r["lead_stage"] == key for r in period) for key in VALID_STAGES},
+        "follow_ups": sum(r["follow_up_needed"] and r["follow_up_status"] != "done" for r in period),
+        "latest_sync": max((r["started_at"] for r in period if r["started_at"]), default=None),
+    }
+
 
 @router.get("/calls/{call_id}")
 def call_detail(oid:str,call_id:uuid.UUID,user=Depends(current_user)):
