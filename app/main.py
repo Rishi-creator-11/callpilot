@@ -95,6 +95,22 @@ def faq():
 
 
 PRODUCT_PAGES = {
+    "answering-services": (
+        "Give callers a helpful first answer", "Set up a receptionist that knows your business and can take a message.",
+        "Choose a greeting and approve the business information your receptionist can share. Enable callbacks so your team can follow up when a caller needs personal help.",
+        ("Set your receptionist’s greeting in Launch Studio.", "Add and approve answers to common questions.",
+         "Try your answers before connecting a number, then confirm routing with a controlled call."),
+        "A caller asks about service hours", "The receptionist checks the approved hours and can collect a callback request if the caller needs more help.",
+        "/app#studio", "Set up your receptionist",
+    ),
+    "local-phone-numbers": (
+        "Connect a number for your business", "Bring your existing public number into your CallPilot setup with forwarding.",
+        "Use your connected CallPilot number directly or forward calls to it from your existing line. If you need a new number, check availability with your phone provider.",
+        ("Review your connected number in Usage &amp; phone.", "Choose how your carrier forwards calls from your existing line.",
+         "Check the greeting, fallback destination, and what happens when a caller hangs up."),
+        "An unanswered call reaches your receptionist", "A carrier can forward an unanswered call to your connected CallPilot number when that forwarding option is available.",
+        "/app#usage", "Review your phone setup",
+    ),
     "lead-capture": (
         "Capture leads while you work", "Give callers a way to leave a clear callback request.",
         "CallPilot can ask what the caller needs, confirm their contact details, and record an approved callback request for your team.",

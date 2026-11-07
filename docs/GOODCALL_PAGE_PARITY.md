@@ -6,16 +6,16 @@ This is the page and interaction inventory. See [the separate feature checklist]
 
 | Done | Goodcall page or page family | Evidence | CallPilot destination and remaining work |
 | --- | --- | --- | --- |
-| [ ] | `/` homepage | Observed | `/` has a redesigned navigation, signup entry point, and interactive receptionist walkthrough. Finish responsive verification and remaining proof, comparison and integration sections. |
+| [ ] | `/` homepage | Observed | `/` has a redesigned navigation, signup entry point, and interactive receptionist walkthrough. Live desktop walkthrough and scheduling link verified. Mobile, proof, comparison, and integration sections remain. |
 | [ ] | `/pricing` | Observed | `/pricing` shows current CallPilot plans. Add customer-facing plan comparison and verify checkout separately. |
 | [ ] | `/how-it-works` | Observed | `/how-it-works` covers setup, test, and connection. Expand walkthrough as setup and practice features ship. |
 | [ ] | `/faq` | Observed | `/faq` has expandable original answers. Complete topic coverage. |
-| [ ] | `/answering-services` | Observed | Standalone product surface missing. |
+| [ ] | `/answering-services` | Observed | `/answering-services` links to Launch Studio. Expand comparison and industry content. |
 | [ ] | `/appointment-scheduling` | Observed | `/appointment-scheduling` explains booking and links to Appointments. Carrier and calendar tests are tracked separately. |
 | [ ] | Lead capture, catalog and order, call review, and phone setup | Homepage and product documentation observed | Dedicated CallPilot pages link to the corresponding workspace tools. Expand industry-specific journeys. |
 | [ ] | `/business-productivity-ai` and individual integration pages | Index observed, child enumeration pending | Build integration directory and provider detail pages. |
 | [ ] | `/business-phone-number` area-code lookup | Observed | Standalone lookup and area-code pages missing. |
-| [ ] | `/local-phone-numbers` | Observed | Standalone local-number landing page missing. |
+| [ ] | `/local-phone-numbers` | Observed | `/local-phone-numbers` explains number connection and forwarding. Live area-code inventory and self-service provisioning remain. |
 | [ ] | `/enterprise` | Observed | Enterprise details and lead entry point missing. |
 | [ ] | `/case-study-goodcall-ai-phone-assistant` and case-study details | Index observed, details pending | CallPilot case studies and proof pages missing. |
 | [ ] | `/about` | Observed | Company page missing. |
@@ -32,7 +32,7 @@ This is the page and interaction inventory. See [the separate feature checklist]
 | --- | --- | --- | --- |
 | [ ] | Sign-in, email/Google options, account recovery and errors | Login observed, recovery end-to-end pending | `/app` supports email and Google. Signed-in dashboard verified. Verify recovery and persistence across reloads. |
 | [ ] | Onboarding business lookup | Observed | Google Maps search and selection missing. |
-| [ ] | Website input and scan progress | Input observed, authorized user supplied a site | Guided setup accepts a website after workspace creation and opens the saved draft in Knowledge. Multi-page discovery and structured metadata review remain. |
+| [ ] | Website input and scan progress | Input observed, authorized user supplied a site | Live QA created a workspace, imported a public page, and opened the unapproved draft in Knowledge. Multi-page discovery and structured metadata review remain. |
 | [ ] | Manual business details | Observed | Guided setup collects name and industry and offers a path to Launch Studio. Timezone and structured details remain. |
 | [ ] | Initial build progress and first-practice prompt | Observed | Launch Studio has a checklist. Generated agent, progress, and voice practice missing. |
 | [ ] | Welcome, finish setup and testing navigation | Observed | Launch Studio and text test partially cover this. Test with no number and publishing remain. |

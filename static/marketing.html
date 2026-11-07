@@ -9,7 +9,7 @@
 :root{color-scheme:light;--ink:#0d1931;--night:#0b1831;--night-line:#293952;--mint:#9ee9d6;--mint-dark:#146452;--paper:#f8f8f3;--line:#dce3df;--muted:#526172;--white:#fff;font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink)}a{color:inherit;text-underline-offset:.22em}a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #2eab98;outline-offset:4px}
 .wrap{width:min(1168px,calc(100% - 64px));margin-inline:auto}.skip{position:absolute;left:12px;top:-80px;background:white;padding:12px;z-index:2}.skip:focus{top:12px}
-.site-head{background:var(--night);color:white;border-bottom:1px solid var(--night-line)}.site-nav,.nav-links,.actions{display:flex;align-items:center;gap:24px;flex-wrap:wrap}.site-nav{min-height:76px;justify-content:space-between}.nav-links a,.brand{text-decoration:none}.nav-links a:hover{text-decoration:underline}.brand{display:inline-flex;align-items:center;gap:10px;font-size:1.55rem;font-weight:780;letter-spacing:-.045em}.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--mint);color:var(--night);font-size:20px}
+.site-head{background:var(--night);color:white;border-bottom:1px solid var(--night-line)}.site-nav,.nav-links,.actions{display:flex;align-items:center;gap:24px;flex-wrap:wrap}.site-nav{min-height:76px;justify-content:space-between}.nav-links a,.brand{text-decoration:none}.nav-links a:hover{text-decoration:underline}.product-menu{position:relative}.product-menu summary{cursor:pointer}.product-menu ul{position:absolute;z-index:1;top:100%;left:0;min-width:210px;margin:10px 0 0;padding:8px;list-style:none;background:white;color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px #030b2340}.product-menu a{display:block;padding:8px 10px;border-radius:6px}.product-menu a:hover{background:#e8f6ee}.brand{display:inline-flex;align-items:center;gap:10px;font-size:1.55rem;font-weight:780;letter-spacing:-.045em}.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--mint);color:var(--night);font-size:20px}
 .button{display:inline-flex;align-items:center;justify-content:center;gap:.55em;min-height:48px;border:1px solid transparent;border-radius:8px;padding:10px 17px;background:var(--mint);color:var(--night);text-decoration:none;font-weight:740;line-height:1.2}.button:hover{background:#c1f4e8;text-decoration:none}.button.quiet{background:transparent;border-color:#687992;color:inherit}.button.quiet:hover{background:#ffffff17}.button.dark{background:var(--night);color:white}.button.dark:hover{background:#283d59}
 h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{font-size:clamp(3rem,6.35vw,5.25rem)}h2{font-size:clamp(2rem,4.1vw,3.55rem)}h3{font-size:1.32rem}p{color:var(--muted)}.eyebrow{font-size:.76rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--mint-dark)}.lead{font-size:clamp(1.04rem,1.65vw,1.25rem);max-width:53ch}.hero-shell,.closing{background:var(--night);color:white}.hero{display:grid;grid-template-columns:1.2fr .92fr;align-items:center;gap:clamp(28px,6vw,90px);min-height:690px;padding-block:70px}.hero h1{max-width:10.5ch;margin:.2em 0 .28em}.hero .lead,.closing p{color:#cdd9e8}.hero .lead{margin-bottom:1.45em}.hero .eyebrow,.closing .eyebrow{color:var(--mint)}
 .example{background:white;color:var(--ink);border:1px solid #32425b;border-radius:15px;min-width:0;overflow:hidden;box-shadow:0 20px 72px #030b2354}.example-head{display:flex;align-items:center;gap:13px;padding:20px}.example-head p{margin:0;font-size:.83rem}.avatar{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:#d4f5ec;color:#124536;font-size:1.45rem}.tag{display:inline-block;padding:2px 7px;border:1px solid var(--line);border-radius:999px;font-size:.69rem;font-weight:700;white-space:nowrap}.example-bar{display:flex;align-items:center;gap:8px;padding:8px 20px;background:#eef5f1;border-block:1px solid #deebe4;color:#235b49;font-size:.76rem;font-weight:750}.dot{width:8px;height:8px;border-radius:50%;background:#39ad8b}.demo{margin:0;padding:16px 20px 20px;border:0;min-width:0}.demo legend{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.choice{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;margin:0 3px 8px 0;font-size:.85rem;font-weight:670;cursor:pointer}.choice:has(:checked){background:#d9f4eb;border-color:#82c7b4}.choice input{accent-color:var(--mint-dark);margin:0}.scenario{display:none;min-height:283px;margin-top:8px}.demo:has(#setup:checked) .setup,.demo:has(#callback:checked) .callback,.demo:has(#calendar:checked) .calendar{display:grid;align-content:start;gap:10px}.bubble{margin:0;border:1px solid #e1e9e4;background:#f5f7f4;border-radius:10px;padding:10px 12px;font-size:.88rem}.bubble strong,.outcome strong{display:block;color:var(--ink);font-size:.76rem;margin-bottom:1px}.outcome{margin:0;padding:11px 12px;background:#eaf9f3;border:1px solid #c9e9de;border-radius:10px;font-size:.84rem;color:#255444}
@@ -25,7 +25,11 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-head"><nav class="wrap site-nav" aria-label="Main navigation">
 <a class="brand" href="/" aria-label="CallPilot home"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a>
-<div class="nav-links"><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/app">Sign in</a><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div>
+<div class="nav-links"><details class="product-menu"><summary>Product</summary><ul>
+<li><a href="/answering-services">AI answering</a></li><li><a href="/appointment-scheduling">Appointment scheduling</a></li>
+<li><a href="/lead-capture">Lead capture</a></li><li><a href="/product-orders">Products and orders</a></li>
+<li><a href="/call-history">Call history</a></li><li><a href="/local-phone-numbers">Business numbers</a></li>
+</ul></details><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/app">Sign in</a><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div>
 </nav></header>
 <main id="main">
 <div class="hero-shell"><section class="hero wrap">
@@ -78,5 +82,17 @@ h1,h2,h3,p{margin:0 0 .65em}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{
 </main>
 <section class="closing"><div class="wrap"><div><p class="eyebrow">Your business, your front desk</p><h2>Set up your first agent.</h2><p>Start with the information your team already uses.</p></div><a class="button" href="/app?mode=signup">Build your agent <span aria-hidden="true">↗</span></a></div></section>
 <footer class="site-footer"><div class="wrap"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span>CallPilot</a><div class="nav-links"><a href="/how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a><a href="/app#help">Support</a><a href="/legal">Terms and privacy</a></div></div></footer>
+<script>
+const productMenu = document.querySelector(".product-menu");
+document.addEventListener("click", event => {
+  if (productMenu.open && !productMenu.contains(event.target)) productMenu.open = false;
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && productMenu.open) {
+    productMenu.open = false;
+    productMenu.querySelector("summary").focus();
+  }
+});
+</script>
 </body>
 </html>
