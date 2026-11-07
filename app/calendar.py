@@ -46,9 +46,13 @@ def authorize(oid:str,user=Depends(current_user)):
 
 @router.get("/api/oauth/google/callback")
 def oauth_callback(code:str|None=None,state:str|None=None,error:str|None=None):
-    if error or not code or not state:return RedirectResponse("/app?calendar=not_connected")
+    # Never reflect arbitrary Google error details or authorization codes to the UI.
+    if error:
+        result="access_denied" if error=="access_denied" else "error"
+        return RedirectResponse("/app?calendar="+result+"#appointments")
+    if not code or not state:return RedirectResponse("/app?calendar=not_connected#appointments")
     valid=rpc("consume_oauth_state",{"p_nonce":state})
-    if not valid:return RedirectResponse("/app?calendar=expired")
+    if not valid:return RedirectResponse("/app?calendar=expired#appointments")
     record=valid[0]
     try:
         with httpx.Client(timeout=15) as c:
@@ -58,15 +62,15 @@ def oauth_callback(code:str|None=None,state:str|None=None,error:str|None=None):
                 "redirect_uri":REDIRECT,"grant_type":"authorization_code"})
         r.raise_for_status()
         token=r.json().get("refresh_token")
-        if not token: return RedirectResponse("/app?calendar=missing_refresh_token")
+        if not token: return RedirectResponse("/app?calendar=missing_refresh_token#appointments")
         encrypted=cipher().encrypt(token.encode()).decode()
         api("calendar_connections","POST",params={"on_conflict":"organization_id"},
             data={"organization_id":record["organization_id"],"calendar_id":"primary",
                 "refresh_token_ciphertext":encrypted,"connected_by":record["created_by"]},
             prefer="resolution=merge-duplicates,return=minimal")
-        return RedirectResponse("/app?calendar=connected")
+        return RedirectResponse("/app?calendar=connected#appointments")
     except (httpx.HTTPError,KeyError,ValueError,InvalidToken):
-        return RedirectResponse("/app?calendar=error")
+        return RedirectResponse("/app?calendar=error#appointments")
 
 def google_token(oid):
     c=connection(oid)
