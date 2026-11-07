@@ -26,8 +26,9 @@ def test_voice_semantic_tool_returns_only_approved_answer(monkeypatch):
 def test_voice_pricing_policy_overrides_retrieval(monkeypatch):
     monkeypatch.setenv("VAPI_WEBHOOK_TOKEN","only-for-tests")
     monkeypatch.setattr(vapi,"org_or_404",lambda oid:{"id":oid})
+    monkeypatch.setattr("app.account.tenant_prices_enabled",lambda oid: False)
     monkeypatch.setattr(semantic,"retrieve",lambda *args: (_ for _ in ()).throw(AssertionError("Should not call retrieval for pricing")))
     r=client.post("/webhooks/vapi-tools/business-1",headers={"Authorization":"Bearer only-for-tests"},
        json={"message":{"type":"tool-calls","toolCallList":[{"id":"call-2","function":{"name":"lookup_approved_knowledge","arguments":{"question":"How much is the container?"}}}]}})
     assert r.status_code==200
-    assert "can't quote" in r.json()["results"][0]["result"].lower()
+    assert "don't have a verified price" in r.json()["results"][0]["result"].lower()

@@ -76,7 +76,35 @@ def health(): return {"status":"ok","mode":"internal-demo"}
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return (ROOT/"static"/"customer.html").read_text()
+    return marketing_page()
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing():
+    return marketing_page(pricing_only=True)
+
+
+def marketing_page(*, pricing_only=False):
+    from app.billing import PLANS, SETUP_FEE_CENTS
+
+    plans = [
+        '<article class="card">'
+        f'<h3>{plan["name"]}</h3><p class="price">${plan["monthly_cents"] // 100}<span> / month</span></p>'
+        f'<p>{plan["included_minutes"]:,} included calling minutes per month.</p></article>'
+        for plan in PLANS.values()
+    ]
+    html = (ROOT / "static" / "marketing.html").read_text()
+    if pricing_only:
+        header, content = html.split('<main id="main">', 1)
+        _, pricing_content = content.split('<section class="band shaded" id="pricing">', 1)
+        html = (
+            header.replace("<title>CallPilot | An AI front desk for your business</title>",
+                           "<title>CallPilot Pricing</title>")
+            + '<main id="main"><section class="band shaded" id="pricing">'
+            + pricing_content.replace("<h2>Choose your monthly minutes</h2>",
+                                      "<h1>Choose your monthly minutes.</h1>", 1)
+        )
+    return html.replace("{{plan_cards}}", "".join(plans)).replace("{{setup_fee}}", f"${SETUP_FEE_CENTS // 100}")
 
 @app.get("/api/businesses", dependencies=[Depends(authorize)])
 def businesses():

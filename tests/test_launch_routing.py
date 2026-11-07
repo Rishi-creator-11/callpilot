@@ -91,13 +91,15 @@ def test_provisioned_assistant_is_capped_at_240_seconds_with_wrapup(monkeypatch)
         return []
     monkeypatch.setattr(cloud.httpx,"Client",FakeClient)
     monkeypatch.setattr(cloud,"api",api)
+    monkeypatch.setattr("app.voice_actions.api",api)
     monkeypatch.setattr(cloud,"org_or_404",lambda oid:{"id":oid,"name":"United Global Trade LLC"})
     monkeypatch.setenv("VAPI_API_KEY","k");monkeypatch.setenv("VAPI_CREDENTIAL_ID","cred_1")
+    monkeypatch.setenv("VAPI_WEBHOOK_TOKEN","only-for-tests")
     monkeypatch.setattr(cloud,"authorize",lambda:None)
     out=cloud.provision_test_agent(A)
     p=sent["payload"]
     assert out["created"] and p["maxDurationSeconds"]==240
-    assert p["hooks"][0]["options"]["seconds"]==215
+    assert [hook["options"]["seconds"] for hook in p["hooks"]]==[1, 215]
     assert p["metadata"]=={"callpilot_org":A}
     assert len(p["name"])<=40 and p["voice"]["provider"]=="vapi"
 

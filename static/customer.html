@@ -450,7 +450,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 @media(max-width:760px){.cp-studio-grid,.cp-studio-connections{grid-template-columns:1fr}.cp-studio-hero{padding:22px}.cp-studio-step{padding:17px}}
 </style></head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
-<nav><div class="brand">✦ Call<span>Pilot</span></div><div class="row">
+<nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
 <button id="topProfile" class="cp-top-user" style="display:none" onclick="window.section('account')" aria-label="Open your account">
 <span id="topAvatar" class="cp-avatar">CP</span><span id="topUserName" class="cp-top-user-name">My account</span><span aria-hidden="true">⌄</span>
@@ -536,7 +536,7 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
    <label class="cp-studio-check"><input id="studioApproveKnowledge" type="checkbox"> I confirm these details are accurate and approved for callers.</label>
    <button id="studioSaveKnowledge" onclick="window.studioSaveKnowledge()">Approve &amp; teach AI</button>
    <p id="studioKnowledgeResult" class="muted" role="status">For safety, numeric prices and sensitive information need a separate review.</p>
-   <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Manage all knowledge →</button>
+   <button class="cp-studio-textbtn" onclick="window.section('knowledge')">Import a website or manage knowledge →</button>
   </article>
   <article class="cp-studio-step"><div class="cp-studio-step-head"><span class="cp-studio-num">03</span><div><h3>Make it sound like you</h3><p>A warm greeting, not a phone menu.</p></div></div>
    <label for="studioAgentName">Receptionist name</label><input id="studioAgentName" maxlength="80" placeholder="Alex">
@@ -653,6 +653,18 @@ body.cp-signed-in .sidebar .cp-account-trigger{min-height:69px}
 <div id="knowledge" class="panel card">
 <div class="cp-panel-heading"><div><h2>Verified business knowledge</h2><p class="muted">Teach your AI the facts it can safely share. Nothing is used until you approve it.</p></div><span class="pill" id="knowledgeCount">Approved facts</span></div>
 <div class="cp-section-box"><h3>Tell your assistant about your business</h3><p>Describe your business naturally: what you do, products, services, shipping, policies, and anything customers should know. CallPilot indexes approved passages by meaning—no customer questions required.</p>
+<details class="item">
+ <summary><strong>Import a page from your website</strong></summary>
+ <form id="websiteImportForm">
+  <p class="muted">Import readable text from a public page. Review the draft below before your receptionist can use it.</p>
+  <label for="websiteImportUrl">Public website address</label>
+  <input id="websiteImportUrl" type="text" inputmode="url" maxlength="2048" placeholder="example.com/services" required>
+  <div class="cp-inline-actions">
+   <button id="websiteImportButton" type="submit">Import draft</button>
+   <span id="websiteImportStatus" class="muted" role="status"></span>
+  </div>
+ </form>
+</details>
 <label for="descriptionTitle">Description title</label><input id="descriptionTitle" maxlength="120" placeholder="About our business and services">
 <label for="descriptionBody">Business information</label><textarea id="descriptionBody" maxlength="12000" style="min-height:220px" placeholder="We are a local business selling... We deliver to... Our return policy is..."></textarea>
 <div class="cp-inline-actions"><button id="descriptionSaveBtn" onclick="window.saveDescription()">Save, approve &amp; index</button><button id="descriptionCancelEdit" class="secondary" style="display:none" onclick="window.cancelDescriptionEdit()">Cancel edit</button><span class="muted">Submitting confirms this information is accurate for callers. Leave out monetary amounts and private details.</span></div>
@@ -845,7 +857,7 @@ window.googleSignIn=async()=>{
   const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+"/app"}});
   if(error)throw error;
  }catch(e){
-  $("authmsg").textContent="Google sign-in is not ready: "+(e?.message||"Check the Google provider in Supabase Auth.");
+  $("authmsg").textContent="Could not start Google sign-in. Try again or continue with email.";
   button.disabled=false;
  }
 };
@@ -995,7 +1007,7 @@ async function render(){
      document.body.classList.remove("cp-signed-in","cp-collapsed","cp-mobile-open");
      document.body.dataset.appState="guest";
      $("topProfile").style.display="none";$("topHelp").style.display="none";$("logout").style.display="none";
-     window.authMode("signin");
+     window.authMode(new URLSearchParams(location.search).get("mode")==="signup"?"signup":"signin");
      return;
    }
    const name=current.user_metadata?.full_name||current.email?.split("@")[0]||"Account";
@@ -1057,6 +1069,11 @@ window.loadWorkspace=async({preserve=false}={})=>{
    $("orgInfo").textContent=(o?.industry||"General")+" · "+(o?.role||"Team member")+" access";
    $("wsName").value=o?.name||"";
    $("wsIndustry").value=o?.industry||"";
+   websiteImportRun++;
+   $("websiteImportUrl").value="";
+   $("websiteImportStatus").textContent="";
+   $("websiteImportButton").disabled=false;
+   window.cancelDescriptionEdit();
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
    const destination=pageMeta[location.hash.slice(1)]?location.hash.slice(1):"studio";
    window.section(destination);
@@ -1128,13 +1145,38 @@ async function loadAgent(){let a=await request("/organizations/"+organization()+
 window.saveAgent=()=>safe(async()=>{await request("/organizations/"+organization()+"/agent","PUT",{agent_name:v("agent"),greeting:v("greeting")});msg("Greeting saved.")});
 let descriptionItems=[];
 let descriptionEditingId=null;
+let websiteImportRun=0;
+$("websiteImportForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const button=$("websiteImportButton"),status=$("websiteImportStatus");
+ const oid=organization(),url=v("websiteImportUrl").trim();
+ if(button.disabled||!url||!oid)return;
+ const run=++websiteImportRun;
+ const isCurrent=()=>run===websiteImportRun&&oid===organization();
+ button.disabled=true;
+ status.textContent="Reading the public page…";
+ try{
+  const result=await request("/organizations/"+encodeURIComponent(oid)+"/descriptions/import-website","POST",{url});
+  if(!isCurrent())return;
+  status.textContent=result.created?
+   "Draft saved. Review the imported text below before approving it.":
+   "This page is already in this workspace’s knowledge base.";
+  $("websiteImportUrl").value="";
+  try{await loadFacts()}
+  catch{if(isCurrent())status.textContent+=" Reopen the Knowledge base to refresh the list."}
+ }catch(e){if(isCurrent())status.textContent=e.message}
+ finally{if(isCurrent())button.disabled=false}
+});
+
 async function loadDescriptions(){
  const oid=organization();if(!oid)return;
  const docs=await request("/organizations/"+encodeURIComponent(oid)+"/descriptions");
  if(oid!==organization())return;
  descriptionItems=docs;
  $("descriptions").innerHTML=docs.map(d=>
-  '<div class="item"><strong>'+esc(d.title)+'</strong><p style="white-space:pre-wrap">'+esc(d.content)+'</p>'+
+  '<div class="item"><strong>'+esc(d.title)+'</strong>'+
+  (d.source_url?'<p class="muted" style="overflow-wrap:anywhere">Source · '+esc(d.source_url)+'</p>':'')+
+  '<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(d.content)+'</p>'+
   '<span class="muted">'+(d.approved_at?'Approved and searchable':'Draft — not shared with callers')+'</span> '+
   (!d.approved_at?'<button class="secondary" data-approve-desc="'+esc(d.id)+'">Approve &amp; index</button>':'')+
   '<button class="secondary" data-edit-desc="'+esc(d.id)+'">Edit</button> '+
@@ -1167,6 +1209,8 @@ window.saveDescription=()=>safe(async()=>{
  return "Business description approved and indexed into "+result.indexed_passages+" searchable passages.";
 });
 window.approveDescription=id=>safe(async()=>{
+ const doc=descriptionItems.find(d=>d.id===id);
+ if(doc?.source_url&&!confirm("Publish this imported text for callers? Confirm that you reviewed it for accuracy and removed private details and instructions."))return;
  const r=await request("/organizations/"+organization()+"/descriptions/"+encodeURIComponent(id)+"/approve","POST");
  await loadDescriptions();await loadSemanticStatus();
  return "Approved and indexed "+r.indexed_passages+" searchable passages.";

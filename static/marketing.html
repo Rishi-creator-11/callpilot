@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="CallPilot gives your business an AI front desk for customer questions, callback requests, and appointment scheduling.">
+<title>CallPilot | An AI front desk for your business</title>
+<style>
+:root{color-scheme:light;--ink:#182034;--muted:#4b5772;--accent:#4b3dcc;--line:#dedff0;--wash:#f3f2ff;--paper:#fbfbfe;font:16px/1.55 system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink)}a{color:var(--accent);text-underline-offset:.22em}
+a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #7566eb;outline-offset:4px}
+.wrap{max-width:1120px;margin:auto;padding-inline:24px}.skip{position:absolute;left:12px;top:-80px;background:white;padding:12px;z-index:2}.skip:focus{top:12px}
+header{background:white;border-bottom:1px solid var(--line)}nav,.nav-links,.actions{display:flex;align-items:center;gap:22px;flex-wrap:wrap}nav{min-height:74px;justify-content:space-between}.nav-links{gap:18px}.nav-links a,.brand{font-weight:650;text-decoration:none}.brand{font-size:1.32rem;color:var(--ink);letter-spacing:-.04em}.brand b{color:var(--accent)}
+.button{display:inline-block;border-radius:12px;padding:11px 19px;background:var(--accent);color:white;text-decoration:none;font-weight:700}.button:hover{background:#3b2cae}.quiet{background:white;color:var(--accent);border:1px solid var(--line)}.quiet:hover{background:var(--wash)}
+.hero{display:grid;grid-template-columns:1.03fr 1fr;align-items:center;gap:48px;padding-block:clamp(45px,8vw,105px)}.eyebrow{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:800}
+h1,h2,h3,p{margin:0 0 .6em}h1,h2,h3{line-height:1.12;letter-spacing:-.035em}h1{font-size:clamp(2.55rem,6vw,4.75rem);margin:.18em 0 .3em}h2{font-size:clamp(1.8rem,4vw,2.8rem)}h3{font-size:1.22rem}p{color:var(--muted)}.hero .intro{font-size:1.14rem;max-width:38ch;margin-bottom:1.4em}
+.example{padding:26px;border:1px solid var(--line);border-radius:25px;background:white;box-shadow:0 16px 45px #30296c12;min-width:0}.example .eyebrow{margin-bottom:12px}.demo{border:0;padding:0;margin:0;min-width:0}.demo legend{font-weight:700;margin-bottom:12px}.choice{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--line);border-radius:20px;margin:0 3px 8px 0;font-size:.9rem;cursor:pointer}.choice:has(:checked){background:var(--wash);border-color:#a49aed}.choice input{accent-color:var(--accent);margin:0}.scenario{display:none;background:var(--wash);padding:18px;border-radius:14px;margin-top:12px;min-height:180px}.demo:has(#questions:checked) .questions,.demo:has(#callback:checked) .callback,.demo:has(#calendar:checked) .calendar{display:block}.scenario p{margin-bottom:10px}.scenario p:last-child{margin-bottom:0}.scenario strong{display:block;color:var(--ink)}.outcome{border-top:1px solid var(--line);padding-top:8px}
+.band{padding-block:clamp(35px,6vw,74px);border-top:1px solid var(--line)}.band.shaded{background:var(--wash)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:22px}.card{background:white;padding:24px;border:1px solid var(--line);border-radius:17px}.card p:last-child{margin-bottom:0}.price{font-size:2.15rem;font-weight:800;letter-spacing:-.04em;color:var(--ink)}.price span{font-size:1rem;font-weight:500;letter-spacing:0;color:var(--muted)}.faq{max-width:750px}details{border-bottom:1px solid var(--line);padding:15px 0}summary{font-weight:700;cursor:pointer}details p{margin:8px 0 0}footer{border-top:1px solid var(--line);padding-block:25px}footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media(max-width:790px){.hero{grid-template-columns:1fr;gap:28px}.grid{grid-template-columns:1fr}.nav-links{gap:11px;font-size:.9rem}nav{padding-block:12px}.example{padding:20px}.actions{gap:12px}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><nav class="wrap" aria-label="Main navigation">
+<a class="brand" href="/">✦ Call<b>Pilot</b></a>
+<div class="nav-links"><a href="/#how-it-works">How it works</a><a href="/pricing">Pricing</a><a href="/#faq">FAQ</a><a href="/app">Sign in</a></div>
+</nav></header>
+<main id="main">
+<section class="hero wrap">
+ <div><p class="eyebrow">The AI front desk</p><h1>Give every caller a place to start.</h1>
+ <p class="intro">CallPilot answers from your approved business information, captures callback requests, and can book appointments on a connected Google Calendar.</p>
+ <div class="actions"><a class="button" href="/app?mode=signup">Create a workspace</a><a class="button quiet" href="#call-example">Explore a call</a></div></div>
+ <div class="example" id="call-example">
+  <p class="eyebrow">Illustrative conversation</p>
+  <fieldset class="demo"><legend>What is the caller trying to do?</legend>
+   <label class="choice"><input type="radio" name="example" id="questions" checked>Ask a question</label>
+   <label class="choice"><input type="radio" name="example" id="callback">Request a callback</label>
+   <label class="choice"><input type="radio" name="example" id="calendar">Book a visit</label>
+   <div class="scenario questions"><p><strong>Caller</strong>Do you repair walk-in coolers?</p><p><strong>Receptionist</strong>Yes. Our team services commercial refrigeration. What type of cooler do you have?</p><p class="outcome">Answers use information approved by the business.</p></div>
+   <div class="scenario callback"><p><strong>Caller</strong>Could someone call me about a quote?</p><p><strong>Receptionist</strong>Of course. What name and number should I pass to the team?</p><p class="outcome">The caller confirms their details before a request is saved.</p></div>
+   <div class="scenario calendar"><p><strong>Caller</strong>Can I book an appointment for Friday?</p><p><strong>Receptionist</strong>Friday at 10 a.m. is available. Would you like me to book that time?</p><p class="outcome">CallPilot confirms the booking after the calendar creates the event.</p></div>
+  </fieldset>
+ </div>
+</section>
+<section class="band shaded" id="how-it-works"><div class="wrap">
+ <p class="eyebrow">How it works</p><h2>Set up your front desk</h2>
+ <div class="grid">
+  <article class="card"><h3>1. Add business details</h3><p>Write your answers or import a public website page. Review the information before approving it for callers.</p></article>
+  <article class="card"><h3>2. Check your answers</h3><p>Set your greeting and try common caller questions in the workspace’s text tester.</p></article>
+  <article class="card"><h3>3. Connect and test</h3><p>Set up your phone connection and any calendar actions you need. Verify each with a controlled call before routing customer calls.</p></article>
+ </div>
+</div></section>
+<section class="band"><div class="wrap">
+ <p class="eyebrow">In your workspace</p><h2>See what happened after the ring</h2>
+ <div class="grid">
+  <article class="card"><h3>Calls and leads</h3><p>Review call history, captured callback requests, and available recordings and transcripts.</p></article>
+  <article class="card"><h3>Google Calendar</h3><p>Connect a calendar to enable availability checks and approved booking workflows.</p></article>
+  <article class="card"><h3>Catalog and orders</h3><p>Maintain an approved catalog and receive pending order requests for staff review.</p></article>
+ </div>
+</div></section>
+<section class="band shaded" id="pricing"><div class="wrap">
+ <p class="eyebrow">Pricing</p><h2>Choose your monthly minutes</h2>
+ <p>One-time setup fee of {{setup_fee}}. No automatic overage charges.</p>
+ <div class="grid">{{plan_cards}}</div>
+</div></section>
+<section class="band" id="faq"><div class="wrap faq">
+ <p class="eyebrow">Common questions</p><h2>Before your first call</h2>
+ <details><summary>Can I keep my business number?</summary><p>You can keep your public number and forward calls to a connected CallPilot number, subject to your carrier’s forwarding options.</p></details>
+ <details><summary>Can I review imported information first?</summary><p>Imported pages arrive as drafts. Workspace owners and admins can edit and approve the text in the Knowledge base.</p></details>
+ <details><summary>What if a caller asks for a price?</summary><p>You can choose to allow exact owner-approved prices. CallPilot can collect the request for a callback when a verified price is unavailable and lead capture is enabled.</p></details>
+ <details><summary>How are recordings and transcripts handled?</summary><p>Authorized workspace members can review available recordings and transcripts. See the <a href="/legal">privacy and recording notice</a> for details.</p></details>
+</div></section>
+</main>
+<footer><div class="wrap"><span>✦ CallPilot</span><div class="nav-links"><a href="/app">Workspace</a><a href="/legal">Terms, privacy and recording notice</a></div></div></footer>
+</body>
+</html>

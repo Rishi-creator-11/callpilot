@@ -4,6 +4,7 @@ import os, uuid, httpx
 from fastapi import APIRouter, Header, Depends, HTTPException
 from pydantic import BaseModel, Field
 from app.cloud import api, PRICE, MONEY, NO_PRICE, UNKNOWN
+from app.website_import import fetch_page
 
 router=APIRouter(prefix="/api/account",tags=["customer"])
 # Only the owner's Call Pilot marketing workspace may publish its fixed plans.
@@ -174,6 +175,10 @@ def delete_knowledge(oid:str,fid:str,user=Depends(current_user)):
     return {"deleted":True}
 
 
+class WebsiteImport(BaseModel):
+    url: str = Field(min_length=3, max_length=2048)
+
+
 class BusinessDescription(BaseModel):
     title:str=Field(min_length=3,max_length=120)
     content:str=Field(min_length=20,max_length=12000)
@@ -189,7 +194,7 @@ def _description_policy(oid,content):
 def list_descriptions(oid:str,user=Depends(current_user)):
     membership(oid,user)
     return api("knowledge_documents",params={"organization_id":"eq."+oid,
-        "select":"id,title,content,approved_at,created_at","order":"created_at.desc","limit":100})
+        "select":"id,title,content,source_url,approved_at,created_at","order":"created_at.desc","limit":100})
 
 @router.post("/organizations/{oid}/descriptions")
 def create_description(oid:str,body:BusinessDescription,user=Depends(current_user)):
@@ -199,6 +204,19 @@ def create_description(oid:str,body:BusinessDescription,user=Depends(current_use
     rows=api("knowledge_documents","POST",data={"organization_id":oid,"title":title,
         "content":content},prefer="return=representation")
     return {"id":rows[0]["id"],"approved":False}
+
+@router.post("/organizations/{oid}/descriptions/import-website")
+def import_website(oid: str, body: WebsiteImport, user=Depends(current_user)):
+    membership(oid, user, ("owner", "admin"))
+    page = fetch_page(body.url)
+    rows = api(
+        "knowledge_documents", "POST",
+        params={"on_conflict": "organization_id,source_url"},
+        data={"organization_id": oid, **page},
+        prefer="resolution=ignore-duplicates,return=representation",
+    )
+    return {"created": bool(rows), "source_url": page["source_url"]}
+
 
 @router.put("/organizations/{oid}/descriptions/{did}")
 def edit_description(oid:str,did:str,body:BusinessDescription,user=Depends(current_user)):
