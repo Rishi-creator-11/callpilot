@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from app.common import authorize, public_base, wrapup_hook, MAX_CALL_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN
+from app.common import authorize, public_base, wrapup_hook, opening_hook, MAX_CALL_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN
 
 router = APIRouter(prefix="/api/cloud", dependencies=[Depends(authorize)], tags=["persistent-workspaces"])
 BASE = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -208,12 +208,14 @@ def provision_test_agent(oid:str):
                     "credentialId":credential,"timeoutSeconds":20}}
     payload={"name":(business["name"][:24]+" - CallPilot")[:40],
         "firstMessage":a["greeting"],
+        "firstMessageMode":"assistant-waits-for-user",
         "model":{"provider":"openai","model":"gpt-4o-mini","temperature":0,
                  "messages":[{"role":"system","content":prompt}],
                  "tools":[tool,{"type":"endCall"}]},
         "voice":voice,
         # Every provisioned assistant is capped at four minutes and tagged with its owner.
-        "maxDurationSeconds":MAX_CALL_SECONDS,"hooks":[wrapup_hook()],
+        "maxDurationSeconds":MAX_CALL_SECONDS,
+        "hooks":[opening_hook(a["greeting"]),wrapup_hook()],
         "endCallMessage":"Thanks for calling. Goodbye.",
         "metadata":{"callpilot_org":oid}}
     try:
