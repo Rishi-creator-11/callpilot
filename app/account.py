@@ -236,7 +236,7 @@ def approve_description(oid:str,did:str,user=Depends(current_user)):
         "source_document_id":"eq."+did},prefer="return=minimal")
     now=datetime.now(timezone.utc).isoformat()
     rows=[{"organization_id":oid,"source_document_id":did,
-           "question":doc["title"]+": "+part,"answer":part,
+           "question":"Business description — "+doc["title"]+": "+part,"answer":part,
            "question_embedding_384":to_pgvector(vector),
            "embedding_model":MODEL,"embedded_at":now}
           for part,vector in zip(sections,vectors)]
