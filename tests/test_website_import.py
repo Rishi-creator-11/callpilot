@@ -94,11 +94,18 @@ def test_import_requires_editor_and_saves_only_a_tenant_draft(monkeypatch):
     page = {"title": "Shop", "content": "Repairs are available here.", "source_url": "https://example.com/"}
     calls = []
 
+    stored = []
+
     def database(table, method="GET", **kwargs):
         calls.append((table, method, kwargs))
         if table == "organization_members":
             return [{"role": "owner"}] if kwargs["params"]["organization_id"] == "eq.owned" else []
-        return [{"id": "draft"}] if len([call for call in calls if call[1] == "POST"]) == 1 else []
+        if table == "knowledge_documents" and method == "GET":
+            return stored[:1]
+        if method == "POST":
+            stored.append({"id": "draft", "content": page["content"], "approved_at": None})
+            return [{"id": "draft"}]
+        return []
 
     monkeypatch.setattr(account, "api", database)
     fetched = []
@@ -115,15 +122,43 @@ def test_import_requires_editor_and_saves_only_a_tenant_draft(monkeypatch):
         finally:
             app.dependency_overrides.pop(account.current_user, None)
 
-    assert first.json() == {"created": True, "source_url": page["source_url"]}
-    assert again.json() == {"created": False, "source_url": page["source_url"]}
+    assert first.json() == {"created": True, "changed": False, "refreshed": False, "source_url": page["source_url"]}
+    assert again.json() == {"created": False, "changed": False, "refreshed": False, "source_url": page["source_url"]}
     writes = [call for call in calls if call[1] == "POST"]
-    assert len(writes) == 2
-    for table, _, options in writes:
-        assert table == "knowledge_documents"
-        assert options["data"] == {"organization_id": "owned", **page}
-        assert options["params"]["on_conflict"] == "organization_id,source_url"
-        assert options["prefer"].startswith("resolution=ignore-duplicates")
+    assert len(writes) == 1
+    table, _, options = writes[0]
+    assert table == "knowledge_documents"
+    assert options["data"] == {"organization_id": "owned", **page}
+    assert options["params"]["on_conflict"] == "organization_id,source_url"
+
+
+def test_reimport_refreshes_an_unapproved_draft_but_never_an_approved_version(monkeypatch):
+    page = {"title": "Shop", "content": "NEW prices and options for every product listed here today.", "source_url": "https://shop.example/"}
+    state = {"row": {"id": "d1", "content": "old", "approved_at": None}}
+    patches = []
+
+    def database(table, method="GET", **kwargs):
+        if table == "organization_members":
+            return [{"role": "owner"}]
+        if method == "GET":
+            return [state["row"]]
+        patches.append(kwargs["data"])
+        return []
+
+    monkeypatch.setattr(account, "api", database)
+    monkeypatch.setattr(account, "fetch_page", lambda url: page)
+    url = "/api/account/organizations/owned/descriptions/import-website"
+    app.dependency_overrides[account.current_user] = lambda: {"id": "owner"}
+    try:
+        with TestClient(app) as client:
+            draft = client.post(url, json={"url": "shop.example"}).json()
+            state["row"]["approved_at"] = "2026-11-08T00:00:00Z"
+            approved = client.post(url, json={"url": "shop.example"}).json()
+    finally:
+        app.dependency_overrides.pop(account.current_user, None)
+    assert draft["refreshed"] and draft["changed"]
+    assert approved["changed"] and not approved["refreshed"]
+    assert len(patches) == 1 and patches[0]["content"] == page["content"]
 
 
 def test_menu_and_button_leftovers_are_removed_but_headings_and_prices_stay():

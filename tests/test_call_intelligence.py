@@ -105,3 +105,28 @@ def test_call_metrics_report_when_records_are_truncated(monkeypatch):
     result = ci.calls("example-tenant", days=30, user={"id": "owner"})
     assert result["truncated"] and result["total"] == 300
     assert result["unique_callers"] == 0 and result["average_duration_seconds"] is None
+
+
+def test_a_hang_up_right_after_the_greeting_gets_a_plain_summary():
+    r = sanitize({"id": "c1", "type": "inboundPhoneCall", "startedAt": "2026-11-06T06:10:00Z",
+                  "endedAt": "2026-11-06T06:10:04Z", "artifact": {"transcript": "AI: Hi"}},
+                 "00000000-0000-0000-0000-000000000001")
+    assert "ended almost right away" in r["summary"] and r["lead_stage"] == "general"
+
+
+def test_call_with_unknown_length_is_not_called_a_hang_up():
+    r = sanitize({"id": "c2", "type": "inboundPhoneCall", "artifact": {"transcript": "AI: Hi"}},
+                 "00000000-0000-0000-0000-000000000001")
+    assert not r["summary"]
+
+
+def test_syncing_queues_new_calls_once_and_saves_finished_results(monkeypatch):
+    rows = [{"provider_call_id": "new", "analysis_requested_at": None},
+            {"provider_call_id": "queued", "analysis_requested_at": "2026-11-08T00:00:00Z"}]
+    monkeypatch.setattr(ci, "api", lambda *a, **k: rows)
+    requested, saved = [], []
+    monkeypatch.setattr(ci, "request_call_analysis", lambda oid, cid: requested.append(cid) or {"queued": True})
+    monkeypatch.setattr(ci, "vapi", lambda method, path, **k: {"artifact": {"structuredOutputs": {"x": {}}}})
+    monkeypatch.setattr(ci, "persist", lambda oid, detail: saved.append(detail))
+    assert ci.analyze_pending("org") == 2
+    assert requested == ["new"] and len(saved) == 1

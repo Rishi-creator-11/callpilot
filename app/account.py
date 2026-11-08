@@ -233,14 +233,23 @@ def create_description(oid:str,body:BusinessDescription,user=Depends(current_use
 @router.post("/organizations/{oid}/descriptions/import-website")
 def import_website(oid: str, body: WebsiteImport, user=Depends(current_user)):
     membership(oid, user, ("owner", "admin"))
-    page = fetch_page(body.url)
-    rows = api(
-        "knowledge_documents", "POST",
-        params={"on_conflict": "organization_id,source_url"},
-        data={"organization_id": oid, **page},
-        prefer="resolution=ignore-duplicates,return=representation",
-    )
-    return {"created": bool(rows), "source_url": page["source_url"]}
+    page = fetch_page(body.url)  # raises before any write, so a failed read never touches saved knowledge
+    existing = api("knowledge_documents", params={"organization_id": "eq." + oid, "source_url": "eq." + page["source_url"],
+                                                  "select": "id,content,approved_at", "limit": 1})
+    if existing:
+        saved = existing[0]
+        changed = saved.get("content") != page["content"]
+        refreshed = False
+        if changed and not saved.get("approved_at"):
+            # An unapproved draft is just a copy of the site, so keep it current.
+            api("knowledge_documents", "PATCH", params={"organization_id": "eq." + oid, "id": "eq." + str(saved["id"])},
+                data={"title": page["title"], "content": page["content"]}, prefer="return=minimal")
+            refreshed = True
+        # An approved version stays live until the owner reviews the new read in Setup.
+        return {"created": False, "changed": changed, "refreshed": refreshed, "source_url": page["source_url"]}
+    rows = api("knowledge_documents", "POST", params={"on_conflict": "organization_id,source_url"},
+               data={"organization_id": oid, **page}, prefer="resolution=ignore-duplicates,return=representation")
+    return {"created": bool(rows), "changed": False, "refreshed": False, "source_url": page["source_url"]}
 
 
 @router.post("/organizations/{oid}/descriptions/import-pdf")

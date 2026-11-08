@@ -4,6 +4,7 @@ Only server-side Vapi/Supabase credentials are used. Never infer that a buyer
 is verified from their statements or a model-generated score.
 """
 from __future__ import annotations
+import logging
 import os, re, uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -14,6 +15,7 @@ from app.account import current_user, membership
 from app.cloud import api, org_or_404
 from app.common import wrapup_hook, WRAPUP_HOOK_NAME, MAX_CALL_SECONDS, SPOKEN_REPLY_MAX_TOKENS, SILENCE_TIMEOUT_SECONDS
 
+log=logging.getLogger("callpilot")
 router = APIRouter(prefix="/api/account/organizations/{oid}", tags=["call-intelligence"])
 VALID_STAGES = {"hot","warm","general","not_qualified","needs_review"}
 VALID_FOLLOW_UP = {"none","todo","in_progress","done"}
@@ -109,6 +111,9 @@ def sanitize(call:dict,oid:str):
     summary=analysis.get("summary")
     if not isinstance(summary,str):
         summary=structured.get("summary")
+    if not summary and not structured and duration(call) is not None and duration(call)<10:
+        summary="The call ended almost right away, so no request was captured."
+        stage="general"
     return {
         "organization_id":oid,"provider_call_id":call["id"],"provider":"vapi",
         "assistant_id":as_text(call.get("assistantId"),150),
@@ -352,7 +357,36 @@ def sync_org_calls(oid:str,limit:int=50):
         if detail.get("assistantId")!=assistant:continue
         persist(oid,detail)
         count+=1
+    try:
+        analyze_pending(oid)
+    except Exception as exc:  # noqa: BLE001 - analysis is best effort and never blocks syncing
+        log.warning("call_analysis_pending_failed error_type=%s", type(exc).__name__)
     return {"synced":count,"checked":len(result),"assistant_id":assistant}
+
+
+def analyze_pending(oid:str, budget:int=4):
+    """Summarize and classify finished calls for this workspace as they sync.
+
+    The old one-time startup job only looked at a handful of workspaces, so calls in newer workspaces were
+    never summarized. Calls under ten seconds are skipped (nothing to analyze). A call is queued once;
+    on a later sync its finished result is saved.
+    """
+    rows=api("call_insights",params={"organization_id":"eq."+oid,"lead_source":"eq.unreviewed",
+        "duration_seconds":"gte.10","select":"provider_call_id,analysis_requested_at",
+        "order":"started_at.desc","limit":20})
+    done=0
+    for row in rows:
+        if done>=budget:break
+        call_id=row["provider_call_id"]
+        if row.get("analysis_requested_at"):
+            detail=vapi("GET","/call/"+call_id)
+            if (detail.get("artifact") or {}).get("structuredOutputs"):
+                persist(oid,detail)
+                done+=1
+        else:
+            request_call_analysis(oid,call_id)
+            done+=1
+    return done
 
 @router.post("/calls/sync")
 def sync_calls(oid:str,user=Depends(current_user)):
