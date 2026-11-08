@@ -215,12 +215,6 @@ def make_demo(oid: str, body: Website, user=Depends(current_user)):
     return {"id": demo["id"], "status": demo["status"], "url": demo["url"]}
 
 
-@router.get("/api/account/organizations/{oid}/lobbystack/demo/{demo_id}")
-def demo_state(oid: str, demo_id: str, user=Depends(current_user)):
-    writer(oid, user)
-    return call("GET", "/partner/demos/%s" % UUID(demo_id)).get("data", {})
-
-
 @router.post("/api/account/organizations/{oid}/lobbystack/calendar/connect")
 def connect_calendar(oid: str, user=Depends(current_user)):
     writer(oid, user)
