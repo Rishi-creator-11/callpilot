@@ -258,8 +258,15 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
             existing[question] = entry["id"]
         if not question:
             continue
+    removed = 0
     for entry_id in duplicates:
-        call("DELETE", "/knowledge/%s" % entry_id, business=biz)
+        try:
+            call("DELETE", "/knowledge/%s" % entry_id, business=biz)
+            removed += 1
+        except HTTPException as exc:
+            # Duplicates are harmless clutter, so one failed delete must not stop the price update.
+            log.warning("lobbystack_duplicate_delete_failed detail=%s", exc.detail)
+            break
     have = {item["name"].lower(): item for item in listing("/services", biz)}
     made = []
     for item in body.services:
@@ -287,7 +294,7 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
     if body.hours:
         call("PATCH", "/business", business=biz, body={"hours": [h.model_dump() for h in body.hours]})
     call("PATCH", "/receptionist", business=biz, body={"booking_mode": body.booking_mode})
-    return {"services": made, "booking_mode": body.booking_mode}
+    return {"services": made, "booking_mode": body.booking_mode, "duplicates_removed": removed, "duplicates_left": len(duplicates) - removed}
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/demo")
