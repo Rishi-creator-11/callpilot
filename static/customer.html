@@ -803,6 +803,44 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 </div>
 
 
+<section id="receptionist" class="panel card" style="display:none">
+<p id="rcStatus" class="muted" role="status">Loading…</p>
+<div id="rcCreate" hidden>
+ <h2>Create your receptionist</h2>
+ <p class="muted">Enter your website. We read it, then you review what was found before anything goes live.</p>
+ <label for="rcSite">Website</label><input id="rcSite" type="url" placeholder="https://yourbusiness.com" autocomplete="url">
+ <p><button id="rcCreateBtn" type="button">Create receptionist</button></p>
+</div>
+<div id="rcMain" hidden>
+ <article class="card"><h2>1. Review what we learned</h2>
+  <p id="rcSources" class="muted"></p>
+  <p class="muted">Check each service. Prices and times are exactly what callers will hear. Remove anything wrong.</p>
+  <div id="rcServices"></div>
+  <p><button id="rcAddService" type="button" class="secondary">Add a service</button></p>
+  <h3>Opening hours</h3><div id="rcHours"></div>
+  <label for="rcMode">When a caller picks a time</label>
+  <select id="rcMode"><option value="instant">Book it right away if the calendar is open</option><option value="request">Take a request for me to confirm</option></select>
+  <p><button id="rcSave" type="button">Save to your receptionist</button> <span id="rcSaved" class="muted" role="status"></span></p>
+ </article>
+ <article class="card"><h2>2. Connect your calendar</h2>
+  <p id="rcCalendar" class="muted"></p>
+  <p><button id="rcConnect" type="button" class="secondary">Connect Google Calendar</button> <button id="rcRefreshCal" type="button" class="secondary">Check connection</button></p>
+ </article>
+ <article class="card"><h2>3. Hear it</h2>
+  <p class="muted">Creates a private link you can open on any device and talk to your receptionist. The link is shown once.</p>
+  <label for="rcDemoSite">Your website</label><input id="rcDemoSite" type="url" placeholder="https://yourbusiness.com" autocomplete="url">
+  <p><button id="rcDemo" type="button" class="secondary">Create a test link</button></p><p id="rcDemoOut"></p>
+ </article>
+ <article class="card"><h2>4. How it sounds</h2>
+  <label for="rcGreeting">Greeting</label><input id="rcGreeting" maxlength="400">
+  <label for="rcVoice">Voice</label><select id="rcVoice"></select>
+  <p><button id="rcStyle" type="button" class="secondary">Save voice and greeting</button> <span id="rcStyled" class="muted" role="status"></span></p>
+ </article>
+ <article class="card"><h2>What happened on calls</h2>
+  <div id="rcCalls" class="muted">No calls yet.</div>
+ </article>
+</div>
+</section>
 <section id="quicksetup" class="panel card" style="display:none">
  <div class="cp-panel-heading"><div><h2>Set up your agent</h2><p>Tell us about your business, pick what the agent should do, and we build it. Then you talk to it.</p></div></div>
  <ol class="qs-steps" aria-label="Setup steps"><li id="qsDot0" aria-current="step">1. What you do</li><li id="qsDot1">2. Your business</li><li id="qsDotR">3. Check it</li><li id="qsDot2">4. What it does</li><li id="qsDot3">5. Your agent</li><li id="qsDot4">6. Talk to it</li></ol>
@@ -2074,6 +2112,7 @@ const pageMeta={
  analytics:["Analytics","How your calls are going."],
  channels:["Channels","Manage how callers connect with your agent."],
  quicksetup:["Agent","Set up your agent, then talk to it."],
+ receptionist:["Agent","Create your receptionist, review what it learned and connect your calendar."],
  workers:["Agent","What your agent does on each kind of call."],
  calls:["Analytics","Every call and what happened."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
@@ -2088,10 +2127,104 @@ const pageMeta={
  account:["Settings","Manage your profile and organization"],
  help:["Help & support","Answers for using CallPilot with confidence."]
 };
+
+const RC_VOICES=["marin","cedar","coral","sage","ballad","verse","alloy","ash","echo","shimmer"];
+const RC_DAYS=["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+function rcBase(){return "/organizations/"+organization()+"/lobbystack"}
+function rcRow(service){
+ const row=document.createElement("div");row.className="cp-inline-actions";row.dataset.rcService="1";
+ const name=document.createElement("input");name.placeholder="Service";name.value=service.name||"";name.maxLength=80;name.setAttribute("aria-label","Service name");
+ const mins=document.createElement("input");mins.type="number";mins.min="5";mins.max="480";mins.value=service.minutes||30;mins.setAttribute("aria-label","Minutes");mins.style.width="90px";
+ const price=document.createElement("input");price.placeholder="$0";price.value=service.price||"";price.maxLength=40;price.setAttribute("aria-label","Price");price.style.width="110px";
+ const drop=document.createElement("button");drop.type="button";drop.className="secondary";drop.textContent="Remove";drop.addEventListener("click",()=>row.remove());
+ row.append(name,mins,price,drop);return row;
+}
+function rcParse(item){
+ const m=/^(.*?),\s*about\s+(\d+)\s+minutes/i.exec(item.description||"");
+ return {name:item.name,minutes:item.duration_minutes||(m?Number(m[2]):30),price:m?m[1]:""};
+}
+function rcHoursRows(){
+ const box=$("rcHours");box.textContent="";
+ for(const day of RC_DAYS){
+  const row=document.createElement("div");row.className="cp-inline-actions";row.dataset.rcDay=day;
+  const label=document.createElement("span");label.textContent=day[0].toUpperCase()+day.slice(1);label.style.width="90px";
+  const open=document.createElement("input");open.type="time";open.setAttribute("aria-label",day+" opens");
+  const close=document.createElement("input");close.type="time";close.setAttribute("aria-label",day+" closes");
+  row.append(label,open,close);box.append(row);
+ }
+}
+async function loadReceptionist(){
+ const status=$("rcStatus");status.textContent="Loading…";
+ $("rcCreate").hidden=true;$("rcMain").hidden=true;
+ const info=await request(rcBase());
+ if(!info.connected){status.textContent="Your receptionist isn't set up yet.";$("rcCreate").hidden=false;return;}
+ $("rcMain").hidden=false;
+ status.textContent="Receptionist connected"+(info.webhook_verified?" · updates from calls are arriving.":" · waiting for the first call update.");
+ const voices=$("rcVoice");if(!voices.options.length)for(const v of RC_VOICES){const o=document.createElement("option");o.value=v;o.textContent=v;voices.append(o)}
+ if(!$("rcHours").children.length)rcHoursRows();
+ const [review,style,calendar,calls]=await Promise.allSettled([request(rcBase()+"/review"),request(rcBase()+"/style"),request(rcBase()+"/calendar"),request(rcBase()+"/calls")]);
+ if(review.status==="fulfilled"){
+  const r=review.value,box=$("rcServices");box.textContent="";
+  for(const item of r.services)box.append(rcRow(rcParse(item)));
+  const pages=r.sources.filter(x=>x.type==="page");
+  $("rcSources").textContent=r.sources.length?("Read "+pages.length+" page"+(pages.length===1?"":"s")+" from your website"+(r.sources.some(x=>x.status!=="indexed"&&x.type!=="page")?" · still reading…":".")):"Nothing read yet.";
+  if(!r.services.length)$("rcSources").textContent+=" No services found yet. Add them below.";
+ }
+ if(style.status==="fulfilled"){
+  $("rcGreeting").value=style.value.greeting||"";if(style.value.voice)$("rcVoice").value=style.value.voice;
+  if(style.value.booking_mode==="instant"||style.value.booking_mode==="request")$("rcMode").value=style.value.booking_mode;
+ }
+ $("rcCalendar").textContent=calendar.status==="fulfilled"?(calendar.value.status==="connected"?"Connected: "+calendar.value.calendars.map(c=>c.calendar_id).join(", "):"Not connected. Callers can only leave requests until you connect one."):"Couldn't check the calendar right now.";
+ const list=$("rcCalls");list.textContent="";
+ const rows=calls.status==="fulfilled"?calls.value.calls:[];
+ if(!rows.length)list.textContent="No calls yet.";
+ for(const c of rows){const p=document.createElement("p");p.textContent=new Date(c.started_at).toLocaleString()+" · "+String(c.outcome||"").replace(/_/g," ")+" · "+(c.summary||"No summary yet.");list.append(p)}
+}
+$("rcCreateBtn").addEventListener("click",async event=>{
+ const button=event.currentTarget,site=$("rcSite").value.trim();
+ if(button.disabled)return;button.disabled=true;$("rcStatus").textContent="Creating your receptionist…";
+ try{
+  await request(rcBase()+"/provision","POST",{website_url:site||null});
+  if(site){$("rcStatus").textContent="Reading your website…";await request(rcBase()+"/website","POST",{url:site})}
+  msg("Receptionist created. Review what it learned.");
+  await loadReceptionist();
+ }catch(e){$("rcStatus").textContent=e.message}finally{button.disabled=false}
+});
+$("rcAddService").addEventListener("click",()=>$("rcServices").append(rcRow({})));
+$("rcSave").addEventListener("click",async event=>{
+ const button=event.currentTarget;if(button.disabled)return;
+ const services=[...document.querySelectorAll("[data-rc-service]")].map(row=>{const i=row.querySelectorAll("input");return {name:i[0].value.trim(),duration_minutes:Number(i[1].value),price_text:i[2].value.trim()}}).filter(x=>x.name);
+ if(services.some(x=>!x.price_text||!(x.duration_minutes>=5))){$("rcSaved").textContent="Give every service a price and a time.";return}
+ const hours=[...document.querySelectorAll("[data-rc-day]")].map(row=>{const i=row.querySelectorAll("input");return {day:row.dataset.rcDay,open:i[0].value,close:i[1].value}}).filter(x=>x.open&&x.close);
+ button.disabled=true;$("rcSaved").textContent="Saving…";
+ try{await request(rcBase()+"/profile","POST",{services,hours,booking_mode:$("rcMode").value});$("rcSaved").textContent="Saved. New calls use this right away."}
+ catch(e){$("rcSaved").textContent=e.message}finally{button.disabled=false}
+});
+$("rcConnect").addEventListener("click",async()=>{
+ try{const r=await request(rcBase()+"/calendar/connect","POST",{});if(!/^https:\/\//.test(r.url||""))throw Error("The calendar link wasn't valid.");window.open(r.url,"_blank","noopener");$("rcCalendar").textContent="Finish approving on Google, then choose Check connection."}
+ catch(e){$("rcCalendar").textContent=e.message}
+});
+$("rcRefreshCal").addEventListener("click",()=>loadReceptionist().catch(e=>msg(e.message,true)));
+$("rcDemo").addEventListener("click",async event=>{
+ const button=event.currentTarget;if(button.disabled)return;button.disabled=true;
+ try{
+  const site=$("rcDemoSite").value.trim();
+  if(!site)throw Error("Enter your website first.");
+  const r=await request(rcBase()+"/demo","POST",{url:site});
+  if(!/^https:\/\//.test(r.url||""))throw Error("The test link wasn't valid.");
+  const out=$("rcDemoOut");out.textContent="Your private test link (copy it now, it isn't shown again): ";
+  const a=document.createElement("a");a.href=r.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent=r.url;out.append(a);
+ }catch(e){$("rcDemoOut").textContent=e.message}finally{button.disabled=false}
+});
+$("rcStyle").addEventListener("click",async event=>{
+ const button=event.currentTarget;if(button.disabled)return;button.disabled=true;$("rcStyled").textContent="Saving…";
+ try{await request(rcBase()+"/style","POST",{greeting:$("rcGreeting").value.trim()||null,voice:$("rcVoice").value});$("rcStyled").textContent="Saved. The next call uses it."}
+ catch(e){$("rcStyled").textContent=e.message}finally{button.disabled=false}
+});
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   quicksetup:()=>loadQuickSetup(),studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics().then(()=>autoSyncCalls()),channels:()=>loadChannels(),
+   receptionist:()=>loadReceptionist(),quicksetup:()=>loadQuickSetup(),studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics().then(()=>autoSyncCalls()),channels:()=>loadChannels(),
    workers:()=>Promise.all([loadWorkers(),loadCallMenu(organization())]),calls:()=>Promise.resolve(window.loadCalls()).then(()=>autoSyncCalls()),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
@@ -2135,7 +2268,7 @@ $("builderOpenFull").addEventListener("click",()=>{
  window.section("builder",{push:true});$("builderReviewToggle").focus();
 });
 const HUBS={
- agent:[["quicksetup","Setup"],["voice","Identity"],["workers","Workers"],["knowledge","Knowledge"],["connections","Connections"]],
+ agent:[["quicksetup","Setup"],["receptionist","Receptionist"],["voice","Identity"],["workers","Workers"],["knowledge","Knowledge"],["connections","Connections"]],
  analytics:[["analytics","Overview"],["calls","Calls"],["appointments","Appointments"],["orders","Orders"]]
 };
 const GROUP_OF={builder:"agent",studio:"agent",simulator:"agent"};
