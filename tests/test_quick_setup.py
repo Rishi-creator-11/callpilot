@@ -219,7 +219,7 @@ def test_confirmed_prices_enable_pricing_and_become_approved_facts(make, monkeyp
     body = {"overview": "We print business cards and signs for local shops.", "prices_confirmed": True,
             "prices": [{"item": "Business cards", "price_text": "$24.99"}]}
     result = client.post(URL + "/knowledge", json=body).json()
-    assert result == {"overview_saved": True, "prices_saved": 1, "prices_enabled": True}
+    assert result == {"overview_saved": True, "prices_saved": 1, "prices_enabled": True, "products_saved": 0, "policies_saved": 0}
     assert ("pricing", True) in k.calls and ("fact", "How much is Business cards?", "Business cards: $24.99") in k.calls
 
 
@@ -291,3 +291,78 @@ def test_services_and_policies_reach_the_overview_without_prices():
         {"name": "Checkup", "description": "Routine visit", "duration": "30 min"}, {"name": "Cleaning", "description": "From $90", "duration": ""}],
         "policies": ["Cancel 24 hours ahead", "We accept most insurance"], "hours": "Mon-Fri 8-5", "phone": "", "email": "", "address": ""})
     assert "Service: Checkup: Routine visit (30 min)" in text and "Good to know: Cancel 24 hours ahead" in text and "$" not in text
+
+
+# ---- whole-website understanding and publishing products ----
+FAKE_SITE = {
+    "source_url": "https://shop.example.com/", "title": "Shop", "description": "We print business cards, flyers and banners.",
+    "pages": [], "text": {"home": "We print things.", "key": "Call us.", "policy": ""}, "email": "hi@shop.example.com",
+    "phone": "(973) 555-0100", "hours": ["Mon-Fri 9-5"],
+    "products": [
+        {"name": "Flyers", "category": "Print Materials", "description": "Eye-catching flyers.", "options": [{"label": "Size", "values": ["4x6", "8.5x11"]}],
+         "from_price": "$42.49", "details": "Flyers (Print Materials). Eye-catching flyers. Options — Size: 4x6, 8.5x11.",
+         "price_note": "Starting at $42.49.", "url": "https://shop.example.com/products/flyers"},
+        {"name": "Banners", "category": "Large Format", "description": "", "options": [], "from_price": "", "details": "Banners (Large Format).",
+         "price_note": "", "url": "https://shop.example.com/products/banners"}],
+    "policies": [{"title": "Refund Policy", "url": "https://shop.example.com/refund-policy", "text": "Refunds are issued before production starts. " * 3}],
+    "stats": {"pages_read": 12, "products": 2, "seconds": 3.1},
+}
+
+
+def test_analyze_reads_the_whole_site_and_returns_exact_products(make, monkeypatch):
+    make()
+    monkeypatch.setattr(mod, "llm_understanding", lambda text, kind=None, subtype=None: None)
+    monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
+    monkeypatch.setattr("app.site_reader.read_site", lambda url: FAKE_SITE)
+    mod_api = mod.api
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: (
+        [{"content": "old junk", "source_url": "https://shop.example.com/", "title": "Shop"}] if table == "knowledge_documents" else mod_api(table, method, params=params, **kw)))
+    response = client.post(URL + "/analyze", json={"document_id": "00000000-0000-0000-0000-000000000001"})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["stats"]["pages_read"] == 12 and [p["name"] for p in result["products"]] == ["Flyers", "Banners"]
+    assert result["products"][0]["from_price"] == "$42.49" and result["understanding"]["summary"].startswith("We print business cards")
+    assert result["understanding"]["email"] == "hi@shop.example.com" and result["understanding"]["hours"] == "Mon-Fri 9-5"
+    assert "old junk" not in str(result) and "$" not in result["overview"]
+    assert [p["title"] for p in result["policy_pages"]] == ["Refund Policy"]
+
+
+class Publish:
+    def __init__(self):
+        self.calls, self.entries = [], []
+
+    def install(self, monkeypatch):
+        monkeypatch.setattr("app.account.create_description", lambda w, b, u: {"id": "doc1"})
+        monkeypatch.setattr("app.account.approve_description", lambda w, d, u: None)
+        monkeypatch.setattr("app.account.set_verified_pricing", lambda w, b, u: self.calls.append(("pricing", b.enabled)))
+        monkeypatch.setattr(mod, "publish_facts", lambda w, doc, entries, uid: self.entries.extend(entries) or len(entries))
+
+
+PRODUCTS = [{"name": "Flyers", "details": "Flyers. Eye-catching. Options — Size: 4x6. Starts at $5 in bulk.", "price_note": "Starting at $42.49."}]
+POLICIES = [{"title": "Refund Policy", "text": "Refunds are issued before production starts. Late fee is $10. Contact us."}]
+
+
+def test_products_are_published_without_prices_until_the_owner_confirms(make, monkeypatch):
+    make()
+    pub = Publish(); pub.install(monkeypatch)
+    result = client.post(URL + "/knowledge", json={"overview": "We print business cards and flyers for shops.", "products": PRODUCTS,
+                                                    "policies": POLICIES, "prices_confirmed": False}).json()
+    assert result["products_saved"] == 1 and result["policies_saved"] == 1 and result["prices_enabled"] is False
+    assert ("pricing", True) not in pub.calls
+    for question, answer, kind in pub.entries:
+        assert "$" not in answer and "prices" not in question
+    assert any("Eye-catching" in a for _, a, _ in pub.entries)
+
+
+def test_confirmed_prices_enable_pricing_and_are_added_to_each_product_answer(make, monkeypatch):
+    make()
+    pub = Publish(); pub.install(monkeypatch)
+    result = client.post(URL + "/knowledge", json={"overview": "We print business cards and flyers for shops.", "products": PRODUCTS,
+                                                    "prices_confirmed": True}).json()
+    assert ("pricing", True) in pub.calls and result["prices_enabled"] is True and result["products_saved"] == 1
+    question, answer, _ = pub.entries[0]
+    assert "Starting at $42.49." in answer and "prices" in question and "Starts at $5" not in answer
+
+
+def test_without_money_drops_only_the_sentences_with_amounts():
+    assert mod.without_money("Flyers are great. They start at $5. Ask about sizes.") == "Flyers are great. Ask about sizes."

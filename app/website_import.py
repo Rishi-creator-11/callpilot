@@ -175,7 +175,8 @@ def fetch_page(raw, extra_pages=EXTRA_PAGES):
         FETCH_SLOTS.release()
 
 
-def _fetch_page(raw, with_links=False):
+def _download(raw, allow_xml=False):
+    """Safely download one public page. Returns (final_url, host, media_type, body_text)."""
     current = normalize_url(raw)
     deadline = time.monotonic() + 12
 
@@ -229,7 +230,8 @@ def _fetch_page(raw, with_links=False):
                 if response.status != 200:
                     raise HTTPException(422, "The website did not allow this page to be read.")
                 media_type = response.headers.get_content_type()
-                if media_type not in {"text/html", "application/xhtml+xml", "text/plain"} or (
+                allowed = {"text/html", "application/xhtml+xml", "text/plain"} | ({"application/xml", "text/xml"} if allow_xml else set())
+                if media_type not in allowed or (
                     response.headers.get("Content-Encoding", "identity").lower() != "identity"
                 ):
                     raise HTTPException(422, "Choose a public HTML or plain-text page.")
@@ -249,15 +251,24 @@ def _fetch_page(raw, with_links=False):
         finally:
             connection.close()
 
-        page = PageText()
-        if media_type == "text/plain":
-            page.body.append(body)
-        else:
-            page.feed(body)
-            page.close()
-        title, content = page.result(host)
-        result = {"title": title, "content": content, "source_url": current}
-        if with_links:
-            result["links"] = page.links
-        return result
+        return current, host, media_type, body
     raise HTTPException(422, "The website redirected too many times. Enter the final page address.")
+
+
+def parse_page(current, host, media_type, body):
+    page = PageText()
+    if media_type == "text/plain":
+        page.body.append(body)
+    else:
+        page.feed(body)
+        page.close()
+    title, content = page.result(host)
+    return page, {"title": title, "content": content, "source_url": current}
+
+
+def _fetch_page(raw, with_links=False):
+    current, host, media_type, body = _download(raw)
+    page, result = parse_page(current, host, media_type, body)
+    if with_links:
+        result["links"] = page.links
+    return result

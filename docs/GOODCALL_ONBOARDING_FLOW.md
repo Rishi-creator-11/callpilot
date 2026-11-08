@@ -57,3 +57,10 @@ Progress is shown as a six-dot stepper with a small mascot above the heading and
 - Analytics tabs: Overview, Calls, Appointments, Orders. Overview counts appointments booked for service businesses and orders received for product businesses (both for older workspaces with no business type). Sessions and Analytics are now one area.
 - Channels: Phone and Shareable demo only. Share my agent creates or reuses one link to the finished agent and copies it. Call screening and routing, browser practice and the link label form are removed from the screen.
 - The old Assistant chat, Setup, Test assistant and Settings pages still exist but are no longer in the sidebar.
+
+## Whole-site reading (owner priority)
+- Importing a website now reads the whole site: the sitemap and key pages in parallel (up to 90 pages in about 8 seconds on the real MetroPrint site), through the same SSRF-safe downloader. It reads structured data many sites embed (JSON-LD and Next.js product records with every size, paper and quantity option and a price matrix), so product names, options and prices are exact, never guessed.
+- The review step shows the business description, categories, contact details, every product with its advertised "From" price and options, and the policy pages. The owner can untick anything. Prices are only used if the owner confirms them.
+- Saving publishes one approved answer per product and per policy page (embedded in parallel), tied to the overview document so re-running replaces them. Amounts are stripped from answers unless prices are confirmed.
+- The AI summary step uses the Vapi chat API. If that call fails (for example HTTP 401), the summary falls back to the site's own description and extracted contact details; products and prices do not depend on the AI step.
+- Verified on https://www.metroprintmkt.com/: 85 pages read, 73 products matching the site's own count, Flyers advertised from $42.49, refund and reprint policies, phone and email.

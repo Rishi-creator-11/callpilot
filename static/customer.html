@@ -139,6 +139,8 @@ body.ta-open{overflow:hidden}
 .ta-note{margin:0;font-size:12px;color:#667085}
 #channelDemoForm,#inboundRouting{display:none!important}
 #channelShare .cp-panel-heading{display:none}
+.qs-plist{display:grid;gap:8px;max-height:340px;overflow:auto;margin:8px 0 14px;padding-right:4px}
+.qs-plist .qs-goal{padding:10px 14px;font-weight:500;font-size:14px}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -844,9 +846,19 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <p>Please check it and fix anything that is wrong. Your agent only knows what you approve here.</p>
   <label for="qsOverview">About your business</label>
   <textarea id="qsOverview" rows="9" maxlength="4000"></textarea>
+  <div id="qsProductsBox" hidden>
+   <h4 id="qsProductsTitle">Products we found</h4>
+   <p class="muted">These are the products and services your agent will be able to explain, with their sizes and options. Untick anything it should not talk about.</p>
+   <label class="cp-studio-check"><input id="qsProductsAll" type="checkbox" checked> Include everything</label>
+   <div id="qsProducts" class="qs-plist"></div>
+  </div>
+  <div id="qsPoliciesBox" hidden>
+   <h4>Policies we found</h4>
+   <div id="qsPolicies" class="qs-plist"></div>
+  </div>
   <div id="qsPricesBox" hidden>
    <h4>Prices we found</h4>
-   <p class="muted">Tick the prices your agent may tell callers. Leave the rest out and it will take details for a quote instead.</p>
+   <p id="qsPricesHelp" class="muted">Tick the prices your agent may tell callers. Leave the rest out and it will take details for a quote instead.</p>
    <div id="qsPrices" class="qs-goals"></div>
    <label class="cp-studio-check"><input id="qsPricesOk" type="checkbox"> These prices are current and correct. My agent may quote them.</label>
   </div>
@@ -3514,6 +3526,7 @@ $("capiSync").addEventListener("click",async event=>{
 const QS_ICONS={info:"💬",messages:"📝",quotes:"🧾",orders:"📦",booking:"📅",transfer:"📞"};
 const QS_HELP={info:"Answer questions about your business",messages:"Take messages and capture leads",quotes:"Collect the details for a quote",
  orders:"Take order requests for your team to review",booking:"Book appointments on your calendar",transfer:"Connect callers to a person"};
+let qsProductList=[],qsPolicyList=[];
 let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null,qsKind=null,qsSubtype=null,qsInfo={kinds:{},presets:{}};
 const qsKey=oid=>"callpilot.qs."+oid;
 function qsShow(step){
@@ -3609,7 +3622,27 @@ async function qsAnalyze(payload,status){
   input.addEventListener("change",()=>label.classList.toggle("on",input.checked));
   text.textContent=price.item+" — "+price.price_text;label.append(input,text);list.append(label);
  }
- $("qsPricesBox").hidden=!prices.length;$("qsNoPrices").hidden=prices.length>0;$("qsPricesOk").checked=false;
+  qsProductList=r.products||[];qsPolicyList=r.policy_pages||[];
+ const rows=(items,box,render,key)=>{
+  box.replaceChildren();
+  items.forEach((item,index)=>{
+   const label=document.createElement("label"),input=document.createElement("input"),text=document.createElement("span");
+   label.className="qs-goal on";input.type="checkbox";input.checked=true;input.dataset.index=String(index);
+   input.addEventListener("change",()=>label.classList.toggle("on",input.checked));
+   text.textContent=render(item);label.append(input,text);box.append(label);
+  });
+ };
+ rows(qsProductList,$("qsProducts"),p=>p.name+(p.from_price?" — from "+p.from_price:"")+(p.category?" · "+p.category:"")+(p.options?" · "+p.options+" options":""));
+ rows(qsPolicyList,$("qsPolicies"),p=>p.title);
+ $("qsProductsBox").hidden=!qsProductList.length;$("qsPoliciesBox").hidden=!qsPolicyList.length;
+ $("qsProductsAll").checked=true;
+ $("qsProductsTitle").textContent="Products we found ("+qsProductList.length+")";
+ const productPrices=qsProductList.some(p=>p.price_note);
+ if(productPrices){
+  $("qsPrices").replaceChildren();
+  $("qsPricesHelp").textContent="Tick this to let your agent tell callers these prices. Leave it unticked and your agent will offer to take details for a quote instead.";
+ }
+ $("qsPricesBox").hidden=!(prices.length||productPrices);$("qsNoPrices").hidden=prices.length>0||productPrices;$("qsPricesOk").checked=false;
  $("qsStatusR").textContent="";status.textContent="";qsShow("R");
 }
 $("qsSkip").addEventListener("click",()=>{
@@ -3678,6 +3711,9 @@ $("qsAboutGo").addEventListener("click",async event=>{
   $("qsMic").textContent="■ Stop";qsRecognition.start();
  });
 }
+$("qsProductsAll").addEventListener("change",event=>{
+ for(const box of $("qsProducts").querySelectorAll("input")){box.checked=event.currentTarget.checked;box.dispatchEvent(new Event("change"))}
+});
 $("qsBackR").addEventListener("click",()=>qsShow(1));
 $("qsStep1").insertAdjacentHTML("afterbegin",'<button type="button" id="qsBack1" class="su-back">← Back</button>');
 $("qsBack1").addEventListener("click",()=>qsShow(0));
@@ -3688,12 +3724,15 @@ $("qsLooksGood").addEventListener("click",async event=>{
  if(overview.length<20){status.textContent="Add a few lines about your business first.";return}
  const prices=[...$("qsPrices").querySelectorAll("input:checked")].map(i=>({item:i.dataset.item,price_text:i.dataset.price}));
  if(prices.length&&!$("qsPricesOk").checked){status.textContent="Confirm the prices are correct, or untick them.";return}
+ const chosen=(box,list)=>[...box.querySelectorAll("input:checked")].map(i=>list[Number(i.dataset.index)]).filter(Boolean);
+ const products=chosen($("qsProducts"),qsProductList).map(p=>({name:p.name,details:p.details,price_note:p.price_note||""}));
+ const policies=chosen($("qsPolicies"),qsPolicyList).map(p=>({title:p.title,text:p.text}));
  button.disabled=true;status.textContent="Saving what your agent will know…";
  try{
-  const r=await request("/organizations/"+oid+"/quick-setup/knowledge","POST",{overview,prices,prices_confirmed:prices.length>0&&$("qsPricesOk").checked});
+  const r=await request("/organizations/"+oid+"/quick-setup/knowledge","POST",{overview,prices,products,policies,prices_confirmed:(prices.length>0||products.some(p=>p.price_note))&&$("qsPricesOk").checked});
   if(oid!==organization())return;
   status.textContent="";qsShow(2);
-  $("qsStatus2").textContent=r.prices_saved?"Saved. Your agent can now quote "+r.prices_saved+" price"+(r.prices_saved===1?"":"s")+".":"Saved.";
+  $("qsStatus2").textContent="Saved."+(r.products_saved?" Your agent now knows "+r.products_saved+" product"+(r.products_saved===1?"":"s")+(r.policies_saved?" and "+r.policies_saved+" polic"+(r.policies_saved===1?"y":"ies"):"")+".":"")+(r.prices_saved&&r.products_saved?" It can quote their prices.":r.prices_saved?" It can quote "+r.prices_saved+" price"+(r.prices_saved===1?"":"s")+".":"");
  }catch(e){status.textContent=e.message}
  finally{button.disabled=false}
 });

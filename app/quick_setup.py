@@ -367,9 +367,14 @@ def overview_text(data: dict) -> str:
     lines = []
     if data.get("summary"):
         lines.append(data["summary"])
-    for offering in data.get("offerings", []):
-        line = offering["name"] + (": " + offering["description"] if offering.get("description") else "")
-        lines.append("We offer " + line)
+    offerings = data.get("offerings", [])
+    counted = [o for o in offerings if re.fullmatch(r"\d+ products?", o.get("description", ""))]
+    if offerings and len(counted) == len(offerings):
+        lines.append("We offer products in these categories: " + ", ".join("%s (%s)" % (o["name"], o["description"].split()[0]) for o in offerings) + ".")
+    else:
+        for offering in offerings:
+            line = offering["name"] + (": " + offering["description"] if offering.get("description") else "")
+            lines.append("We offer " + line)
     for service in data.get("services", []):
         detail = (": " + service["description"] if service.get("description") else "") + (" (" + service["duration"] + ")" if service.get("duration") else "")
         lines.append("Service: " + service["name"] + detail)
@@ -398,26 +403,53 @@ def analyze(oid: UUID, body: Analyze, user=Depends(current_user)):
     membership(workspace, user, ("owner", "admin"))
     if bool(body.document_id) == bool(body.text):
         raise HTTPException(422, "Send either an imported source or some text.")
-    source_url = None
+    source_url, site = None, None
     if body.document_id:
         rows = api("knowledge_documents", params={"organization_id": "eq." + workspace, "id": "eq." + str(body.document_id),
                                                    "select": "content,source_url,title", "limit": 1})
         if not rows:
             raise HTTPException(404, "Source not found.")
         text, source_url = rows[0]["content"], rows[0].get("source_url")
+        if source_url and source_url.startswith("http"):
+            from app.site_reader import read_site
+            try:  # Read the live site again so old or partial imports never limit what the agent learns.
+                site = read_site(source_url)
+            except HTTPException:
+                site = None
     else:
         text = _squash(body.text) if "\n" not in body.text else "\n".join(_squash(l) for l in body.text.splitlines() if l.strip())
-    if len(text.strip()) < 20:
+    if not site and len(text.strip()) < 20:
         raise HTTPException(422, "There is not enough text yet. Tell us a bit more about your business.")
     if not allow_analyze(workspace):
         raise HTTPException(429, "Please wait a little before analyzing again.")
     kind = body.kind if body.kind in BUSINESS_KINDS else None
     subtype = body.subtype if kind and body.subtype in BUSINESS_KINDS[kind]["types"] else None
-    data = llm_understanding(text, kind, subtype) or deterministic_understanding(text)
-    data["prices"] = verified_prices(data.get("prices", []), text)
+    if site:
+        narrative = "\n".join(part for part in (site["description"], site["text"]["home"], site["text"]["key"]) if part)[:9000]
+        data = llm_understanding(narrative, kind, subtype) or deterministic_understanding(narrative)
+        data["prices"] = []  # Prices come from the products, which carry exact names.
+        if site["description"]:
+            data["summary"] = site["description"][:600]
+        for key in ("phone", "email"):
+            data[key] = data.get(key) or site[key]
+        data["hours"] = data.get("hours") or "; ".join(site["hours"])[:240]
+        if not data.get("offerings"):
+            categories = {}
+            for product in site["products"]:
+                categories[product["category"] or "Other"] = categories.get(product["category"] or "Other", 0) + 1
+            data["offerings"] = [{"name": name, "description": "%d products" % count} for name, count in list(categories.items())[:8]]
+        products = [{"name": p["name"], "category": p["category"], "from_price": p["from_price"], "details": p["details"],
+                     "price_note": p["price_note"], "options": sum(len(o["values"]) for o in p["options"])} for p in site["products"]]
+        policies = [{"title": item["title"], "text": item["text"]} for item in site["policies"]]
+        stats = site["stats"]
+    else:
+        data = llm_understanding(text, kind, subtype) or deterministic_understanding(text)
+        data["prices"] = verified_prices(data.get("prices", []), text)
+        products, policies, stats = [], [], None
     if not data.get("summary"):
         data["summary"] = deterministic_understanding(text)["summary"]
-    return {"understanding": data, "overview": overview_text(data), "source_url": source_url}
+    return {"understanding": data, "overview": overview_text(data), "source_url": source_url,
+            "products": products, "policy_pages": policies, "stats": stats}
 
 
 class PriceChoice(BaseModel):
@@ -425,13 +457,51 @@ class PriceChoice(BaseModel):
     price_text: str = Field(min_length=2, max_length=40)
 
 
+class ProductChoice(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    details: str = Field(min_length=5, max_length=1400)
+    price_note: str = Field(default="", max_length=900)
+
+
+class PolicyChoice(BaseModel):
+    title: str = Field(min_length=2, max_length=80)
+    text: str = Field(min_length=20, max_length=1800)
+
+
 class SaveKnowledge(BaseModel):
     overview: str = Field(min_length=20, max_length=4000)
     prices: list[PriceChoice] = Field(default_factory=list, max_length=12)
     prices_confirmed: bool = False
+    products: list[ProductChoice] = Field(default_factory=list, max_length=120)
+    policies: list[PolicyChoice] = Field(default_factory=list, max_length=8)
 
 
 OVERVIEW_TITLE = "Business overview"
+
+
+def without_money(text: str) -> str:
+    """Drop sentences that state an amount. Amounts are only published after the owner confirms prices."""
+    sentences = re.split(r"(?<=[.!?])\s+", _squash(text))
+    return " ".join(sentence for sentence in sentences if not MONEY.search(sentence) and not PRICE_TEXT.search(sentence))
+
+
+def publish_facts(workspace: str, document_id: str, entries: list[tuple], user_id: str) -> int:
+    """Embed and publish many approved answers at once, tied to the overview document so a re-run replaces them."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime, timezone
+    from app.semantic import MODEL, embeddings, to_pgvector
+    if not entries:
+        return 0
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        vectors = list(pool.map(lambda entry: embeddings([entry[0]])[0], entries))
+    now = datetime.now(timezone.utc).isoformat()
+    rows = [{"organization_id": workspace, "source_document_id": document_id, "question": question, "answer": answer,
+             "question_embedding_384": to_pgvector(vector), "embedding_model": MODEL, "embedded_at": now,
+             "approved_at": now, "approved_by": user_id}
+            for (question, answer, _), vector in zip(entries, vectors)]
+    for start in range(0, len(rows), 40):
+        api("knowledge_facts", "POST", data=rows[start:start + 40], prefer="return=minimal")
+    return len(rows)
 
 
 @router.post("/knowledge")
@@ -449,6 +519,8 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
     doc = create_description(workspace, BusinessDescription(title=OVERVIEW_TITLE, content=body.overview.strip()), user)
     approve_description(workspace, doc["id"], user)
     saved_prices = 0
+    saved_products = saved_policies = 0
+    has_price_notes = any(item.price_note for item in body.products)
     if body.prices and body.prices_confirmed:
         set_verified_pricing(workspace, PricingCapabilities(enabled=True, owner_confirms_prices_are_verified=True), user)
         for price in body.prices:
@@ -460,5 +532,24 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
             fact = create_fact(workspace, FactCreate(question=question, answer=answer), user)
             approve_fact(workspace, fact["id"], user)
             saved_prices += 1
-    return {"overview_saved": True, "prices_saved": saved_prices,
-            "prices_enabled": bool(saved_prices)}
+    if body.products or body.policies:
+        pricing_on = bool(body.prices_confirmed and has_price_notes)
+        if pricing_on:
+            set_verified_pricing(workspace, PricingCapabilities(enabled=True, owner_confirms_prices_are_verified=True), user)
+        entries = []
+        for item in body.products:
+            details = without_money(item.details)
+            answer = (details + (" " + item.price_note.strip() if pricing_on and item.price_note else "")).strip()
+            question = ("Tell me about %s. What options, sizes and prices do you have for %s?" if pricing_on
+                        else "Tell me about %s. What options and sizes do you have for %s?") % (item.name.strip(), item.name.strip())
+            entries.append((question[:500], answer[:2500], "product"))
+        for item in body.policies:
+            text = without_money(item.text) if not pricing_on else item.text
+            if len(text) >= 20:
+                entries.append(("What is your %s?" % item.title.strip(), text[:2500], "policy"))
+        published = publish_facts(workspace, doc["id"], entries, user["id"])
+        saved_products = sum(1 for e in entries[:published] if e[2] == "product")
+        saved_policies = sum(1 for e in entries[:published] if e[2] == "policy")
+        saved_prices = saved_prices or (saved_products if pricing_on else 0)
+    return {"overview_saved": True, "prices_saved": saved_prices, "prices_enabled": bool(saved_prices),
+            "products_saved": saved_products, "policies_saved": saved_policies}
