@@ -58,6 +58,18 @@ def call(method, path, *, business=None, body=None, params=None, idem=None):
     return response.json() if response.content else {}
 
 
+def listing(path, business, limit_pages=20):
+    """Collect every page of a list endpoint; the API returns 25 rows at a time with a cursor."""
+    rows, cursor = [], None
+    for _ in range(limit_pages):
+        page = call("GET", path, business=business, params={"cursor": cursor} if cursor else None)
+        rows += page.get("data", [])
+        cursor = page.get("next_cursor")
+        if not page.get("has_more") or not cursor:
+            break
+    return rows
+
+
 def link(oid):
     rows = api("lobbystack_businesses", params={"organization_id": "eq." + oid, "select": "*"})
     return rows[0] if rows else None
@@ -226,7 +238,7 @@ def review(oid: str, user=Depends(current_user)):
     UUID(oid)
     membership(oid, user)
     biz = require_link(oid)["business_id"]
-    return {name: call("GET", path, business=biz).get("data", []) for name, path in
+    return {name: listing(path, biz) for name, path in
             (("sources", "/knowledge/sources"), ("services", "/services"), ("rules", "/rules"), ("knowledge", "/knowledge"))}
 
 
@@ -235,7 +247,7 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
     """Save reviewed services, prices, hours and booking mode through LobbyStack's native settings. Safe to repeat."""
     writer(oid, user)
     biz = require_link(oid)["business_id"]
-    entries = call("GET", "/knowledge", business=biz).get("data", [])
+    entries = listing("/knowledge", biz)
     existing, duplicates = {}, []
     for entry in entries:
         # The API lists an FAQ with its question as the title.
@@ -248,7 +260,7 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
             continue
     for entry_id in duplicates:
         call("DELETE", "/knowledge/%s" % entry_id, business=biz)
-    have = {item["name"].lower(): item for item in call("GET", "/services", business=biz).get("data", [])}
+    have = {item["name"].lower(): item for item in listing("/services", biz)}
     made = []
     for item in body.services:
         # The price and time live on the service itself, so the receptionist sees them with the service it is booking.
