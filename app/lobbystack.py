@@ -131,6 +131,14 @@ class Booking(BaseModel):
     key: str = Field(min_length=8, max_length=64)
 
 
+class Style(BaseModel):
+    """Only the fields that change how the receptionist sounds. Booking and transfer settings stay out of reach."""
+    greeting: str | None = Field(default=None, max_length=400)
+    tone: str | None = Field(default=None, max_length=300)
+    voice: str | None = Field(default=None, pattern="^[a-z]{3,12}$")
+    voice_instructions: str | None = Field(default=None, max_length=3000)
+
+
 class Reschedule(BaseModel):
     starts_at: str = Field(min_length=10, max_length=40)
 
@@ -221,6 +229,38 @@ def make_demo(oid: str, body: Website, user=Depends(current_user)):
     demo = call("POST", "/partner/demos", body={"name": org["name"], "website_url": body.url,
                                                 "timezone": org.get("timezone") or "America/New_York", "access_level": "full"})["data"]
     return {"id": demo["id"], "status": demo["status"], "url": demo["url"]}
+
+
+@router.get("/api/account/organizations/{oid}/lobbystack/style")
+def get_style(oid: str, user=Depends(current_user)):
+    UUID(oid)
+    membership(oid, user)
+    data = call("GET", "/receptionist", business=require_link(oid)["business_id"]).get("data", {})
+    return {k: data.get(k) for k in ("greeting", "tone", "voice", "voice_instructions", "booking_mode", "summary")}
+
+
+@router.post("/api/account/organizations/{oid}/lobbystack/style")
+def set_style(oid: str, body: Style, user=Depends(current_user)):
+    writer(oid, user)
+    changes = body.model_dump(exclude_none=True)
+    if not changes:
+        raise HTTPException(422, "Nothing to change.")
+    call("PATCH", "/receptionist", business=require_link(oid)["business_id"], body=changes)
+    return {"updated": sorted(changes)}
+
+
+@router.get("/api/account/organizations/{oid}/lobbystack/calls/{call_id}")
+def call_detail(oid: str, call_id: str, user=Depends(current_user)):
+    UUID(oid)
+    membership(oid, user)
+    return call("GET", "/calls/%s" % UUID(call_id), business=require_link(oid)["business_id"])
+
+
+@router.get("/api/account/organizations/{oid}/lobbystack/calls")
+def calls(oid: str, user=Depends(current_user)):
+    UUID(oid)
+    membership(oid, user)
+    return call("GET", "/calls", business=require_link(oid)["business_id"], params={"limit": 20})
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/calendar/connect")
