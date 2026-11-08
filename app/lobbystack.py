@@ -55,7 +55,13 @@ def call(method, path, *, business=None, body=None, params=None, idem=None):
         log.warning("lobbystack_failed method=%s path=%s status=%s code=%s", method, path.split("?")[0], response.status_code, code)
         # Provider codes are short fixed identifiers, safe to show the workspace owner for support.
         raise HTTPException(502, "The receptionist service rejected the request (HTTP %s%s)." % (response.status_code, ", " + code if code else ""))
-    return response.json() if response.content else {}
+    if not response.content:
+        return {}
+    try:
+        return response.json()
+    except ValueError:
+        # Some successful calls, such as deletes, return no JSON body.
+        return {}
 
 
 def listing(path, business, limit_pages=20):
