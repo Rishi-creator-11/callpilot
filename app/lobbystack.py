@@ -235,17 +235,40 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
     """Save reviewed services, prices, hours and booking mode through LobbyStack's native settings. Safe to repeat."""
     writer(oid, user)
     biz = require_link(oid)["business_id"]
-    existing = {item.get("question") for item in call("GET", "/knowledge", business=biz).get("data", [])}
+    entries = call("GET", "/knowledge", business=biz).get("data", [])
+    existing, duplicates = {}, []
+    for entry in entries:
+        question = entry.get("question")
+        if question in existing:
+            duplicates.append(entry["id"])
+        elif question:
+            existing[question] = entry["id"]
+    for entry_id in duplicates:
+        call("DELETE", "/knowledge/%s" % entry_id, business=biz)
     have = {item["name"].lower(): item for item in call("GET", "/services", business=biz).get("data", [])}
     made = []
     for item in body.services:
-        saved = have.get(item.name.lower()) or call("POST", "/services", business=biz, idem="svc-%s-%s" % (oid, hashlib.sha1(item.name.lower().encode()).hexdigest()[:16]), body={
-            "name": item.name, "duration_minutes": item.duration_minutes, **({"description": item.description} if item.description else {})})["data"]
+        # The price and time live on the service itself, so the receptionist sees them with the service it is booking.
+        detail = "%s, about %s minutes%s" % (item.price_text, item.duration_minutes, ". " + item.description if item.description else "")
+        saved = have.get(item.name.lower())
+        if not saved:
+            saved = call("POST", "/services", business=biz, idem="svc-%s-%s" % (oid, hashlib.sha1(item.name.lower().encode()).hexdigest()[:16]), body={
+                "name": item.name, "duration_minutes": item.duration_minutes, "description": detail})["data"]
+        elif saved.get("description") != detail:
+            saved = call("PATCH", "/services/%s" % saved["id"], business=biz, body={"description": detail})["data"]
         question = "How much is a %s and how long does it take?" % item.name.lower()
         if question not in existing:
             call("POST", "/knowledge", business=biz, body={"type": "faq", "question": question, "answer": "A %s is %s and takes about %s minutes." % (
                 item.name.lower(), item.price_text, item.duration_minutes)})
         made.append({"id": saved["id"], "name": saved["name"], "duration_minutes": saved["duration_minutes"], "price": item.price_text})
+    if body.services:
+        menu = "; ".join("%s %s (%s min)" % (i.name, i.price_text, i.duration_minutes) for i in body.services)
+        listing = "Here is our full price list: " + menu + "."
+        key = "What are your prices?"
+        if key in existing:
+            call("PATCH", "/knowledge/%s" % existing[key], business=biz, body={"answer": listing})
+        else:
+            call("POST", "/knowledge", business=biz, body={"type": "faq", "question": key, "answer": listing})
     if body.hours:
         call("PATCH", "/business", business=biz, body={"hours": [h.model_dump() for h in body.hours]})
     call("PATCH", "/receptionist", business=biz, body={"booking_mode": body.booking_mode})
