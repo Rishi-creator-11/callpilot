@@ -123,6 +123,14 @@ class Profile(BaseModel):
     booking_mode: str = Field(default="request", pattern="^(off|request|instant)$")
 
 
+class Booking(BaseModel):
+    service_id: str = Field(min_length=8, max_length=64)
+    starts_at: str = Field(min_length=10, max_length=40)
+    contact_name: str = Field(min_length=1, max_length=80)
+    contact_phone: str = Field(min_length=7, max_length=20)
+    key: str = Field(min_length=8, max_length=64)
+
+
 class Reschedule(BaseModel):
     starts_at: str = Field(min_length=10, max_length=40)
 
@@ -245,6 +253,15 @@ def appointment(oid: str, appointment_id: str, user=Depends(current_user)):
     UUID(oid)
     membership(oid, user)
     return call("GET", "/appointments/%s" % UUID(appointment_id), business=require_link(oid)["business_id"])
+
+
+@router.post("/api/account/organizations/{oid}/lobbystack/appointments")
+def book(oid: str, body: Booking, user=Depends(current_user)):
+    """Book through LobbyStack, which checks the calendar and returns an error if the slot is taken."""
+    writer(oid, user)
+    return call("POST", "/appointments", business=require_link(oid)["business_id"], idem="book-%s-%s" % (oid, body.key),
+                body={"service_id": body.service_id, "starts_at": body.starts_at, "contact_name": body.contact_name,
+                      "contact_phone": body.contact_phone})
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/appointments/{appointment_id}/cancel")
