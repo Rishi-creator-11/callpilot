@@ -95,6 +95,19 @@ def store_event(oid, event):
     return bool(rows)
 
 
+HUMAN_STYLE = (
+    "Talk like a friendly person at the front desk, not a script. Use contractions and short, relaxed sentences. "
+    "Keep each reply to one or two sentences and ask only one thing at a time. React to what the caller just said before "
+    "moving on (for example: 'Sure thing', 'Gotcha', 'Nice'). Vary your wording so you never repeat the same phrase twice "
+    "in a call. Never read more than three options; offer two and let them choose. Say prices naturally. Take their name "
+    "and number in one go, then say the name back once to confirm. Do not repeat every detail back more than once. After a "
+    "booking is confirmed, say the day, time and service once, then ask if they need anything else. If the caller goes quiet, "
+    "wait a moment, then say something light like 'No rush, take your time'. Never say you are an AI unless asked directly. "
+    "Never promise a booking until the system confirms it. If you do not know something, say so simply and offer to take a message."
+)
+DEFAULT_STYLE = {"tone": "warm, relaxed and friendly, like someone at the front desk", "voice": "marin", "voice_instructions": HUMAN_STYLE}
+
+
 class Provision(BaseModel):
     website_url: str | None = Field(default=None, max_length=500)
 
@@ -160,6 +173,8 @@ def provision(oid: str, body: Provision, user=Depends(current_user)):
         request["website_url"] = body.website_url
     # Same workspace always sends the same key, so a retry cannot create a second business.
     created = call("POST", "/businesses", body=request, idem="callpilot-" + oid)["data"]
+    # Every new business starts with the same natural, short-greeting style; owners can change it later.
+    call("PATCH", "/receptionist", business=created["id"], body={**DEFAULT_STYLE, "greeting": "%s, how can I help?" % org["name"]})
     base = os.getenv("PUBLIC_BASE_URL", "https://callpilot-internal.onrender.com").rstrip("/")
     hook = call("POST", "/webhooks", business=created["id"], body={
         "url": base + "/webhooks/lobbystack", "events": list(EVENTS), "description": "CallPilot dashboard"})["data"]

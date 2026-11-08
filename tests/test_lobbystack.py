@@ -108,7 +108,8 @@ def test_provision_uses_stable_idempotency_key_and_requires_owner(db, monkeypatc
         r = client.post("/api/account/organizations/%s/lobbystack/provision" % "00000000-0000-0000-0000-0000000000a3", json={})
         assert r.status_code == 200 and r.json()["connected"] is True
         assert calls[0] == ("POST", "/businesses", "callpilot-00000000-0000-0000-0000-0000000000a3", None)
-        assert calls[1][1] == "/webhooks" and calls[1][3] == "biz9"
+        assert calls[1][:2] == ("PATCH", "/receptionist") and calls[1][3] == "biz9"
+        assert calls[2][1] == "/webhooks" and calls[2][3] == "biz9"
         def deny(*a, **k): raise HTTPException(404, "Workspace not found")
         monkeypatch.setattr(mod, "membership", deny)
         assert client.post("/api/account/organizations/%s/lobbystack/provision" % W1, json={}).status_code == 404
