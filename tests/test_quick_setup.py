@@ -483,11 +483,11 @@ def test_test_questions_cover_products_options_prices_categories_faqs_and_unknow
 
 def test_scoring_marks_answers_that_contain_what_was_expected(monkeypatch):
     answers = {"Do you do Flyers?": "Yes, Flyers (Print Materials). Eye-catching.", "How much are Flyers?": "I can take details for a quote instead.",
-               "Do you sell live elephants?": "I don’t have verified information about that."}
+               "Do you sell live elephants?": "I'm not sure about that one."}
     monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": answers.get(question, "")})
     assert mod.run_case("w", {"question": "Do you do Flyers?", "expect": "flyers", "group": "product"})["passed"] is True
     assert mod.run_case("w", {"question": "How much are Flyers?", "expect": "$", "group": "price"})["passed"] is False
-    assert mod.run_case("w", {"question": "Do you sell live elephants?", "expect": "don't have verified information", "group": "unknown"})["passed"] is True
+    assert mod.run_case("w", {"question": "Do you sell live elephants?", "expect": "not sure|don't carry", "group": "unknown"})["passed"] is True
 
 
 def test_the_self_test_runs_in_slices_with_a_total_and_a_next_offset(make, monkeypatch):

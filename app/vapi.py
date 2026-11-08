@@ -99,7 +99,7 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
             if not is_routed_worker_call(organization_id,provider_call):
                 raise HTTPException(403,"Assistant does not belong to this workspace")
     from app.semantic import retrieve
-    from app.cloud import PRICE, MONEY, NO_PRICE, UNKNOWN
+    from app.cloud import PRICE, MONEY, NO_PRICE, UNKNOWN, NOT_CARRIED
     results=[]
     for call in calls:
         if not isinstance(call,dict):continue
@@ -143,7 +143,7 @@ async def vapi_semantic_tool(organization_id:str,request:Request,authorization:s
         else:
             try:
                 fact,meta=retrieve(organization_id,question)
-                answer=fact["answer"] if fact else UNKNOWN
+                answer=fact["answer"] if fact else (NOT_CARRIED if meta.get("reason")=="item_not_listed" else UNKNOWN)
                 if MONEY.search(answer) and organization_id!=CALLPILOT_ORG and not tenant_prices_enabled(organization_id):answer=NO_PRICE
             except Exception:
                 answer=UNKNOWN

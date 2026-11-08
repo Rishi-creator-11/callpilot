@@ -39,5 +39,6 @@ def wrapup_hook() -> dict:
 
 PRICE = re.compile(r"\b(price|prices|pricing|cost|costs|fee|fees|quote|estimate|charge|charges|rate|rates|discount|how much|ballpark|dollars?|usd|precio|precios|cuánto|cuanto|cuesta|cotización|cotizacion|tarifa|costo|costos|presupuesto)\b|\$", re.I)
 MONEY = re.compile(r"\$\s*\d|\b\d+(?:\.\d+)?\s*(?:dollars?|usd|bucks)\b", re.I)
-NO_PRICE = "I can help with the product options and collect details for an accurate quote, but I don't have a verified price for that exact configuration."
-UNKNOWN = "I don't have verified information about that. I can ask a team member to follow up."
+NO_PRICE = "I don't want to guess on the price. I can grab a few details and have the team get you an exact quote."
+UNKNOWN = "Hmm, I'm not sure about that one and I don't want to guess. I can have someone from the team get back to you."
+NOT_CARRIED = "I'm afraid we don't carry that. Is there something else I can help you find?"

@@ -4,7 +4,7 @@ import hashlib, os, uuid, httpx
 from fastapi import APIRouter, Header, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
-from app.cloud import api, PRICE, MONEY, NO_PRICE, UNKNOWN
+from app.cloud import api, PRICE, MONEY, NO_PRICE, UNKNOWN, NOT_CARRIED
 from app.website_import import fetch_page
 from app.pdf_import import extract_pdf, MAX_PDF_BYTES
 from app import places
@@ -360,7 +360,7 @@ def answer_question(oid: str, question: str):
             return {"answer":NO_PRICE,"source":"policy"}
         return {"answer":fact["answer"],"source":"approved_semantic",
                 "matched_question":fact["question"],"similarity":metadata["similarity"]}
-    return {"answer":UNKNOWN,"source":"unknown","reason":metadata["reason"]}
+    return {"answer":NOT_CARRIED if metadata["reason"]=="item_not_listed" else UNKNOWN,"source":"unknown","reason":metadata["reason"]}
 
 class KnowledgeCheck(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)

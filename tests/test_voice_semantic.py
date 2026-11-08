@@ -31,7 +31,7 @@ def test_voice_pricing_policy_overrides_retrieval(monkeypatch):
     r=client.post("/webhooks/vapi-tools/business-1",headers={"Authorization":"Bearer only-for-tests"},
        json={"message":{"type":"tool-calls","toolCallList":[{"id":"call-2","function":{"name":"lookup_approved_knowledge","arguments":{"question":"How much is the container?"}}}]}})
     assert r.status_code==200
-    assert "don't have a verified price" in r.json()["results"][0]["result"].lower()
+    assert "exact quote" in r.json()["results"][0]["result"].lower()
 
 
 def _fake_rows(monkeypatch, rows):

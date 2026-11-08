@@ -3895,7 +3895,7 @@ $("taForm").addEventListener("submit",async event=>{
  const oid=organization(),input=$("taQuestion"),question=input.value.trim(),button=event.submitter;
  if(!question||button.disabled)return;
  taLine("you",question);input.value="";button.disabled=true;
- try{const r=await request("/organizations/"+oid+"/simulate","POST",{question});taLine("agent",r.answer||"I don’t have verified information about that. I would take a message.")}
+ try{const r=await request("/organizations/"+oid+"/simulate","POST",{question});taLine("agent",r.answer||"Hmm, I’m not sure about that one. I can take a message for the team.")}
  catch(e){taLine("agent",e.message)}
  finally{button.disabled=false;input.focus()}
 });

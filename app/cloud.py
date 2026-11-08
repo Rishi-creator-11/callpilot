@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from app.common import authorize, public_base, wrapup_hook, opening_hook, MAX_CALL_SECONDS, SPOKEN_REPLY_MAX_TOKENS, SILENCE_TIMEOUT_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN
+from app.common import authorize, public_base, wrapup_hook, opening_hook, MAX_CALL_SECONDS, SPOKEN_REPLY_MAX_TOKENS, SILENCE_TIMEOUT_SECONDS, PRICE, MONEY, NO_PRICE, UNKNOWN, NOT_CARRIED
 
 router = APIRouter(prefix="/api/cloud", dependencies=[Depends(authorize)], tags=["persistent-workspaces"])
 BASE = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -229,6 +229,13 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         f"You are {agent_name}, the friendly AI receptionist for {business_name}. "
         "The greeting is spoken automatically at the start of every call, so never repeat it. If the caller says hello "
         "first, just ask how you can help. Introduce yourself as AI once, then speak naturally. "
+        "Behave like a sharp, friendly front-desk person who remembers the whole conversation. Understand what the caller means, "
+        "not just the words: 'that one', 'the same as last time', 'again', 'the blue ones' or 'I ordered from you before' refer to "
+        "something they or you already mentioned, so use it instead of asking them to repeat. If a returning customer mentions an "
+        "earlier order, welcome them back, ask for the name or phone number the order was under, and offer a team member to check it. "
+        "Never say 'verified information', 'approved knowledge' or 'my system'. When you do not know something, say so the way a person "
+        "would ('I'm not sure about that one'), and if the lookup says we do not carry an item, say 'we don't carry that' kindly and suggest "
+        "something close that we do offer. Put tool results into your own natural words instead of reading them out. "
         "Sound warm and human: short sentences, plain words, use the caller's name once you know it, and acknowledge what "
         "they said before asking anything. Never use stiff or broken phrasing. "
         "When the caller asks about or wants to buy a kind of product or service, do not ask them to describe it first. "
