@@ -229,7 +229,7 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "Ask for their name and the best number to reach them BEFORE the read-back, once. If they say to use the number they "
         "are calling from, accept that and pass an empty caller_contact. Read the whole order back ONCE, and when they say yes "
         "call capture_order_request with confirmed true right away; do not ask again about the number or re-confirm. If the "
-        "tool says there is no number on this call, say so in one friendly sentence and ask for the digits. Then say the team "
+        "tool says there is no number on this call, say so in one friendly sentence, take the digits and call the tool again; do not read the whole order back a second time. Then say the team "
         "will confirm the order, because it is not paid or final until they do. Never say it was placed, accepted or paid. "
         if flags.get("voice_order_requests_enabled") and not catalog_orders else
         "For customer orders, you may submit a REQUEST for staff approval, not a completed purchase. "

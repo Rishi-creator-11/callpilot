@@ -722,6 +722,7 @@ class AgentChat(BaseModel):
 
 CHAT_MESSAGES_PER_HOUR = 60
 _chat_hits: deque = deque()
+_chat_owner: dict = {}  # chat id -> workspace that started it; a chat can only be continued by its own workspace
 
 
 @router.post("/agent-chat")
@@ -742,8 +743,16 @@ def agent_chat(oid: UUID, body: AgentChat, user=Depends(current_user)):
         _chat_hits.append((now, workspace))
     request = {"assistantId": assistant, "input": body.message}
     if body.chat_id:
+        if _chat_owner.get(body.chat_id) != workspace:
+            raise HTTPException(409, "That chat has ended. Start a new one.")
         request["previousChatId"] = body.chat_id
     result = vapi("POST", "/chat", body=request)
+    new_id = result.get("id") if isinstance(result, dict) else None
+    if isinstance(new_id, str):
+        with _analyze_lock:
+            _chat_owner[new_id] = workspace
+            while len(_chat_owner) > 2000:
+                _chat_owner.pop(next(iter(_chat_owner)))
     reply, steps = [], []
     for item in result.get("output", []) if isinstance(result, dict) else []:
         if not isinstance(item, dict):

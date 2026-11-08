@@ -560,6 +560,9 @@ def test_agent_chat_talks_to_the_workspace_assistant_and_is_limited(make, monkey
     monkeypatch.setattr("app.call_intel.vapi", lambda method, path, **kw: sent.append((path, kw["body"])) or
                         {"id": "chat-9", "output": [{"role": "assistant", "content": "Hi! We make business cards."}]})
     monkeypatch.setattr(mod, "_chat_hits", mod.deque())
+    monkeypatch.setattr(mod, "_chat_owner", {"chat-1": str(W), "other": "someone-else"})
+    foreign = client.post(URL + "/agent-chat", json={"message": "hello", "chat_id": "other"})
+    assert foreign.status_code == 409 and not sent
     ok = client.post(URL + "/agent-chat", json={"message": "hello", "chat_id": "chat-1"})
     assert ok.status_code == 200 and ok.json()["reply"].startswith("Hi!") and ok.json()["chat_id"] == "chat-9"
     assert sent[0] == ("/chat", {"assistantId": "asst-1", "input": "hello", "previousChatId": "chat-1"})
