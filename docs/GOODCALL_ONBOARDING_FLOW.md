@@ -50,3 +50,10 @@ Progress is shown as a six-dot stepper with a small mascot above the heading and
 - Clinics: instructions follow common practice from vendor guidance (booking, rescheduling and cancelling as the core jobs; new or returning patient; collect only name, number, visit type and time; no medical advice or urgency judgments; emergencies go to 911). CallPilot is not HIPAA certified and has no signed agreements with its providers, so clinics are told not to use it for patient health information.
 - Talk to your agent: after setup, "Call your agent" starts a browser call with the real agent and its real tools (bookings and requests are real, so use made-up details); "Practice call" answers from approved knowledge only. Both need VOICE_PREVIEW_ENABLED=true on the server, and the workspace allowed if VOICE_PREVIEW_WORKSPACES is set.
 - Sources: https://www.cliniqapps.com/ai-receptionist, https://www.primepro.ai/clinics, https://vortalabsai.com/blog/hipaa-compliant-ai-receptionist (vendor pages; treat as practical checklists, not legal advice).
+
+## Simplified navigation (owner request)
+- Sidebar has three places: Agent, Analytics, Channels. Account, Team and billing live in the account menu; Support stays at the bottom.
+- Agent tabs: Setup, Identity, Workers, Knowledge, Connections, plus a Test agent button. Test agent opens a live circle: tap it to start a voice call with the real agent (typing also works). Voice needs VOICE_PREVIEW_ENABLED=true.
+- Analytics tabs: Overview, Calls, Appointments, Orders. Overview counts appointments booked for service businesses and orders received for product businesses (both for older workspaces with no business type). Sessions and Analytics are now one area.
+- Channels: Phone and Shareable demo only. Share my agent creates or reuses one link to the finished agent and copies it. Call screening and routing, browser practice and the link label form are removed from the screen.
+- The old Assistant chat, Setup, Test assistant and Settings pages still exist but are no longer in the sidebar.

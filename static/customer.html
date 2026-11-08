@@ -109,6 +109,36 @@ body.cp-signed-in .sidebar .cp-side-support{margin-top:6px!important}
 .qs-types{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 16px}
 .qs-type{padding:10px 16px;background:#fff;color:var(--cp-text);border:1px solid var(--cp-border);border-radius:999px;font:inherit;font-weight:600;cursor:pointer;box-shadow:none}
 @media(max-width:600px){.qs-kinds{grid-template-columns:1fr}}
+.hub-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;border-bottom:1px solid var(--cp-border);margin:0 0 20px}
+.hub-tabs button{background:transparent;color:#667085;box-shadow:none;border-radius:0;padding:12px 2px;border-bottom:3px solid transparent;font-weight:700}
+.hub-tabs button[aria-current="page"]{color:#101629;border-bottom-color:#07104f}
+.hub-tabs button[hidden]{display:none}
+.hub-tabs .hub-test{margin-left:auto;background:#07104f;color:#fff;border-radius:999px;padding:9px 16px;border-bottom:0;font-size:14px}
+.hub-tabs .hub-test:hover{background:#0b1a7a}
+body.ta-open{overflow:hidden}
+.ta{position:fixed;inset:0;z-index:200;background:rgba(7,16,79,.82);display:grid;place-items:center;padding:16px}
+.ta[hidden]{display:none}
+.ta-card{position:relative;width:min(560px,100%);max-height:94vh;overflow:auto;background:#fff;border-radius:28px;padding:28px 24px 22px;text-align:center}
+.ta-close{position:absolute;right:14px;top:14px;width:38px;height:38px;border-radius:50%;background:#eef1f4;color:#344e65;padding:0;box-shadow:none}
+.ta-kicker{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#667085;font-weight:700}
+.ta-card h2{margin:6px 0 18px;font-size:26px}
+.ta-orb{--lvl:0;position:relative;width:168px;height:168px;border-radius:50%;border:0;padding:0;cursor:pointer;color:#fff;
+ background:radial-gradient(circle at 35% 30%,#7f8cff,#07104f 70%);box-shadow:0 12px 40px rgba(7,16,79,.35);transition:transform .12s ease}
+.ta-orb span{position:absolute;inset:0;display:grid;place-items:center}
+.ta-orb span::before{content:"🎙️";font-size:44px}
+.ta-orb.live span::before{content:"■";font-size:34px}
+.ta-orb:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.4)}
+.ta-orb.connecting{animation:taPulse 1s ease-in-out infinite}
+.ta-orb.live{animation:taPulse 2.4s ease-in-out infinite}
+.ta-orb.speaking{animation:none;transform:scale(calc(1 + var(--lvl)*.22));box-shadow:0 0 0 14px rgba(127,140,255,.28),0 12px 40px rgba(7,16,79,.35)}
+@keyframes taPulse{0%,100%{box-shadow:0 0 0 0 rgba(127,140,255,.5),0 12px 40px rgba(7,16,79,.35)}50%{box-shadow:0 0 0 22px rgba(127,140,255,0),0 12px 40px rgba(7,16,79,.35)}}
+@media(prefers-reduced-motion:reduce){.ta-orb.live,.ta-orb.connecting{animation:none}}
+.ta-state{min-height:24px;margin:16px 0 10px;color:#344e65;font-weight:600}
+.ta-transcript{display:grid;gap:8px;max-height:200px;overflow:auto;text-align:left;margin:6px 0 12px}
+.ta-form{display:flex;gap:10px;margin:0 0 10px}.ta-form input{flex:1}
+.ta-note{margin:0;font-size:12px;color:#667085}
+#channelDemoForm,#inboundRouting{display:none!important}
+#channelShare .cp-panel-heading{display:none}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -744,28 +774,13 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <button class="cp-sidebar-collapse-open" onclick="window.toggleSidebar()" title="Expand navigation" aria-label="Expand sidebar">☰</button><div class="cols"><aside id="appSidebar" class="card sidebar" aria-label="Main navigation">
 <div class="cp-side-brand"><button class="cp-collapse-button" onclick="window.toggleSidebar()" aria-label="Toggle navigation labels" title="Toggle navigation labels">✦</button><span class="cp-brand-name">Call<span>Pilot</span></span></div>
 <div class="cp-side-scroll">
-<button data-section="builder" title="Assistant" onclick="window.section('builder',{push:true})"><span aria-hidden="true" class="cp-nav-icon">✧</span> Assistant</button>
+<button data-section="agent" title="Agent" onclick="window.openAgent()"><span aria-hidden="true" class="cp-nav-icon">✦</span> Agent</button>
 <button data-section="analytics" title="Analytics" onclick="window.section('analytics',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▥</span> Analytics</button>
-<button data-section="calls" title="Sessions" onclick="window.section('calls',{push:true})"><span aria-hidden="true" class="cp-nav-icon">☎</span> Sessions</button>
 <button data-section="channels" title="Channels" onclick="window.section('channels',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◉</span> Channels</button>
-<div class="cp-nav-divider"></div>
-<button data-section="voice" title="Identity" onclick="window.section('voice',{push:true})"><span aria-hidden="true" class="cp-nav-icon">♙</span> Identity</button>
-<button data-section="workers" title="Workers" onclick="window.section('workers',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⋮</span> Workers</button>
-<button data-section="connections" title="Connections" onclick="window.section('connections',{push:true})"><span aria-hidden="true" class="cp-nav-icon">↔</span> Connections</button>
-<div class="cp-nav-divider"></div>
-<button type="button" id="navMoreToggle" class="cp-more-toggle" aria-expanded="false" aria-controls="navMore"><span aria-hidden="true" class="cp-nav-icon">⋯</span> More</button>
-<div id="navMore" hidden>
-<button data-section="quicksetup" title="Quick setup" onclick="window.section('quicksetup',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚡</span> Quick setup</button>
-<button data-section="knowledge" title="Knowledge" onclick="window.section('knowledge',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▤</span> Knowledge</button>
-<button data-section="appointments" title="Appointments" onclick="window.section('appointments',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▣</span> Appointments</button>
-<button data-section="orders" title="Order requests" onclick="window.section('orders',{push:true})"><span aria-hidden="true" class="cp-nav-icon">▧</span> Order requests</button>
-<button data-section="studio" title="Setup" onclick="window.section('studio',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚑</span> Setup</button>
-<button data-section="simulator" title="Test assistant" onclick="window.section('simulator',{push:true})"><span aria-hidden="true" class="cp-nav-icon">◇</span> Test assistant</button>
-<button data-section="workspace" title="Settings" onclick="window.section('workspace',{push:true})"><span aria-hidden="true" class="cp-nav-icon">⚙</span> Settings</button>
-</div>
 </div>
 <div class="cp-sidebar-bottom"><div id="cpAccountMenu" class="cp-account-menu" hidden>
 <button onclick="window.openAccountSettings()"><span aria-hidden="true">♙</span> Account settings</button>
+<button onclick="window.section('workspace',{push:true});window.closeAccountMenu()"><span aria-hidden="true">⚙</span> Team &amp; workspace</button>
 <button onclick="window.section('usage');window.closeAccountMenu()"><span aria-hidden="true">◷</span> Usage &amp; phone</button>
 <button onclick="window.section('billing');window.closeAccountMenu()"><span aria-hidden="true">▤</span> Billing &amp; plans</button>
 <button onclick="window.section('help');window.closeAccountMenu()"><span aria-hidden="true">ⓘ</span> Help &amp; support</button>
@@ -863,17 +878,12 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  </div>
  <div id="qsStep4" class="cp-section-box" hidden>
   <h3>Talk to your agent</h3>
-  <p>Ask what a real caller would ask. Type below, or speak with your voice.</p>
-  <div id="qsChat" class="qs-chat" aria-live="polite"></div>
-  <form id="qsChatForm" class="qs-chatform"><label for="qsQuestion" class="cp-visually-hidden">Your question</label>
-   <input id="qsQuestion" required maxlength="500" placeholder="What are your hours?" autocomplete="off"><button type="submit">Ask</button></form>
-  <div class="cp-inline-actions"><button type="button" id="qsVoiceLive">Call your agent</button><button type="button" id="qsVoice" class="secondary">Practice call (answers only)</button><button type="button" id="qsVoiceEnd" class="secondary" hidden>End call</button></div>
-  <p id="qsVoiceStatus" role="status" class="muted"></p>
-  <p class="muted"><strong>Call your agent</strong> uses your real agent, so a booking or request it takes is real. Use made-up details. The practice call only answers questions. Typing always works.</p>
-  <div class="cp-inline-actions"><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button></div>
-  <div class="cp-inline-actions" style="margin-top:14px"><button type="button" id="qsFinish">I’m done. Open my dashboard</button></div>
+  <p>Meet your agent. Tap the button, then tap the circle to start a call and ask it anything a customer would.</p>
+  <div class="cp-inline-actions"><button type="button" id="qsTestAgent">▶ Test your agent</button></div>
+  <p class="muted">It is your real agent, so a booking or request it takes is real. Use made-up details.</p>
+  <div class="cp-inline-actions" style="margin-top:14px"><button type="button" id="qsLive" class="secondary">Put it on a phone number</button><button type="button" id="qsBack4" class="secondary">Back</button><button type="button" id="qsFinish">I’m done. Open my dashboard</button></div>
  </div>
-</section>
+ </section>
 
 <section id="onboarding" class="panel card" style="display:none">
  <div class="cp-onboarding-wrap">
@@ -1047,7 +1057,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    <div class="assistant-input"><textarea id="builderPrompt" minlength="5" maxlength="1200" required rows="2" placeholder="Ask CallPilot to change something…"></textarea><button type="submit">Send</button></div>
    <p class="muted">Drafts use our AI provider. Keep passwords and customer information out of messages.</p>
   </form>
-  <div class="cp-inline-actions"><button class="secondary" onclick="window.section('simulator')">Practice as a caller</button><button class="secondary" onclick="window.section('channels')">Open channels</button></div>
+  <div class="cp-inline-actions"><button class="secondary" onclick="window.testAgent()">Test your agent</button><button class="secondary" onclick="window.section('channels')">Open channels</button></div>
  </div>
  <details id="builderHistory" class="cp-section-box" hidden>
   <summary>Configuration history</summary>
@@ -1226,9 +1236,11 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <article class="card"><span>Unique callers</span><strong id="analyticsCallers">—</strong></article>
   <article class="card"><span>Average duration</span><strong id="analyticsDuration">—</strong></article>
   <article class="card"><span>Open follow-ups</span><strong id="analyticsFollowUps">—</strong></article>
+  <article class="card" id="analyticsApptCard" hidden><span>Appointments booked</span><strong id="analyticsAppointments">—</strong></article>
+  <article class="card" id="analyticsOrderCard" hidden><span>Orders received</span><strong id="analyticsOrders">—</strong></article>
  </div>
  <div id="analyticsCustomMetrics" class="cp-analytics-metrics" style="margin-top:10px" aria-live="polite"></div>
- <article class="card cp-analytics-card"><div class="row"><h2>Call volume</h2><button type="button" class="secondary" onclick="window.section('calls')">Open sessions</button></div>
+ <article class="card cp-analytics-card"><div class="row"><h2>Call volume</h2><button type="button" class="secondary" onclick="window.section('calls')">See all calls</button></div>
   <p id="analyticsChartLabel" class="muted"></p><div id="analyticsChart" aria-hidden="true"></div>
   <details><summary>Daily totals</summary><div id="analyticsDaily"></div></details>
  </article>
@@ -1246,10 +1258,9 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    </form>
    <button type="button" id="phoneReserveCheck" class="secondary" hidden>Check pending number</button>
    <p id="phoneReserveStatus" role="status"></p></article>
-  <article class="cp-studio-connection ch-card"><span class="ch-icon" aria-hidden="true">⛓</span><h3>Shareable demo</h3><p>Send colleagues a link to talk to your agent, no sign in needed.</p>
-   <p id="channelShareHint" role="status" class="muted"></p><button id="channelShareButton" type="button">Share</button></article>
-  <article class="cp-studio-connection ch-card"><span class="ch-icon" aria-hidden="true">◇</span><h3>Browser practice</h3><p>Try the assistant from your workspace before routing calls.</p>
-   <p id="channelPractice" role="status">Checking availability…</p><button class="secondary" onclick="window.section('simulator')">Open practice</button></article>
+  <article class="cp-studio-connection ch-card"><span class="ch-icon" aria-hidden="true">⛓</span><h3>Shareable demo</h3><p>Share your finished agent. Anyone with the link can talk to it, no sign in needed.</p>
+   <p id="channelShareHint" role="status" class="muted"></p><button id="channelShareButton" type="button">Share my agent</button></article>
+  <span id="channelPractice" hidden></span>
  </div>
  <div class="cp-section-box" id="channelShare" hidden>
   <div class="cp-panel-heading"><div><h3>Share a demo</h3><p>Create an expiring text preview and see how many questions each link receives.</p></div></div>
@@ -1729,6 +1740,19 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 <div class="cp-section-box"><h3>Security &amp; payments</h3><p>Manage your password and email in <strong>My account</strong>. If Stripe Checkout is enabled for your business, payment methods and invoices are managed in its secure customer portal.</p>
 <div class="cp-inline-actions"><button class="secondary" onclick="window.section('account')">Account settings</button><button class="secondary" onclick="window.section('billing')">Billing settings</button></div></div>
 <div class="cp-section-box"><h3>Contact support</h3><p>For technical support, save the time and symptoms of any issue. Support contact information will be published once the service's support channel is configured.</p></div></div><p id="message" role="status"></p></main></div></section><footer>© 2026 CallPilot · Business operations platform · Private beta</footer></div>
+<div id="testAgent" class="ta" role="dialog" aria-modal="true" aria-labelledby="taName" hidden>
+ <div class="ta-card">
+  <button type="button" id="taClose" class="ta-close" aria-label="Close">✕</button>
+  <p class="ta-kicker">Test your agent</p>
+  <h2 id="taName">Your agent</h2>
+  <button type="button" id="taOrb" class="ta-orb" aria-label="Start a call with your agent"><span></span></button>
+  <p id="taState" class="ta-state" role="status">Tap the circle to start the call.</p>
+  <div id="taTranscript" class="ta-transcript" aria-live="polite"></div>
+  <form id="taForm" class="ta-form"><label for="taQuestion" class="cp-visually-hidden">Type a question</label>
+   <input id="taQuestion" maxlength="500" placeholder="Or type a question…" autocomplete="off"><button type="submit">Ask</button></form>
+  <p class="ta-note">This is your real agent. A booking or request it takes is real, so use made-up details.</p>
+ </div>
+</div>
 <script type="module">
 import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.1/+esm";
 let sb=null,current=null,orgs=[];
@@ -1759,6 +1783,7 @@ function readAuthReturnError(){
 }
 {
  const toggle=document.getElementById("navMoreToggle"),more=document.getElementById("navMore");
+ if(toggle&&more){
  toggle.addEventListener("click",()=>{
   more.hidden=!more.hidden;
   toggle.setAttribute("aria-expanded",String(!more.hidden));
@@ -1766,6 +1791,7 @@ function readAuthReturnError(){
  new MutationObserver(()=>{
   if(more.querySelector(".cp-active")&&more.hidden){more.hidden=false;toggle.setAttribute("aria-expanded","true")}
  }).observe(more,{subtree:true,attributes:true,attributeFilter:["class"]});
+ }
 }
 window.authMode=mode=>{
  authView=mode;
@@ -2020,18 +2046,18 @@ const pageMeta={
  onboarding:["Business setup","Create a workspace and get your receptionist ready to learn."],
  studio:["Launch studio","Set up, test and connect your AI front desk in one place."],
  builder:["Assistant","Draft, review and sync your receptionist’s configuration."],
- analytics:["Analytics","Track call volume, caller activity and lead outcomes."],
+ analytics:["Analytics","How your calls are going."],
  channels:["Channels","Manage how callers connect with your agent."],
- quicksetup:["Quick setup","Build your agent in a few clicks."],
- workers:["Workers","Organize the playbooks your receptionist follows on calls."],
- calls:["Sessions","Review calls, transcripts and follow-up activity."],
+ quicksetup:["Agent","Set up your agent, then talk to it."],
+ workers:["Agent","What your agent does on each kind of call."],
+ calls:["Analytics","Every call and what happened."],
  usage:["Usage & phone","Track included minutes, alerts and your business number."],
- knowledge:["Knowledge base","Manage exactly what your AI receptionist can tell customers."],
- voice:["Identity","Manage the identity, greeting and voice for your receptionist."],
+ knowledge:["Agent","What your agent knows about your business."],
+ voice:["Agent","Who your agent is and how it speaks."],
  simulator:["Test assistant","Test approved answers before customers hear them."],
- appointments:["Appointments","Manage appointment requests and calendar connections."],
- orders:["Order requests","Review and resolve customer order requests."],
- connections:["Connections","External services your agent can use."],
+ appointments:["Analytics","Appointments your agent booked."],
+ orders:["Analytics","Order requests your agent took."],
+ connections:["Agent","Tools your agent can use."],
  billing:["Settings","Manage your plan, payment methods and invoices."],
  workspace:["Settings","Manage your team and business workspace."],
  account:["Settings","Manage your profile and organization"],
@@ -2060,7 +2086,7 @@ function updateSettingsTabs(page){
  }
 }
 function updateAssistantDock(){
- const available=Boolean(organization())&&!["builder","onboarding"].includes(activePage);
+ const available=false;
  const docked=available&&dockViewport.matches&&assistantDockOpen;
  document.body.classList.toggle("cp-assistant-docked",docked);
  document.body.classList.toggle("cp-assistant-full",activePage==="builder");
@@ -2083,8 +2109,66 @@ $("builderCloseDock").addEventListener("click",()=>{
 $("builderOpenFull").addEventListener("click",()=>{
  window.section("builder",{push:true});$("builderReviewToggle").focus();
 });
+const HUBS={
+ agent:[["quicksetup","Setup"],["voice","Identity"],["workers","Workers"],["knowledge","Knowledge"],["connections","Connections"]],
+ analytics:[["analytics","Overview"],["calls","Calls"],["appointments","Appointments"],["orders","Orders"]]
+};
+const GROUP_OF={builder:"agent",studio:"agent",simulator:"agent"};
+for(const [group,tabs] of Object.entries(HUBS))for(const [id] of tabs)GROUP_OF[id]=group;
+let hubInfo=null;
+function applyHubInfo(){
+ const info=hubInfo,kind=info?.business_kind||null,enabled=info?.enabled||{};
+ const showAppointments=!kind||kind==="services"||Boolean(enabled.booking);
+ const showOrders=!kind||kind==="products"||Boolean(enabled.orders);
+ for(const tab of document.querySelectorAll('[data-hub-tab="appointments"]'))tab.hidden=!showAppointments;
+ for(const tab of document.querySelectorAll('[data-hub-tab="orders"]'))tab.hidden=!showOrders;
+ window.cpHubShows={appointments:showAppointments,orders:showOrders};
+}
+async function refreshHubInfo(){
+ const oid=organization();
+ if(!oid||!current)return hubInfo;
+ try{
+  const status=await request("/organizations/"+encodeURIComponent(oid)+"/quick-setup");
+  if(oid!==organization())return hubInfo;
+  hubInfo=status;applyHubInfo();
+ }catch{}
+ return hubInfo;
+}
+window.openAgent=async()=>{
+ const info=hubInfo||await refreshHubInfo();
+ window.section(info&&info.setup_done?"voice":"quicksetup",{push:true});
+};
+function buildHubTabs(){
+ for(const [group,tabs] of Object.entries(HUBS)){
+  for(const [id] of tabs){
+   const host=document.getElementById(id);
+   if(!host||host.querySelector(":scope>.hub-tabs"))continue;
+   const nav=document.createElement("div");
+   nav.className="hub-tabs";nav.setAttribute("role","navigation");nav.setAttribute("aria-label",group==="agent"?"Agent":"Analytics");
+   for(const [target,label] of tabs){
+    const button=document.createElement("button");
+    button.type="button";button.textContent=label;button.dataset.hubTab=target;
+    button.addEventListener("click",()=>window.section(target,{push:true}));
+    nav.append(button);
+   }
+   if(group==="agent"){
+    const test=document.createElement("button");
+    test.type="button";test.className="hub-test";test.textContent="▶ Test agent";
+    test.addEventListener("click",()=>window.testAgent());
+    nav.append(test);
+   }
+   host.insertBefore(nav,host.firstChild);
+  }
+ }
+ applyHubInfo();
+}
+function updateHubTabs(page){
+ for(const tab of document.querySelectorAll("[data-hub-tab]")){
+  if(tab.dataset.hubTab===page)tab.setAttribute("aria-current","page");else tab.removeAttribute("aria-current");
+ }
+}
 window.section=(x,options={})=>{
- if(!Object.hasOwn(pageMeta,x))x="builder";
+ if(!Object.hasOwn(pageMeta,x))x="analytics";
  if(x!=="simulator"&&activePage==="simulator")endVoicePractice();
  activePage=x;
  moveIdentityHours();
@@ -2094,10 +2178,11 @@ window.section=(x,options={})=>{
    if($(id))$(id).style.display=id===x?"block":"none";
  }
  document.querySelectorAll(".sidebar [data-section]").forEach(button=>{
-   const active=button.dataset.section===x||(button.dataset.section==="workspace"&&settingsPages.has(x));
+   const active=button.dataset.section===(GROUP_OF[x]||x);
    button.classList.toggle("cp-active",active);
    if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
  });
+ updateHubTabs(x);
  $("pageTitle").textContent=pageMeta[x][0];
  $("welcome").textContent=pageMeta[x][1];
  if(!options.noHash&&location.hash!=="#"+x){
@@ -2110,7 +2195,7 @@ window.section=(x,options={})=>{
  loadActivePage(x);
 };
 window.addEventListener("popstate",()=>{
- if(current&&organization())window.section(location.hash.slice(1)||"builder",{noHash:true});
+ if(current&&organization())window.section(location.hash.slice(1)||"analytics",{noHash:true});
 });
 let pendingInvite="";
 try{
@@ -2381,6 +2466,7 @@ window.loadWorkspace=async({destination}={})=>{
    const workspaceKey=current.id+"/"+organization();
    if(workspaceKey!==loadedWorkspace){
     loadedWorkspace=workspaceKey;
+    hubInfo=null;void refreshHubInfo();
     for(const id of ["studioDescription","studioAgentName","studioGreeting","studioQuestion","studioSku","studioItemName",
      "studioItemPrice","studioItemStock","studioItemDescription"])$(id).value="";
     for(const id of ["studioApproveKnowledge","studioPricesVerified","studioAllowPrices","studioCaptureLeads",
@@ -2464,7 +2550,7 @@ window.loadWorkspace=async({destination}={})=>{
    clearCallWorkspace();
    // Only fetch the selected page; unrelated provider calls must not delay the dashboard.
    const hash=location.hash.slice(1);
-   const page=destination||(Object.hasOwn(pageMeta,hash)&&hash!=="onboarding"?hash:"builder");
+   const page=destination||(Object.hasOwn(pageMeta,hash)&&hash!=="onboarding"?hash:"analytics");
    window.section(page);
    window.refreshAccountPlan();
  });
@@ -3428,7 +3514,7 @@ $("capiSync").addEventListener("click",async event=>{
 const QS_ICONS={info:"💬",messages:"📝",quotes:"🧾",orders:"📦",booking:"📅",transfer:"📞"};
 const QS_HELP={info:"Answer questions about your business",messages:"Take messages and capture leads",quotes:"Collect the details for a quote",
  orders:"Take order requests for your team to review",booking:"Book appointments on your calendar",transfer:"Connect callers to a person"};
-let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null,qsKind=null,qsSubtype=null,qsInfo={kinds:{},presets:{}},qsVoiceInstance=null;
+let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null,qsKind=null,qsSubtype=null,qsInfo={kinds:{},presets:{}};
 const qsKey=oid=>"callpilot.qs."+oid;
 function qsShow(step){
  for(const n of [0,1,"R",2,3,4]){
@@ -3494,41 +3580,6 @@ $("qsKindNext").addEventListener("click",()=>{
  if(!qsSubtype){$("qsStatus0").textContent="Pick the one that fits best.";return}
  $("qsStatus0").textContent="";qsPickGoals();qsShow(1);
 });
-function qsAddMessage(who,text){
- const row=document.createElement("p");row.className="qs-msg "+who;row.textContent=text;$("qsChat").append(row);row.scrollIntoView({block:"nearest"});
-}
-async function qsStartVoice(path,label){
- const status=$("qsVoiceStatus");
- if(qsVoiceInstance)return;
- status.textContent="Connecting your microphone…";
- try{
-  if(!navigator.mediaDevices?.getUserMedia)throw Error("This browser does not provide microphone access.");
-  const mic=await navigator.mediaDevices.getUserMedia({audio:true});mic.getTracks().forEach(t=>t.stop());
-  const {default:sdk}=await import("https://cdn.jsdelivr.net/npm/@vapi-ai/web@3.1.0/+esm");
-  const Vapi=sdk.default??sdk;
-  status.textContent="Starting "+label+"…";
-  const room=await request(path,"POST");
-  const instance=new Vapi("");qsVoiceInstance=instance;
-  const finish=text=>{
-   if(qsVoiceInstance!==instance)return;
-   qsVoiceInstance=null;try{instance.stop()}catch{}
-   $("qsVoiceEnd").hidden=true;status.textContent=text||"The call ended.";
-  };
-  instance.on("call-end",()=>finish());
-  instance.on("error",()=>finish("The call disconnected. Please try again."));
-  instance.on("message",event=>{
-   if(event.type!=="transcript"||event.transcriptType!=="final"||!event.transcript)return;
-   qsAddMessage(event.role==="assistant"?"agent":"you",event.transcript);
-  });
-  await instance.reconnect(room);
-  $("qsVoiceEnd").hidden=false;status.textContent="You are on the call. Speak normally.";
- }catch(e){
-  qsVoiceInstance=null;
-  status.textContent=e.name==="NotAllowedError"?"Allow microphone access to talk to your agent.":(e.message||"The call could not start.");
- }
-}
-$("qsVoiceEnd").addEventListener("click",()=>{try{qsVoiceInstance?.stop()}catch{}});
-$("qsVoiceLive").addEventListener("click",()=>qsStartVoice("/organizations/"+organization()+"/voice-test","your agent"));
 async function loadQuickSetup(){
  const oid=organization();
  qsShow(0);qsTab("website");qsRenderGoals();
@@ -3671,24 +3722,93 @@ $("qsBuild").addEventListener("click",async event=>{
  finally{button.disabled=false}
 });
 $("qsRedo").addEventListener("click",()=>qsShow(2));
-$("qsToTest").addEventListener("click",()=>{qsShow(4);$("qsQuestion").focus()});
+$("qsToTest").addEventListener("click",()=>{qsShow(4);void refreshHubInfo();window.testAgent()});
 $("qsBack4").addEventListener("click",()=>qsShow(3));
-$("qsVoice").addEventListener("click",()=>qsStartVoice("/organizations/"+organization()+"/voice-preview","a practice call"));
+$("qsTestAgent").addEventListener("click",()=>window.testAgent());
 $("qsLive").addEventListener("click",()=>window.section("channels",{push:true}));
 $("qsFinish").addEventListener("click",()=>{
  try{localStorage.setItem(qsKey(organization()),"done")}catch{}
+ void refreshHubInfo();
  window.section("analytics",{push:true});
 });
-$("qsChatForm").addEventListener("submit",async event=>{
+let taInstance=null,taAvailable=false;
+function taLine(who,text){
+ const row=document.createElement("p");row.className="qs-msg "+who;row.textContent=text;
+ $("taTranscript").append(row);row.scrollIntoView({block:"nearest"});
+}
+function taReset(text){
+ $("taOrb").classList.remove("live","speaking","connecting");
+ $("taOrb").style.removeProperty("--lvl");
+ $("taOrb").setAttribute("aria-label","Start a call with your agent");
+ if(text)$("taState").textContent=text;
+}
+window.testAgent=async()=>{
+ const oid=organization();
+ if(!oid)return;
+ $("testAgent").hidden=false;document.body.classList.add("ta-open");
+ $("taTranscript").replaceChildren();taReset();
+ $("taName").textContent=hubInfo?.agent_name||"Your agent";
+ $("taState").textContent="Getting ready…";
+ $("taOrb").disabled=true;
+ try{taAvailable=(await request("/organizations/"+encodeURIComponent(oid)+"/voice-preview")).available===true}catch{taAvailable=false}
+ if(oid!==organization())return;
+ $("taOrb").disabled=!taAvailable;
+ $("taState").textContent=taAvailable?"Tap the circle to start the call.":"Voice calls are not switched on yet. You can still type to your agent below.";
+ $("taOrb").focus();
+};
+function closeTestAgent(){
+ try{taInstance?.stop()}catch{}
+ taInstance=null;taReset();
+ $("testAgent").hidden=true;document.body.classList.remove("ta-open");
+}
+$("taClose").addEventListener("click",closeTestAgent);
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&!$("testAgent").hidden)closeTestAgent()});
+$("taOrb").addEventListener("click",async()=>{
+ const orb=$("taOrb");
+ if(taInstance){try{taInstance.stop()}catch{}return}
+ if(orb.disabled||!taAvailable)return;
+ orb.classList.add("connecting");$("taState").textContent="Connecting your microphone…";
+ try{
+  if(!navigator.mediaDevices?.getUserMedia)throw Error("This browser does not provide microphone access.");
+  const mic=await navigator.mediaDevices.getUserMedia({audio:true});mic.getTracks().forEach(t=>t.stop());
+  const {default:sdk}=await import("https://cdn.jsdelivr.net/npm/@vapi-ai/web@3.1.0/+esm");
+  const Vapi=sdk.default??sdk;
+  $("taState").textContent="Calling your agent…";
+  const room=await request("/organizations/"+organization()+"/voice-test","POST");
+  const instance=new Vapi("");taInstance=instance;
+  const finish=text=>{
+   if(taInstance!==instance)return;
+   taInstance=null;try{instance.stop()}catch{}
+   taReset(text||"The call ended. Tap the circle to call again.");
+  };
+  instance.on("call-end",()=>finish());
+  instance.on("error",()=>finish("The call disconnected. Tap the circle to try again."));
+  instance.on("speech-start",()=>{orb.classList.add("speaking");$("taState").textContent="Your agent is speaking…"});
+  instance.on("speech-end",()=>{orb.classList.remove("speaking");$("taState").textContent="Listening…"});
+  instance.on("volume-level",level=>orb.style.setProperty("--lvl",String(Math.max(0,Math.min(1,Number(level)||0)))));
+  instance.on("message",event=>{
+   if(event.type!=="transcript"||event.transcriptType!=="final"||!event.transcript)return;
+   taLine(event.role==="assistant"?"agent":"you",event.transcript);
+  });
+  await instance.reconnect(room);
+  orb.classList.remove("connecting");orb.classList.add("live");
+  orb.setAttribute("aria-label","End the call");
+  $("taState").textContent="Connected. Say hello!";
+ }catch(e){
+  taInstance=null;taReset();
+  $("taState").textContent=e.name==="NotAllowedError"?"Allow microphone access to talk to your agent.":(e.message||"The call could not start.");
+ }
+});
+$("taForm").addEventListener("submit",async event=>{
  event.preventDefault();
- const oid=organization(),input=$("qsQuestion"),question=input.value.trim(),button=event.submitter;
+ const oid=organization(),input=$("taQuestion"),question=input.value.trim(),button=event.submitter;
  if(!question||button.disabled)return;
- const add=qsAddMessage;
- add("you",question);input.value="";button.disabled=true;
- try{const r=await request("/organizations/"+oid+"/simulate","POST",{question});add("agent",r.answer||"I don’t have verified information about that. I would take a message.")}
- catch(e){add("agent",e.message)}
+ taLine("you",question);input.value="";button.disabled=true;
+ try{const r=await request("/organizations/"+oid+"/simulate","POST",{question});taLine("agent",r.answer||"I don’t have verified information about that. I would take a message.")}
+ catch(e){taLine("agent",e.message)}
  finally{button.disabled=false;input.focus()}
 });
+buildHubTabs();
 async function loadConnections(){
  const oid=organization();
  const services=[
@@ -3711,12 +3831,25 @@ for(const tab of document.querySelectorAll("[data-cn-tab]")){
   $("cnCustom").hidden=tab.dataset.cnTab!=="custom";
  });
 }
-$("channelShareButton").addEventListener("click",()=>{
- const box=$("channelShare");
- if(box.hidden){$("channelShareHint").textContent="Only workspace owners and admins can share a demo.";return}
- $("channelShareHint").textContent="";
- box.scrollIntoView({block:"center"});
- $("channelDemoLabel").focus();
+$("channelShareButton").addEventListener("click",async event=>{
+ const button=event.currentTarget,oid=organization(),hint=$("channelShareHint");
+ if(button.disabled)return;
+ if(!["owner","admin"].includes(orgs.find(w=>w.id===oid)?.role)){hint.textContent="Only workspace owners and admins can share the agent.";return}
+ button.disabled=true;hint.textContent="Getting your link…";
+ try{
+  const {links}=await request(demoLinksPath(oid));
+  let link=links.find(item=>item.url&&!item.revoked_at);
+  if(!link){
+   await request(demoLinksPath(oid),"POST",{label:"My agent",confirm_public_knowledge:true,voice_enabled:false});
+   link=(await request(demoLinksPath(oid))).links.find(item=>item.url&&!item.revoked_at);
+  }
+  if(oid!==organization())return;
+  if(!link)throw Error("We could not create a link. Please try again.");
+  try{await navigator.clipboard.writeText(link.url);hint.textContent="Link copied. Anyone who opens it can try your agent."}
+  catch{hint.textContent="Your link: "+link.url}
+  await loadDemoLinks(oid);
+ }catch(e){hint.textContent=e.message}
+ finally{button.disabled=false}
 });
 const connectionFilters=[...document.querySelectorAll("[data-connection-group]")];
 const connectionCards=[...document.querySelectorAll("[data-connection-type]")];
@@ -4142,7 +4275,7 @@ $("workersAdd").addEventListener("click",()=>{
  if(workersEditable&&!$("addWorker").disabled)$("addWorker").click();
  else $("workerStatus").textContent=workersEditable?"You have reached the worker limit.":"Only workspace owners and admins can add workers.";
 });
-$("workersPractice").addEventListener("click",()=>window.section("simulator"));
+$("workersPractice").addEventListener("click",()=>window.testAgent());
 function markWorkersDirty(){
  workersDirty=true;
  $("syncWorkers").disabled=true;
@@ -5132,7 +5265,7 @@ const ciStageLabels={hot:"Hot lead",warm:"Warm lead",general:"General inquiry",n
 let analyticsRun=0;
 function clearAnalytics(){
  analyticsRun++;
- for(const id of ["analyticsCalls","analyticsCallers","analyticsDuration","analyticsFollowUps"])$(id).textContent="—";
+ for(const id of ["analyticsCalls","analyticsCallers","analyticsDuration","analyticsFollowUps","analyticsAppointments","analyticsOrders"])$(id).textContent="—";
  for(const id of ["analyticsChart","analyticsDaily","analyticsOutcomes","analyticsCustomMetrics"])$(id).replaceChildren();
  $("analyticsAddMetric").hidden=true;
  $("analyticsChartLabel").textContent="";
@@ -5146,6 +5279,25 @@ function analyticsList(target,rows){
  }
  table.append(body);
  $(target).replaceChildren(table);
+}
+async function loadAnalyticsExtras(oid,data,run){
+ if(!hubInfo)await refreshHubInfo();
+ if(oid!==organization()||run!==analyticsRun)return;
+ const shows=window.cpHubShows||{appointments:true,orders:true};
+ $("analyticsApptCard").hidden=!shows.appointments;$("analyticsOrderCard").hidden=!shows.orders;
+ const inRange=row=>{const day=String(row.created_at||row.requested_time||"").slice(0,10);return !day||(day>=data.start&&day<=data.end)};
+ if(shows.appointments){
+  try{
+   const rows=await request("/organizations/"+oid+"/bookings");
+   if(oid===organization()&&run===analyticsRun)$("analyticsAppointments").textContent=rows.filter(r=>r.status==="confirmed"&&inRange(r)).length.toLocaleString();
+  }catch{}
+ }
+ if(shows.orders){
+  try{
+   const rows=await request(orderReviewPath(oid));
+   if(oid===organization()&&run===analyticsRun)$("analyticsOrders").textContent=rows.filter(r=>["requested","approved"].includes(r.status)&&inRange(r)).length.toLocaleString();
+  }catch{}
+ }
 }
 async function loadAnalytics(){
  const oid=organization(),status=$("analyticsStatus");
@@ -5166,6 +5318,7 @@ async function loadAnalytics(){
   $("analyticsCallers").textContent=data.unique_callers.toLocaleString();
   $("analyticsDuration").textContent=ciDuration(data.average_duration_seconds);
   $("analyticsFollowUps").textContent=data.follow_ups.toLocaleString();
+  void loadAnalyticsExtras(oid,data,run);
   $("analyticsAddMetric").hidden=!data.can_manage;
   renderAnalyticsMetrics(oid,data.metrics||[],data.can_manage);
   status.textContent=data.start+" to "+data.end+" · "+data.time_zone;
