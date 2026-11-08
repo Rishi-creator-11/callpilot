@@ -46,8 +46,15 @@ def call(method, path, *, business=None, body=None, params=None, idem=None):
     except httpx.RequestError:
         raise HTTPException(503, "The receptionist service is unavailable. Try again shortly.")
     if response.status_code >= 400:
-        log.warning("lobbystack_failed method=%s path=%s status=%s", method, path, response.status_code)
-        raise HTTPException(502, "The receptionist service rejected the request (HTTP %s)." % response.status_code)
+        code = ""
+        try:
+            err = response.json().get("error") or {}
+            code = str(err.get("code") or err.get("message") or "")[:80] if isinstance(err, dict) else str(err)[:80]
+        except (ValueError, AttributeError):
+            pass
+        log.warning("lobbystack_failed method=%s path=%s status=%s code=%s", method, path.split("?")[0], response.status_code, code)
+        # Provider codes are short fixed identifiers, safe to show the workspace owner for support.
+        raise HTTPException(502, "The receptionist service rejected the request (HTTP %s%s)." % (response.status_code, ", " + code if code else ""))
     return response.json() if response.content else {}
 
 
