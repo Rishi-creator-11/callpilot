@@ -137,6 +137,7 @@ class Style(BaseModel):
     tone: str | None = Field(default=None, max_length=300)
     voice: str | None = Field(default=None, pattern="^[a-z]{3,12}$")
     voice_instructions: str | None = Field(default=None, max_length=3000)
+    business_name: str | None = Field(default=None, min_length=2, max_length=120)
 
 
 class Reschedule(BaseModel):
@@ -245,8 +246,13 @@ def set_style(oid: str, body: Style, user=Depends(current_user)):
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(422, "Nothing to change.")
-    call("PATCH", "/receptionist", business=require_link(oid)["business_id"], body=changes)
-    return {"updated": sorted(changes)}
+    biz = require_link(oid)["business_id"]
+    name = changes.pop("business_name", None)
+    if name:
+        call("PATCH", "/business", business=biz, body={"name": name})
+    if changes:
+        call("PATCH", "/receptionist", business=biz, body=changes)
+    return {"updated": sorted(changes) + (["business_name"] if name else [])}
 
 
 SUMMARY_FIELDS = ("id", "channel", "status", "outcome", "summary", "duration_seconds", "started_at", "ended_at", "recording_available")
