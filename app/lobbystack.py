@@ -238,11 +238,14 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
     entries = call("GET", "/knowledge", business=biz).get("data", [])
     existing, duplicates = {}, []
     for entry in entries:
-        question = entry.get("question")
+        # The API lists an FAQ with its question as the title.
+        question = entry.get("title") or entry.get("question")
         if question in existing:
             duplicates.append(entry["id"])
         elif question:
             existing[question] = entry["id"]
+        if not question:
+            continue
     for entry_id in duplicates:
         call("DELETE", "/knowledge/%s" % entry_id, business=biz)
     have = {item["name"].lower(): item for item in call("GET", "/services", business=biz).get("data", [])}
