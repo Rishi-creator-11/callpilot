@@ -151,3 +151,14 @@ def test_conflicting_reservation_does_not_create_event(monkeypatch):
         "caller_name": "Sam Taylor", "caller_contact": "+15555550100",
         "service": "Consultation"})
     assert "another customer" in reply
+
+
+@pytest.mark.parametrize("value", ["914446046", "4460465", "12345", "+1 914 446"])
+def test_incomplete_callback_numbers_are_refused_with_a_helpful_message(value):
+    with pytest.raises(ValueError, match="full number slowly|Invalid callback phone format"):
+        voice_actions._phone(value)
+
+
+@pytest.mark.parametrize("value", ["9144460465", "(914) 446-0465", "+1 914 446 0465", "+44 20 7946 0958"])
+def test_complete_callback_numbers_are_accepted(value):
+    assert voice_actions._phone(value) == value

@@ -519,7 +519,9 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
     goodbye="Thanks for calling. Goodbye."
     # Defer only the opening greeting, not ordinary conversational responses.
     # The scheduled hook uses the exact existing business-specific greeting.
-    from app.common import opening_hook, OPENING_HOOK_NAME
+    from app.common import opening_hook, OPENING_HOOK_NAME, public_base
+    token=os.getenv("VAPI_WEBHOOK_TOKEN","")
+    desired_server={"url":public_base()+"/webhooks/vapi/"+oid,"headers":{"Authorization":"Bearer "+token}} if token else None
     greeting=(cfg[0].get("greeting") if use_saved_greeting else assistant.get("firstMessage"))
     if not isinstance(greeting,str) or not greeting.strip():
         return {"updated":False,"reason":"missing_first_greeting"}
@@ -537,10 +539,13 @@ def refresh_receptionist_prompt(oid:str, *, use_saved_greeting=False):
             and assistant.get("silenceTimeoutSeconds")==SILENCE_TIMEOUT_SECONDS
             and next_hooks==prior_hooks
             and matches_transcriber(assistant.get("transcriber"))
+            and (desired_server is None or (assistant.get("server") or {}).get("url")==desired_server["url"])
             and matches_voice(prior_voice)):
         return {"updated":False,"reason":"already_current"}
     new_model=dict(model,messages=next_messages,tools=next_tools,maxTokens=SPOKEN_REPLY_MAX_TOKENS)
+    server_patch={"server":desired_server,"serverMessages":["status-update","end-of-call-report"]} if desired_server else {}
     vapi("PATCH","/assistant/"+aid,body={
+        **server_patch,
         "model":new_model,"endCallMessage":goodbye,
         "firstMessage":greeting,
         "firstMessageMode":"assistant-waits-for-user",

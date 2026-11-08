@@ -188,9 +188,14 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "specifications, then offer a human quote without repeating the refusal. "
     )
     lead_policy=(
-        "For callbacks, ask for the name and preferred callback number, repeat them back, "
-        "obtain permission to contact, and use capture_customer_lead. Say the callback "
-        "request was saved only if the tool confirms it. "
+        "To take a callback, ask for the caller's name, then ask ONCE: 'Is the number you're calling from the best one to "
+        "reach you?' If they say yes, or 'this is a good number', do not ask for digits or read anything back: call "
+        "capture_customer_lead with an empty callback_phone. Only ask for digits if they say no, or if the tool says it has no "
+        "number. Phone numbers need ten digits with the area code; if you heard fewer or more, say you did not catch all of it "
+        "and ask them to say the full number slowly. Read digits back only when the caller dictated them, and only once. "
+        "A caller who asks to buy, get a quote, book or be called back has already agreed to a callback, so do not ask "
+        "permission again: pass callback_requested true and close by saying the team will call them at that number. "
+        "For anything else, ask once if a callback is okay. Say the request was saved only if the tool confirms it. "
         if lead_enabled else
         "Never say a callback request was recorded when no lead-saving tool is connected. "
     )
@@ -219,8 +224,15 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "Do not claim to place, accept or charge for orders. "
     )
     return (
-        f"You are {agent_name}, the helpful AI receptionist for {business_name}. "
-        "Introduce yourself as AI once, then speak naturally. "
+        f"You are {agent_name}, the friendly AI receptionist for {business_name}. "
+        "The greeting is spoken automatically at the start of every call, so never repeat it. If the caller says hello "
+        "first, just ask how you can help. Introduce yourself as AI once, then speak naturally. "
+        "Sound warm and human: short sentences, plain words, use the caller's name once you know it, and acknowledge what "
+        "they said before asking anything. Never use stiff or broken phrasing. "
+        "If the caller wants to buy something, get the product and quantity, mention any design help the approved "
+        "information describes when they have no artwork, and offer a team quote instead of inventing details. "
+        "If the caller sounds annoyed, rushed or tells you to stop, stop asking questions: apologize in a few words, "
+        "say what you have so far, and offer to wrap up or have the team follow up. "
         + language_policy + " " +
         "For every factual business question, call lookup_approved_knowledge. "
         "Because the existing knowledge index is mainly English, translate Spanish "
@@ -290,6 +302,8 @@ def provision_test_agent(oid:str):
         "silenceTimeoutSeconds":SILENCE_TIMEOUT_SECONDS,
         "hooks":[opening_hook(a["greeting"]),wrapup_hook()],
         "endCallMessage":"Thanks for calling. Goodbye.",
+        **({"server":{"url":base+"/webhooks/vapi/"+oid,"headers":{"Authorization":"Bearer "+os.environ["VAPI_WEBHOOK_TOKEN"]}},
+            "serverMessages":["status-update","end-of-call-report"]} if os.getenv("VAPI_WEBHOOK_TOKEN") else {}),
         "metadata":{"callpilot_org":oid}}
     try:
         with httpx.Client(timeout=20) as c:

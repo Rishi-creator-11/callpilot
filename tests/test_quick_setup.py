@@ -397,3 +397,37 @@ def test_only_a_few_crawls_run_at_once(make, monkeypatch):
     assert response.status_code == 429 and reads == []
     slots.release()
     assert client.post(URL + "/analyze", json={"document_id": "00000000-0000-0000-0000-000000000001"}).status_code == 200
+
+
+def test_product_names_become_speech_keywords_without_losing_the_owners_terms(monkeypatch):
+    store = {"speech_keyterms": ["Metro", "metroprint"]}
+    patches = []
+
+    def api(table, method="GET", params=None, data=None, **kw):
+        if method == "GET":
+            return [dict(store)]
+        patches.append(data)
+        return []
+
+    monkeypatch.setattr(mod, "api", api)
+    mod.add_keyterms("w", ["Business Cards", "metro", "Flyers", "x", "Flyers"] + ["Product %d" % i for i in range(40)])
+    terms = patches[0]["speech_keyterms"]
+    assert terms[:2] == ["Metro", "metroprint"] and "Business Cards" in terms and "Flyers" in terms
+    assert len(terms) == 25 and len({t.casefold() for t in terms}) == 25 and "x" not in terms
+
+
+def test_keyword_trouble_never_blocks_saving_knowledge(monkeypatch):
+    def api(*args, **kwargs):
+        raise RuntimeError("database down")
+    monkeypatch.setattr(mod, "api", api)
+    mod.add_keyterms("w", ["Flyers"])  # must not raise
+
+
+def test_the_agent_prompt_teaches_a_smooth_callback_flow(monkeypatch):
+    from app import cloud
+    monkeypatch.setattr("app.voice_actions.feature_flags", lambda oid: {"voice_leads_enabled": True, "call_instructions": ""})
+    text = cloud.receptionist_prompt("00000000-0000-0000-0000-00000000000a", "Metro Print", "Alex")
+    for phrase in ("never repeat it", "Is the number you're calling from the best one", "do not ask for digits",
+                   "ten digits", "has already agreed to a callback", "sounds annoyed", "Sound warm and human", "offer a team quote"):
+        assert phrase in text
+    assert "repeat them back" not in text

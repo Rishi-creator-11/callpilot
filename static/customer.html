@@ -2078,8 +2078,8 @@ const pageMeta={
 function loadActivePage(id){
  if(!current||!organization())return;
  const load={
-   quicksetup:()=>loadQuickSetup(),studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics(),channels:()=>loadChannels(),
-   workers:()=>Promise.all([loadWorkers(),loadCallMenu(organization())]),calls:()=>window.loadCalls(),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
+   quicksetup:()=>loadQuickSetup(),studio:()=>window.loadStudio(),builder:()=>loadBuilder(),analytics:()=>loadAnalytics().then(()=>autoSyncCalls()),channels:()=>loadChannels(),
+   workers:()=>Promise.all([loadWorkers(),loadCallMenu(organization())]),calls:()=>Promise.resolve(window.loadCalls()).then(()=>autoSyncCalls()),usage:()=>window.loadUsage(),knowledge:()=>loadFacts(),voice:()=>loadAgent(),
    simulator:()=>Promise.all([loadSemanticStatus(),loadKnowledgeChecks(),loadVoicePractice()]),appointments:()=>Promise.allSettled([loadBookings(),loadCalendar()]),
    billing:()=>loadBilling(),orders:()=>loadOrderReview(),connections:()=>loadConnections(),workspace:()=>Promise.all([window.fillWorkspace(),loadBookingHours(),loadInvitations()])
  }[id];
@@ -3819,6 +3819,7 @@ $("taOrb").addEventListener("click",async()=>{
    if(taInstance!==instance)return;
    taInstance=null;try{instance.stop()}catch{}
    taReset(text||"The call ended. Tap the circle to call again.");
+   setTimeout(()=>void autoSyncCalls(true),15000);
   };
   instance.on("call-end",()=>finish());
   instance.on("error",()=>finish("The call disconnected. Tap the circle to try again."));
@@ -6023,6 +6024,20 @@ window.linkAssistant=()=>safe(async()=>{
  await request("/organizations/"+organization()+"/voice-assistants/link","POST",{assistant_id:v("ciAssistant")});
  await window.loadCalls();return "Assistant connected. Select Sync Vapi calls to import its history.";
 });
+// Calls appear on their own: the server receives end-of-call reports, and this quietly re-syncs as a backup.
+const callSyncAt={};
+async function autoSyncCalls(force=false){
+ const oid=organization();
+ if(!oid||!["owner","admin"].includes(orgs.find(w=>w.id===oid)?.role))return;
+ if(!force&&Date.now()-(callSyncAt[oid]||0)<45000)return;
+ callSyncAt[oid]=Date.now();
+ try{
+  const r=await request("/organizations/"+encodeURIComponent(oid)+"/calls/sync","POST");
+  if(oid!==organization()||!r.synced)return;
+  if(activePage==="calls")await window.loadCalls();
+  if(activePage==="analytics")void loadAnalytics();
+ }catch{}
+}
 window.syncCalls=()=>safe(async()=>{
  const btn=$("syncCallsButton");btn.disabled=true;btn.textContent="Syncing...";
  try{const r=await request("/organizations/"+organization()+"/calls/sync","POST");

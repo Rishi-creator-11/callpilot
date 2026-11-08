@@ -175,9 +175,17 @@ def start_live_test(oid: UUID, response: Response, user=Depends(current_user)):
         raise HTTPException(429, "Test call limit reached. Wait a few minutes, or try again tomorrow.")
     response.headers["Cache-Control"] = "no-store"
     try:
+        # Test calls always use the latest saved settings, and the greeting is spoken once by the assistant itself.
+        try:
+            from app.call_intel import refresh_receptionist_prompt
+            refresh_receptionist_prompt(workspace, use_saved_greeting=True)
+        except Exception:  # noqa: BLE001 - a sync problem must not stop the test; the last synced version is used
+            pass
+        from app.common import wrapup_hook
         result = vapi("POST", "/call/web", body={
             "assistantId": assistant_id, "roomDeleteOnUserLeaveEnabled": True,
-            "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20}}, key_env="VAPI_PUBLIC_KEY")
+            "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20,
+                                   "firstMessageMode": "assistant-speaks-first", "hooks": [wrapup_hook()]}}, key_env="VAPI_PUBLIC_KEY")
         return validated_room(result)
     except HTTPException:
         release(workspace, user["id"])

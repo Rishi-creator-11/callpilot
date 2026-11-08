@@ -176,3 +176,35 @@ def test_a_failed_call_does_not_use_up_the_allowance(preview_client, monkeypatch
     monkeypatch.setattr(voice_preview, "vapi", provider)
     assert preview_client.post(LIVE).status_code == 502
     assert released == [("voice_preview_attempts", "eq." + OID, "eq." + OTHER)]
+
+
+def test_live_test_uses_the_latest_settings_and_only_the_system_greeting(preview_client, monkeypatch):
+    synced = []
+    monkeypatch.setattr(voice_preview, "api", lambda *a, **k: [{"provider_agent_id": "asst_1"}])
+    monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: True)
+    monkeypatch.setattr("app.call_intel.refresh_receptionist_prompt", lambda oid, **k: synced.append(oid) or {"reason": "already_current"})
+    monkeypatch.setattr(voice_preview, "rpc", lambda name, args: True)
+    calls = []
+
+    def provider(method, path, *, body=None, key_env=None):
+        calls.append((method, path, body))
+        return {"id": "asst_1"} if method == "GET" else {"webCallUrl": "https://callpilot.daily.co/room", "id": "c"}
+
+    monkeypatch.setattr(voice_preview, "vapi", provider)
+    assert preview_client.post(LIVE).status_code == 200
+    overrides = calls[-1][2]["assistantOverrides"]
+    assert synced == [OID] and overrides["firstMessageMode"] == "assistant-speaks-first"
+    assert [hook["name"] for hook in overrides["hooks"]] == ["callpilot-wrapup"] or len(overrides["hooks"]) == 1
+    assert all("one-second-opening" not in hook.get("name", "") for hook in overrides["hooks"])
+
+
+def test_a_failed_settings_sync_does_not_stop_the_test_call(preview_client, monkeypatch):
+    monkeypatch.setattr(voice_preview, "api", lambda *a, **k: [{"provider_agent_id": "asst_1"}])
+    monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: True)
+    def boom(oid, **k):
+        raise RuntimeError("sync broke")
+    monkeypatch.setattr("app.call_intel.refresh_receptionist_prompt", boom)
+    monkeypatch.setattr(voice_preview, "rpc", lambda name, args: True)
+    monkeypatch.setattr(voice_preview, "vapi", lambda method, path, *, body=None, key_env=None:
+                        {"id": "asst_1"} if method == "GET" else {"webCallUrl": "https://callpilot.daily.co/room", "id": "c"})
+    assert preview_client.post(LIVE).status_code == 200

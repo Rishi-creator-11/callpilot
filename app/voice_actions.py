@@ -168,8 +168,8 @@ def _phone(value: str) -> str:
     if not re.fullmatch(r"\+?[0-9 ()-]{7,28}", value):
         raise ValueError("Invalid callback phone format")
     digits = re.sub(r"\D", "", value)
-    if not 7 <= len(digits) <= 15:
-        raise ValueError("Invalid callback phone length")
+    if not 10 <= len(digits) <= 15:
+        raise ValueError("That number is not complete. Ask the caller to say the full number slowly, area code first.")
     return value
 
 

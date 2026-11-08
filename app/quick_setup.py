@@ -36,8 +36,9 @@ GOALS = {
 SECTIONS = {
     "info": "Answer questions about the business using only the approved information you can look up. "
             "If you do not have the answer, say so and offer to take a message.",
-    "messages": "Take messages and capture leads: ask for the caller's name and best callback number, "
-                "repeat the number back, and save the request only after the caller agrees to be contacted.",
+    "messages": "Take messages and capture leads: ask for the caller's name, then ask once whether the number they are "
+                "calling from is the best one to reach them. If yes, use it without asking for digits. A caller who asks for "
+                "a quote or to buy has already agreed to a callback, so close by saying the team will call them.",
     "quotes": "When a caller wants a quote, collect what they need, the quantity or size, their deadline and "
               "their contact details, then save it for the team. Do not state a price unless the business has "
               "approved exact prices. Tell the caller a team member will follow up with the quote.",
@@ -491,6 +492,22 @@ def without_money(text: str) -> str:
     return " ".join(sentence for sentence in sentences if not MONEY.search(sentence) and not PRICE_TEXT.search(sentence))
 
 
+def add_keyterms(workspace: str, names: list[str]) -> None:
+    """Teach the speech recognizer the product names, keeping any terms the owner already added."""
+    try:
+        rows = api("agent_configs", params={"organization_id": "eq." + workspace, "select": "speech_keyterms", "limit": 1})
+        terms = list((rows[0].get("speech_keyterms") if rows else None) or [])
+        known = {term.casefold() for term in terms}
+        for name in names:
+            term = _squash(name)[:64]
+            if 2 <= len(term) and term.casefold() not in known and len(terms) < 25:
+                known.add(term.casefold())
+                terms.append(term)
+        api("agent_configs", "PATCH", params={"organization_id": "eq." + workspace}, data={"speech_keyterms": terms}, prefer="return=minimal")
+    except Exception as exc:  # noqa: BLE001 - keywords improve hearing but must never block saving knowledge
+        log.warning("keyterms_failed workspace=%s error=%s", workspace, type(exc).__name__)
+
+
 def publish_facts(workspace: str, document_id: str, entries: list[tuple], user_id: str) -> int:
     """Embed and publish many approved answers at once, tied to the overview document so a re-run replaces them."""
     from concurrent.futures import ThreadPoolExecutor
@@ -557,5 +574,6 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
         saved_products = sum(1 for e in entries[:published] if e[2] == "product")
         saved_policies = sum(1 for e in entries[:published] if e[2] == "policy")
         saved_prices = saved_prices or (saved_products if pricing_on else 0)
+        add_keyterms(workspace, [item.name for item in body.products])
     return {"overview_saved": True, "prices_saved": saved_prices, "prices_enabled": bool(saved_prices),
             "products_saved": saved_products, "policies_saved": saved_policies}
