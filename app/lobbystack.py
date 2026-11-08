@@ -249,18 +249,25 @@ def set_style(oid: str, body: Style, user=Depends(current_user)):
     return {"updated": sorted(changes)}
 
 
+SUMMARY_FIELDS = ("id", "channel", "status", "outcome", "summary", "duration_seconds", "started_at", "ended_at", "recording_available")
+
+
 @router.get("/api/account/organizations/{oid}/lobbystack/calls/{call_id}")
 def call_detail(oid: str, call_id: str, user=Depends(current_user)):
-    UUID(oid)
-    membership(oid, user)
-    return call("GET", "/calls/%s" % UUID(call_id), business=require_link(oid)["business_id"])
+    """Full record with transcript and caller details, for owners and admins only. Recording links are never passed on."""
+    writer(oid, user)
+    data = call("GET", "/calls/%s" % UUID(call_id), business=require_link(oid)["business_id"]).get("data", {})
+    keep = SUMMARY_FIELDS + ("caller_name", "caller_phone", "end_reason", "transcript")
+    return {k: data.get(k) for k in keep}
 
 
 @router.get("/api/account/organizations/{oid}/lobbystack/calls")
 def calls(oid: str, user=Depends(current_user)):
+    """Summaries only, with no caller phone numbers or transcripts, so any member can see what happened."""
     UUID(oid)
     membership(oid, user)
-    return call("GET", "/calls", business=require_link(oid)["business_id"], params={"limit": 20})
+    rows = call("GET", "/calls", business=require_link(oid)["business_id"], params={"limit": 20}).get("data", [])
+    return {"calls": [{k: row.get(k) for k in SUMMARY_FIELDS} for row in rows]}
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/calendar/connect")
