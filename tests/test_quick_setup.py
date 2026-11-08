@@ -64,9 +64,10 @@ def test_goals_without_prerequisites_enable_only_what_is_safe_and_list_what_is_m
     env = make()
     result = client.post(URL, json={"goals": ["info", "messages", "quotes", "orders", "booking"]}).json()
     assert env.patched[0] == {"voice_leads_enabled": True, "voice_booking_enabled": False,
-                              "voice_catalog_enabled": False, "voice_order_requests_enabled": False}
-    assert {n["key"] for n in result["needs"]} == {"calendar", "products"}
-    assert "Book appointments" not in result["enabled"] and "Take orders" not in result["enabled"]
+                              "voice_catalog_enabled": False, "voice_order_requests_enabled": True}
+    # Orders need no product list (the caller's own words are saved); only booking waits on the calendar.
+    assert {n["key"] for n in result["needs"]} == {"calendar"}
+    assert "Book appointments" not in result["enabled"]
     assert "Answer questions" in result["enabled"] and result["synced"] is True and len(env.saved) == 1
 
 

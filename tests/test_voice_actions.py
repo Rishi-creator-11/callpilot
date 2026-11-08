@@ -171,3 +171,42 @@ def test_a_call_without_a_phone_number_gets_a_plain_instruction(monkeypatch):
     with pytest.raises(ValueError, match="don't have their number from this call"):
         voice_actions.capture_customer_lead("o", {}, {"caller_name": "Rishi", "interest": "200 business cards",
                                                       "callback_phone": "", "callback_requested": True})
+
+
+def _store(monkeypatch, **extra):
+    writes = []
+    monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: flags(**extra))
+    monkeypatch.setattr(voice_actions, "api", lambda table, method="GET", **kw: writes.append((table, kw.get("data"))) or [{"id": "new-id"}])
+    return writes
+
+
+def test_orders_are_taken_in_the_callers_words_when_there_is_no_catalog(monkeypatch):
+    tools = voice_actions.voice_tool_definitions(OID, "c", flags(voice_order_requests_enabled=True))
+    assert [t["function"]["name"] for t in tools] == ["capture_order_request"]
+    writes = _store(monkeypatch, voice_order_requests_enabled=True)
+    args = {"product": "Business cards", "quantity": "500", "details": "3.5x2, matte, pickup Friday",
+            "caller_name": "Dana Lee", "caller_contact": "5555550123", "confirmed": True}
+    result = voice_actions.capture_order_request(OID, CALL, args)
+    table, data = writes[0]
+    assert table == "order_requests" and data["product_text"] == "Business cards" and data["quantity"] == 500
+    assert data["status"] == "requested" and "not confirmed or paid" in result
+    with pytest.raises(ValueError):
+        voice_actions.capture_order_request(OID, CALL, {**args, "confirmed": False})
+
+
+def test_appointment_request_is_saved_unconfirmed_when_no_calendar_is_connected(monkeypatch):
+    tools = voice_actions.voice_tool_definitions(OID, "c", flags(voice_leads_enabled=True))
+    assert "request_appointment" in [t["function"]["name"] for t in tools]
+    booked = voice_actions.voice_tool_definitions(OID, "c", flags(voice_leads_enabled=True, voice_booking_enabled=True))
+    assert "request_appointment" not in [t["function"]["name"] for t in booked]
+    writes = _store(monkeypatch, voice_leads_enabled=True)
+    when = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    result = voice_actions.request_appointment(OID, CALL, {
+        "service": "Consultation", "preferred_time": when, "caller_name": "Dana Lee",
+        "caller_contact": "5555550123", "notes": ""})
+    table, data = writes[0]
+    assert table == "appointment_requests" and data["status"] == "requested" and "NOT confirmed" in result
+    with pytest.raises(ValueError):
+        voice_actions.request_appointment(OID, CALL, {
+            "service": "Consultation", "preferred_time": "2020-01-01T10:00:00+00:00", "caller_name": "Dana Lee",
+            "caller_contact": "5555550123", "notes": ""})

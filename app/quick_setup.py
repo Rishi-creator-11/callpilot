@@ -174,12 +174,12 @@ def prerequisites(workspace: str, goals: list[str]) -> dict:
         else:
             needs.append({"key": "calendar", "text": "Connect Google Calendar so the agent can book appointments.", "page": "appointments"})
     if "orders" in goals:
+        # Orders work from what the caller says, so no product list is needed. A SKU catalog is used only if one exists.
+        flags["voice_order_requests_enabled"] = True
         approved = api("catalog_items", params={"organization_id": "eq." + workspace, "active": "eq.true",
                                                  "approved_at": "not.is.null", "select": "id", "limit": 1})
         if approved:
-            flags["voice_catalog_enabled"] = flags["voice_order_requests_enabled"] = True
-        else:
-            needs.append({"key": "products", "text": "Add and approve at least one product so the agent can take orders.", "page": "studio"})
+            flags["voice_catalog_enabled"] = True
     return {"flags": flags, "needs": needs}
 
 

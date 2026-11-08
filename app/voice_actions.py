@@ -19,6 +19,7 @@ from app.cloud import api, public_base
 MANAGED_TOOLS = frozenset({
     "capture_customer_lead", "check_appointment_availability", "book_appointment",
     "lookup_catalog_item", "submit_order_request", "resolve_call_menu",
+    "capture_order_request", "request_appointment",
 })
 
 
@@ -116,7 +117,7 @@ def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
             {"item": s("Product SKU or exact product name stated by the caller.")},
             ["item"], oid, credential,
         ))
-    if flags.get("voice_order_requests_enabled"):
+    if flags.get("voice_order_requests_enabled") and flags.get("voice_catalog_enabled"):
         tools.append(_definition(
             "submit_order_request",
             "Save a pending order request for business staff review only. No payment "
@@ -133,6 +134,35 @@ def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
             },
             ["sku","quantity","caller_name","caller_contact","confirmed"],
             oid, credential,
+        ))
+    if flags.get("voice_order_requests_enabled") and not flags.get("voice_catalog_enabled"):
+        tools.append(_definition(
+            "capture_order_request",
+            "Save a new order request for the team to review. Use only after reading back the product, quantity and "
+            "options and hearing the caller agree. Nothing is charged, produced or changed; the team confirms the order.",
+            {
+                "product": s("What the caller wants to order, in their words."),
+                "quantity": s("How many, as the caller said it."),
+                "details": s("Size, material, finish, design, pickup or delivery and anything else they specified."),
+                "caller_name": s("Customer-stated name."),
+                "caller_contact": s("Customer-confirmed phone number or email."),
+                "confirmed": {"type": "boolean", "description": "True only after the caller agreed to the read-back."},
+            },
+            ["product", "quantity", "details", "caller_name", "caller_contact", "confirmed"], oid, credential,
+        ))
+    if flags.get("voice_leads_enabled") and not flags.get("voice_booking_enabled"):
+        tools.append(_definition(
+            "request_appointment",
+            "Save the caller's preferred appointment time as a request. The team confirms the time later; "
+            "this never books anything.",
+            {
+                "service": s("What the appointment is for."),
+                "preferred_time": s("Preferred date and time with the business timezone offset, ISO-8601, in the future."),
+                "caller_name": s("Caller-stated name."),
+                "caller_contact": s("Caller-confirmed phone number or email."),
+                "notes": s("Anything else the caller mentioned, or empty."),
+            },
+            ["service", "preferred_time", "caller_name", "caller_contact", "notes"], oid, credential,
         ))
     from app.custom_apis import tool_definitions
     tools.extend(tool_definitions(oid, credential, _definition))
@@ -461,6 +491,69 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
     return "Order request "+str(found[0]["id"])+" already submitted. Do not submit it again."
 
 
+def _contact(value) -> str:
+    contact = _text(value, maximum=100, minimum=3)
+    if "@" in contact:
+        if not re.fullmatch(r"[^@ ]+@[^@ ]+[.][^@ ]+", contact):
+            raise ValueError("That email doesn't look right. Ask the caller to repeat it.")
+    else:
+        _phone(contact)
+    return contact
+
+
+def capture_order_request(oid: str, message: dict, args: dict) -> str:
+    call_id, _ = _call_context(oid, message)
+    if not feature_flags(oid).get("voice_order_requests_enabled"):
+        raise ValueError("Order requests are not enabled")
+    if args.get("confirmed") is not True:
+        raise ValueError("Read the order back and get the caller's agreement before saving it")
+    product = _text(args.get("product", ""), maximum=200, minimum=2)
+    quantity = _text(args.get("quantity", ""), maximum=60, minimum=1)
+    details = _text(args.get("details", ""), maximum=800)
+    name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
+    contact = _contact(args.get("caller_contact", ""))
+    key = hashlib.sha256("|".join((oid, call_id, "free", product.casefold(), quantity.casefold(),
+                                   contact.casefold())).encode()).hexdigest()
+    digits = re.search(r"\d+", quantity)
+    rows = api("order_requests", "POST", params={"on_conflict": "organization_id,idempotency_key"},
+               data={"organization_id": oid, "provider_call_id": call_id, "idempotency_key": key,
+                     "product_text": product, "details": ("Quantity: " + quantity + (". " + details if details else "")),
+                     "quantity": min(100000, max(1, int(digits.group()))) if digits else 1,
+                     "caller_name": name, "caller_contact": contact, "status": "requested"},
+               prefer="resolution=ignore-duplicates,return=representation")
+    if not rows:
+        return "That order request is already saved. Do not save it again."
+    return ("Order request saved for the team to review: " + product + ", " + quantity
+            + ". It is not confirmed or paid yet. Tell the caller the team will follow up to confirm.")
+
+
+def request_appointment(oid: str, message: dict, args: dict) -> str:
+    call_id, _ = _call_context(oid, message)
+    if not feature_flags(oid).get("voice_leads_enabled"):
+        raise ValueError("Requests are not enabled")
+    service = _text(args.get("service", ""), maximum=150, minimum=2)
+    name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
+    contact = _contact(args.get("caller_contact", ""))
+    raw = _text(args.get("preferred_time", ""), maximum=70, minimum=10)
+    try:
+        when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if when.tzinfo is None or when <= datetime.now(timezone.utc):
+            raise ValueError
+    except ValueError as exc:
+        raise ValueError("Ask for the exact day and a future time the caller prefers.") from exc
+    key = hashlib.sha256("|".join((oid, call_id, "request", when.astimezone(timezone.utc).isoformat(),
+                                   service.casefold())).encode()).hexdigest()
+    rows = api("appointment_requests", "POST", params={"on_conflict": "organization_id,idempotency_key"},
+               data={"organization_id": oid, "provider_call_id": call_id, "idempotency_key": key,
+                     "caller_name": name, "caller_contact": contact, "service": service,
+                     "requested_time": when.isoformat(), "duration_minutes": 30, "status": "requested"},
+               prefer="resolution=ignore-duplicates,return=representation")
+    if not rows:
+        return "That appointment request is already saved. Do not save it again."
+    return ("Appointment request saved for " + service + ". It is NOT confirmed. Tell the caller the team will check "
+            "availability and get back to them to confirm.")
+
+
 def resolve_call_menu(oid: str, message: dict, args: dict) -> str:
     _call_context(oid, message)
     from app.call_menu import resolve
@@ -478,6 +571,8 @@ def execute_voice_action(oid: str, message: dict, name: str, args: dict) -> str:
         "book_appointment": book_appointment,
         "lookup_catalog_item": lookup_catalog_item,
         "submit_order_request": submit_order_request,
+        "capture_order_request": capture_order_request,
+        "request_appointment": request_appointment,
     }
     if name not in handlers:
         if isinstance(name, str) and name.startswith("api_"):

@@ -6231,7 +6231,7 @@ window.studioLoadCatalog=async()=>{
  }
  if(!orders)orderBox.textContent="Could not load order requests.";
  else orderBox.innerHTML=orders.length?orders.map(o=>
-  '<div class="cp-studio-product"><div><strong>'+esc(o.quantity)+' × '+esc(o.sku)+'</strong><p>'+esc(o.caller_name)+' · '+esc(o.caller_contact)+'</p><p>'+esc(o.status)+' · '+esc(new Date(o.created_at).toLocaleDateString())+'</p></div><span class="pill">Staff review</span></div>'
+  '<div class="cp-studio-product"><div><strong>'+(o.product_text?esc(o.product_text):esc(o.quantity)+' × '+esc(o.sku))+'</strong>'+(o.details?'<p>'+esc(o.details)+'</p>':'')+'<p>'+esc(o.caller_name)+' · '+esc(o.caller_contact)+'</p><p>'+esc(o.status)+' · '+esc(new Date(o.created_at).toLocaleDateString())+'</p></div><span class="pill">Staff review</span></div>'
  ).join(""):'<p class="muted">No pending order requests. Approved catalog items can be used by the voice assistant after you enable its tools.</p>';
 };
 window.studioAddProduct=()=>safe(async()=>{

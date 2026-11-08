@@ -208,7 +208,11 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         "book_appointment only after the caller says yes, passing confirmed true. "
         "Never claim the appointment exists until the tool confirms a Google event. "
         if booking_enabled else
-        "You cannot directly book an appointment for this business yet. Do not claim one is booked. "
+        ("If the caller wants an appointment, get the service, the day and time they prefer, their name and number, read it "
+         "back, and call request_appointment. Then say something like 'Absolutely, I have your preferred time. Our team will "
+         "check availability and get back to you to confirm.' Never say it is booked and never mention a calendar. "
+         if lead_enabled else
+         "You cannot directly book an appointment for this business yet. Do not claim one is booked. ")
     )
     catalog_policy=(
         "Use lookup_catalog_item for SKU, stock and product questions. "
@@ -217,7 +221,13 @@ def receptionist_prompt(oid:str,business_name:str,agent_name:str, *, preview=Fal
         if flags.get("voice_catalog_enabled") else
         "Do not claim to check real-time stock because catalog lookup is not enabled. "
     )
+    catalog_orders=bool(flags.get("voice_catalog_enabled"))
     order_policy=(
+        "To take an order, ask for the product, quantity and any size, material, finish, design and pickup or delivery "
+        "preference the product needs, one question at a time and skipping anything already said. Read the order back, ask "
+        "if it is right, and only after a yes call capture_order_request with confirmed true. Then say the team will "
+        "confirm it, because it is not paid or final until they do. Never say the order was placed, accepted or paid. "
+        if flags.get("voice_order_requests_enabled") and not catalog_orders else
         "For customer orders, you may submit a REQUEST for staff approval, not a completed purchase. "
         "Ask for product SKU, quantity, name and contact, read the details back and ask explicitly "
         "for consent to submit. Only then call submit_order_request with confirmed true. "

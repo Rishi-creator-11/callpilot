@@ -126,7 +126,7 @@ def archive_catalog_item(oid: str, iid: uuid.UUID,user=Depends(current_user)):
 @router.get("/orders/requests")
 def order_requests(oid: str,user=Depends(current_user)):
     role = membership(oid, user)
-    columns = "id,sku,quantity,caller_name,caller_contact,status,created_at"
+    columns = "id,sku,product_text,details,quantity,caller_name,caller_contact,status,created_at"
     if role in ("owner", "admin"):
         columns += ",checkout_state"
     return api("order_requests",params={"organization_id":"eq."+oid,
