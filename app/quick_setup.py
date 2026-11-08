@@ -533,15 +533,21 @@ def category_overviews(products, pricing_on: bool) -> list[tuple]:
     return entries
 
 
-def add_keyterms(workspace: str, names: list[str]) -> None:
-    """Teach the speech recognizer the product names, keeping any terms the owner already added."""
+def add_keyterms(workspace: str, names: list[str], categories: list[str] | tuple = ()) -> None:
+    """Teach the speech recognizer category and product names, keeping terms the owner added themselves.
+
+    Categories come first (callers say "business cards" far more often than a specific product name),
+    then the owner's own terms, then product names, up to the 25 the recognizer accepts.
+    """
     try:
         rows = api("agent_configs", params={"organization_id": "eq." + workspace, "select": "speech_keyterms", "limit": 1})
-        terms = list((rows[0].get("speech_keyterms") if rows else None) or [])
-        known = {term.casefold() for term in terms}
-        for name in names:
-            term = _squash(name)[:64]
-            if 2 <= len(term) and term.casefold() not in known and len(terms) < 25:
+        existing = list((rows[0].get("speech_keyterms") if rows else None) or [])
+        product_names = {_squash(name).casefold() for name in names}
+        owner_terms = [t for t in existing if t.casefold() not in product_names]
+        terms, known = [], set()
+        for raw in [*categories, *owner_terms, *names]:
+            term = _squash(raw)[:64]
+            if len(term) >= 2 and term.casefold() not in known and len(terms) < 25:
                 known.add(term.casefold())
                 terms.append(term)
         api("agent_configs", "PATCH", params={"organization_id": "eq." + workspace}, data={"speech_keyterms": terms}, prefer="return=minimal")
@@ -623,7 +629,8 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
         saved_products = sum(1 for e in entries[:published] if e[2] == "product")  # category overviews are counted separately
         saved_policies = sum(1 for e in entries[:published] if e[2] == "policy")
         saved_prices = saved_prices or (saved_products if pricing_on else 0)
-        add_keyterms(workspace, [item.name for item in body.products])
+        add_keyterms(workspace, [item.name for item in body.products],
+                     list(dict.fromkeys(_squash(item.category) for item in body.products if _squash(item.category))))
     return {"overview_saved": True, "prices_saved": saved_prices, "prices_enabled": bool(saved_prices),
             "products_saved": saved_products, "policies_saved": saved_policies,
             "faqs_saved": sum(1 for e in entries[:published] if e[2] == "faq") if (body.products or body.policies or body.faqs) else 0}

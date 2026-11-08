@@ -877,6 +877,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <div id="qsKnowTest" class="qs-knowtest" hidden>
    <h4>What your agent knows</h4>
    <p id="qsKnowSummary" role="status"></p>
+   <button type="button" id="qsKnowAgain" class="secondary">Test again</button>
    <details id="qsKnowMisses" hidden><summary>Questions it missed</summary><ul id="qsKnowList" class="qs-list"></ul></details>
   </div>
   <h3>What should your agent do?</h3>
@@ -3772,6 +3773,12 @@ async function qsRunKnowledgeTest(oid){
   $("qsKnowMisses").hidden=!r.results.length;
  }catch(e){summary.textContent="We could not run the knowledge test: "+e.message}
 }
+$("qsKnowAgain").addEventListener("click",event=>{
+ const button=event.currentTarget;
+ if(button.disabled)return;
+ button.disabled=true;
+ qsRunKnowledgeTest(organization()).finally(()=>{button.disabled=false});
+});
 $("qsBack2").addEventListener("click",()=>qsShow("R"));
 $("qsBuild").addEventListener("click",async event=>{
  const button=event.currentTarget,oid=organization();

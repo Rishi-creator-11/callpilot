@@ -410,7 +410,7 @@ def test_product_names_become_speech_keywords_without_losing_the_owners_terms(mo
         return []
 
     monkeypatch.setattr(mod, "api", api)
-    mod.add_keyterms("w", ["Business Cards", "metro", "Flyers", "x", "Flyers"] + ["Product %d" % i for i in range(40)])
+    mod.add_keyterms("w", ["Business Cards", "Flyers", "x", "Flyers"] + ["Product %d" % i for i in range(40)])
     terms = patches[0]["speech_keyterms"]
     assert terms[:2] == ["Metro", "metroprint"] and "Business Cards" in terms and "Flyers" in terms
     assert len(terms) == 25 and len({t.casefold() for t in terms}) == 25 and "x" not in terms
@@ -520,3 +520,14 @@ def test_saving_replaces_the_unapproved_raw_copy_of_the_website(make, monkeypatc
     monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: deletions.append((table, params)) if method == "DELETE" and table == "knowledge_documents" and "source_url" in (params or {}) else inner(table, method, params=params, **kw))
     client.post(URL + "/knowledge", json={"overview": "We print business cards and flyers for shops.", "source_url": "https://shop.example.com/"})
     assert deletions == [("knowledge_documents", {"organization_id": "eq.00000000-0000-0000-0000-00000000000a", "source_url": "eq.https://shop.example.com/", "approved_at": "is.null"})]
+
+
+def test_category_names_get_speech_keyword_priority_over_individual_products(monkeypatch):
+    store = {"speech_keyterms": ["Flags", "Menus", "Metro"]}
+    patches = []
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, data=None, **kw: [dict(store)] if method == "GET" else patches.append(data) or [])
+    products = ["Flags", "Menus"] + ["Product %d" % i for i in range(40)]
+    mod.add_keyterms("w", products, ["Business Cards", "Print Materials"])
+    terms = patches[0]["speech_keyterms"]
+    assert terms[:3] == ["Business Cards", "Print Materials", "Metro"] and len(terms) == 25
+    assert terms.count("Flags") == 1 or "Flags" in terms
