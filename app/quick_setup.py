@@ -645,8 +645,8 @@ _test_hits: deque = deque()
 def test_cases(facts: list[dict], pricing_on: bool) -> list[dict]:
     cases = []
     products = [f for f in facts if f["question"].startswith("Tell me about ")]
-    step = max(1, len(products) // 24)
-    for fact in products[::step][:24]:
+    step = max(1, len(products) // 10)
+    for fact in products[::step][:10]:
         name = fact["question"][len("Tell me about "):].split(".")[0].strip()
         if not name:
             continue
@@ -666,7 +666,7 @@ def test_cases(facts: list[dict], pricing_on: bool) -> list[dict]:
     for fact in plain[:20]:
         cases.append({"question": fact["question"], "expect": _squash(fact["answer"])[:28].casefold(), "group": "faq"})
     cases.append({"question": "Do you sell live elephants?", "expect": "don't have verified information", "group": "unknown"})
-    return cases[:90]
+    return cases[:60]
 
 
 def run_case(workspace: str, case: dict) -> dict:
@@ -678,30 +678,32 @@ def run_case(workspace: str, case: dict) -> dict:
     return {**case, "answer": answer[:200], "passed": case["expect"] in answer.casefold().replace("’", "'")}
 
 
+class SelfTest(BaseModel):
+    offset: int = Field(default=0, ge=0, le=500)
+    limit: int = Field(default=10, ge=1, le=12)
+
+
 @router.post("/self-test")
-def self_test(oid: UUID, user=Depends(current_user)):
+def self_test(oid: UUID, body: SelfTest | None = None, user=Depends(current_user)):
+    """Run a slice of the knowledge test. The page calls this repeatedly so progress is visible and no request runs long."""
+    body = body or SelfTest()
     workspace = str(oid)
     membership(workspace, user, ("owner", "admin"))
-    now = monotonic()
-    with _analyze_lock:
-        while _test_hits and _test_hits[0][0] <= now - 3600:
-            _test_hits.popleft()
-        if sum(1 for _, who in _test_hits if who == workspace) >= 10:
-            raise HTTPException(429, "Please wait a little before testing again.")
-        _test_hits.append((now, workspace))
+    if body.offset == 0:
+        now = monotonic()
+        with _analyze_lock:
+            while _test_hits and _test_hits[0][0] <= now - 3600:
+                _test_hits.popleft()
+            if sum(1 for _, who in _test_hits if who == workspace) >= 10:
+                raise HTTPException(429, "Please wait a little before testing again.")
+            _test_hits.append((now, workspace))
     from app.account import tenant_prices_enabled
     facts = api("knowledge_facts", params={"organization_id": "eq." + workspace, "approved_at": "not.is.null",
                                            "select": "question,answer", "order": "created_at.asc", "limit": 400})
     cases = test_cases(facts, tenant_prices_enabled(workspace))
-    if not cases:
-        return {"total": 0, "passed": 0, "results": [], "groups": {}}
+    window = cases[body.offset:body.offset + body.limit]
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=6) as pool:
-        results = list(pool.map(lambda case: run_case(workspace, case), cases))
-    groups: dict[str, dict] = {}
-    for item in results:
-        g = groups.setdefault(item["group"], {"passed": 0, "total": 0})
-        g["total"] += 1
-        g["passed"] += int(item["passed"])
-    return {"total": len(results), "passed": sum(1 for r in results if r["passed"]), "groups": groups,
-            "results": [r for r in results if not r["passed"]][:25]}
+        results = list(pool.map(lambda case: run_case(workspace, case), window))
+    end = body.offset + len(window)
+    return {"total": len(cases), "offset": body.offset, "next_offset": end if end < len(cases) else None, "results": results}

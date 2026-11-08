@@ -490,16 +490,35 @@ def test_scoring_marks_answers_that_contain_what_was_expected(monkeypatch):
     assert mod.run_case("w", {"question": "Do you sell live elephants?", "expect": "don't have verified information", "group": "unknown"})["passed"] is True
 
 
-def test_the_self_test_endpoint_reports_a_score_and_only_the_misses(make, monkeypatch):
+def test_the_self_test_runs_in_slices_with_a_total_and_a_next_offset(make, monkeypatch):
     make()
     inner = mod.api
     monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: FACTS if table == "knowledge_facts" else inner(table, method, params=params, **kw))
     monkeypatch.setattr(mod, "_test_hits", mod.deque())
     monkeypatch.setattr("app.account.tenant_prices_enabled", lambda oid: False)
-    monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": "Flyers. We offer Flyers, categories. Within one business day. Options. I don’t have verified information about that." if "elephants" in question or "Flyers" in question or "sell" in question or "have" in question else "nothing"})
-    result = client.post(URL + "/self-test").json()
-    assert result["total"] > 5 and 0 < result["passed"] <= result["total"] and set(result["groups"]) >= {"product", "category", "unknown"}
-    assert all(not item["passed"] for item in result["results"])
+    monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": "Flyers. We offer categories. Within one business day. Options. I don’t have verified information about that."})
+    first = client.post(URL + "/self-test", json={"offset": 0, "limit": 4}).json()
+    assert first["total"] > 4 and first["offset"] == 0 and first["next_offset"] == 4 and len(first["results"]) == 4
+    assert {"question", "expect", "group", "answer", "passed"} <= set(first["results"][0])
+    seen, offset = list(first["results"]), first["next_offset"]
+    while offset is not None:
+        page = client.post(URL + "/self-test", json={"offset": offset, "limit": 4}).json()
+        seen += page["results"]
+        offset = page["next_offset"]
+    assert len(seen) == first["total"]
+
+
+def test_only_the_first_slice_counts_toward_the_hourly_test_limit(make, monkeypatch):
+    make()
+    inner = mod.api
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: FACTS if table == "knowledge_facts" else inner(table, method, params=params, **kw))
+    monkeypatch.setattr(mod, "_test_hits", mod.deque())
+    monkeypatch.setattr("app.account.tenant_prices_enabled", lambda oid: False)
+    monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": "x"})
+    for _ in range(10):
+        assert client.post(URL + "/self-test", json={"offset": 0, "limit": 1}).status_code == 200
+    assert client.post(URL + "/self-test", json={"offset": 0, "limit": 1}).status_code == 429
+    assert client.post(URL + "/self-test", json={"offset": 1, "limit": 1}).status_code == 200
 
 
 def test_saving_publishes_faqs_and_strips_amounts_until_prices_are_confirmed(make, monkeypatch):

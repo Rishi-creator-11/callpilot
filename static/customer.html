@@ -3757,21 +3757,29 @@ async function qsRunKnowledgeTest(oid){
  const box=$("qsKnowTest"),summary=$("qsKnowSummary");
  box.hidden=false;$("qsKnowMisses").hidden=true;
  summary.textContent="Testing what your agent knows with real caller questions…";
+ const all=[];
  try{
-  const r=await request("/organizations/"+oid+"/quick-setup/self-test","POST");
-  if(oid!==organization())return;
-  if(!r.total){summary.textContent="Nothing to test yet.";return}
+  let offset=0,total=0;
+  while(offset!==null){
+   const r=await request("/organizations/"+oid+"/quick-setup/self-test","POST",{offset,limit:10});
+   if(oid!==organization())return;
+   total=r.total;all.push(...r.results);offset=r.next_offset;
+   if(total)summary.textContent="Testing what your agent knows… "+all.length+" of "+total+" questions asked.";
+  }
+  if(!total){summary.textContent="Nothing to test yet.";return}
+  const groups={};
+  for(const item of all){const g=groups[item.group]||(groups[item.group]={passed:0,total:0});g.total++;g.passed+=item.passed?1:0}
   const names={product:"products",options:"sizes and options",price:"prices",category:"what you sell",faq:"your FAQs and policies",unknown:"things you do not sell"};
-  const parts=Object.entries(r.groups).map(([g,v])=>(names[g]||g)+" "+v.passed+"/"+v.total).join(" · ");
-  summary.textContent="Your agent answered "+r.passed+" of "+r.total+" test questions correctly. "+parts+".";
+  const passed=all.filter(i=>i.passed).length;
+  summary.textContent="Your agent answered "+passed+" of "+all.length+" test questions correctly. "+Object.entries(groups).map(([g,v])=>(names[g]||g)+" "+v.passed+"/"+v.total).join(" · ")+".";
   const list=$("qsKnowList");list.replaceChildren();
-  for(const miss of r.results){
+  for(const miss of all.filter(i=>!i.passed)){
    const li=document.createElement("li");
    li.textContent="“"+miss.question+"” → "+(miss.answer||"(no answer)");
    list.append(li);
   }
-  $("qsKnowMisses").hidden=!r.results.length;
- }catch(e){summary.textContent="We could not run the knowledge test: "+e.message}
+  $("qsKnowMisses").hidden=!list.children.length;
+ }catch(e){summary.textContent="We could not finish the knowledge test: "+e.message}
 }
 $("qsKnowAgain").addEventListener("click",event=>{
  const button=event.currentTarget;
