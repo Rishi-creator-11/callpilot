@@ -155,3 +155,51 @@ def test_listing_follows_pages(monkeypatch):
     pages = {None: {"data": [1, 2], "next_cursor": "c2", "has_more": True}, "c2": {"data": [3], "next_cursor": None, "has_more": False}}
     monkeypatch.setattr(mod, "call", lambda method, path, **kw: pages[(kw.get("params") or {}).get("cursor")])
     assert mod.listing("/knowledge", "biz") == [1, 2, 3]
+
+
+MENU = """Dinner Menu
+Appetizers & Small Plates
+Duck Croquettes
+Duck Confit, Green Garlic
+21
+Jumbo Lump Crab Cake
+Harissa Aioli & Preserved Citrus
+27
+Daily Crudo MP
+Satis Signatures
+Truffle-Roasted Organic Half Chicken
+Fava Beans, Morels
+35
+Closing events text that has no price
+"""
+
+
+def test_menu_parser_reads_sections_dishes_and_market_price():
+    from app.menu import parse, answers
+    sections = parse(MENU)
+    assert [s["name"] for s in sections] == ["Dinner Menu Appetizers & Small Plates", "Satis Signatures"] or [s["name"] for s in sections][-1] == "Satis Signatures"
+    items = {i["name"]: i["price"] for s in sections for i in s["items"]}
+    assert items["Jumbo Lump Crab Cake"] == "$27" and items["Duck Croquettes"] == "$21"
+    assert items["Daily Crudo"] == "market price" and items["Truffle-Roasted Organic Half Chicken"] == "$35"
+    faq = dict(answers("Dinner menu", sections))
+    assert faq["How much is the jumbo lump crab cake?"].startswith("The Jumbo Lump Crab Cake is $27.")
+    assert "ask the team" in faq["How much is the daily crudo?"]
+
+
+def test_menu_import_is_idempotent_and_rejects_text_without_prices(monkeypatch):
+    saved = {}
+    def fake(method, path, **kw):
+        if method == "GET" and path == "/knowledge":
+            return {"data": [{"id": k, "title": k, "content": v} for k, v in saved.items()], "next_cursor": None, "has_more": False}
+        if method == "POST":
+            saved[kw["body"]["question"]] = kw["body"]["answer"]
+        return {"data": {}}
+    monkeypatch.setattr(mod, "call", fake)
+    monkeypatch.setattr(mod, "require_link", lambda o: {"business_id": "biz"})
+    monkeypatch.setattr(mod, "membership", lambda *a, **k: "owner")
+    first = mod.import_menu(W1, mod.Menu(title="Dinner menu", text=MENU), {"id": "u"})
+    again = mod.import_menu(W1, mod.Menu(title="Dinner menu", text=MENU), {"id": "u"})
+    assert first["added"] > 0 and again["added"] == 0 and again["updated"] == 0
+    with pytest.raises(HTTPException) as e:
+        mod.import_menu(W1, mod.Menu(title="Dinner menu", text="We serve food. Come visit us any day of the week."), {"id": "u"})
+    assert e.value.status_code == 422

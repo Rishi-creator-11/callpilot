@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from app.account import current_user, membership
 from app.calendar import cipher
 from app.cloud import api, org_or_404
+from app.menu import answers, parse
 
 router = APIRouter(tags=["lobbystack"])
 log = logging.getLogger("callpilot")
@@ -184,6 +185,11 @@ class Style(BaseModel):
     voice: str | None = Field(default=None, pattern="^[a-z]{3,12}$")
     voice_instructions: str | None = Field(default=None, max_length=3000)
     business_name: str | None = Field(default=None, min_length=2, max_length=120)
+
+
+class Menu(BaseModel):
+    title: str = Field(min_length=2, max_length=60)
+    text: str = Field(min_length=20, max_length=30000)
 
 
 class Reschedule(BaseModel):
@@ -355,6 +361,33 @@ def calls(oid: str, user=Depends(current_user)):
     membership(oid, user)
     rows = call("GET", "/calls", business=require_link(oid)["business_id"], params={"limit": 20}).get("data", [])
     return {"calls": [{k: row.get(k) for k in SUMMARY_FIELDS} for row in rows]}
+
+
+@router.post("/api/account/organizations/{oid}/lobbystack/menu")
+def import_menu(oid: str, body: Menu, user=Depends(current_user)):
+    """Save pasted menu text as one exact answer per dish and one spoken list per section. Safe to repeat."""
+    writer(oid, user)
+    biz = require_link(oid)["business_id"]
+    sections = parse(body.text)
+    pairs = answers(body.title, sections)
+    if not pairs:
+        raise HTTPException(422, "No dishes with prices were found. Paste each dish's name, then its price on its own line.")
+    if len(pairs) > 120:
+        raise HTTPException(422, "That menu is too long to import at once. Paste one section at a time.")
+    existing = {}
+    for entry in listing("/knowledge", biz):
+        if entry.get("title") and entry["title"] not in existing:
+            existing[entry["title"]] = entry
+    added = updated = 0
+    for question, answer in pairs:
+        found = existing.get(question)
+        if found is None:
+            call("POST", "/knowledge", business=biz, body={"type": "faq", "question": question, "answer": answer})
+            added += 1
+        elif found.get("content") != answer:
+            call("PATCH", "/knowledge/%s" % found["id"], business=biz, body={"content": answer})
+            updated += 1
+    return {"sections": [{"name": sec["name"], "dishes": len(sec["items"])} for sec in sections], "added": added, "updated": updated}
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/calendar/connect")
