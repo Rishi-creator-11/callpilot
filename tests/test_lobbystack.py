@@ -122,3 +122,36 @@ def test_missing_platform_key_is_a_clear_503(monkeypatch):
     with pytest.raises(HTTPException) as e:
         mod.call("GET", "/me")
     assert e.value.status_code == 503
+
+
+def test_apply_profile_removes_duplicates_updates_prices_and_never_duplicates(monkeypatch):
+    log = []
+    knowledge = [{"id": "a", "title": "How much is a haircut and how long does it take?"},
+                 {"id": "b", "title": "How much is a haircut and how long does it take?"}]
+
+    def fake(method, path, **kw):
+        log.append((method, path))
+        if method == "GET" and path == "/knowledge":
+            return {"data": list(knowledge), "next_cursor": None, "has_more": False}
+        if method == "GET" and path == "/services":
+            return {"data": [{"id": "s1", "name": "Haircut", "description": "old", "duration_minutes": 20}]}
+        if path.startswith("/services/"):
+            return {"data": {"id": "s1", "name": "Haircut", "duration_minutes": 20}}
+        return {"data": {}}
+
+    monkeypatch.setattr(mod, "call", fake)
+    monkeypatch.setattr(mod, "require_link", lambda o: {"business_id": "biz"})
+    monkeypatch.setattr(mod, "membership", lambda *a, **k: "owner")
+    body = mod.Profile(services=[mod.ServiceIn(name="Haircut", duration_minutes=20, price_text="$40")], booking_mode="instant")
+    result = mod.apply_profile(W1, body, {"id": "u"})
+    assert result["duplicates_removed"] == 1 and result["duplicates_left"] == 0
+    assert ("DELETE", "/knowledge/b") in log and ("DELETE", "/knowledge/a") not in log
+    assert ("PATCH", "/services/s1") in log
+    assert ("POST", "/knowledge") in log  # only the price list is new; the haircut FAQ already exists
+    assert sum(1 for m_, p_ in log if (m_, p_) == ("POST", "/knowledge")) == 1
+
+
+def test_listing_follows_pages(monkeypatch):
+    pages = {None: {"data": [1, 2], "next_cursor": "c2", "has_more": True}, "c2": {"data": [3], "next_cursor": None, "has_more": False}}
+    monkeypatch.setattr(mod, "call", lambda method, path, **kw: pages[(kw.get("params") or {}).get("cursor")])
+    assert mod.listing("/knowledge", "biz") == [1, 2, 3]

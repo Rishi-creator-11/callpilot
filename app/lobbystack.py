@@ -291,12 +291,12 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
         made.append({"id": saved["id"], "name": saved["name"], "duration_minutes": saved["duration_minutes"], "price": item.price_text})
     if body.services:
         menu = "; ".join("%s %s (%s min)" % (i.name, i.price_text, i.duration_minutes) for i in body.services)
-        listing = "Here is our full price list: " + menu + "."
+        price_list = "Here is our full price list: " + menu + "."
         key = "What are your prices?"
         if key in existing:
-            call("PATCH", "/knowledge/%s" % existing[key], business=biz, body={"content": listing})
+            call("PATCH", "/knowledge/%s" % existing[key], business=biz, body={"content": price_list})
         else:
-            call("POST", "/knowledge", business=biz, body={"type": "faq", "question": key, "answer": listing})
+            call("POST", "/knowledge", business=biz, body={"type": "faq", "question": key, "answer": price_list})
     if body.hours:
         call("PATCH", "/business", business=biz, body={"hours": [h.model_dump() for h in body.hours]})
     call("PATCH", "/receptionist", business=biz, body={"booking_mode": body.booking_mode})
