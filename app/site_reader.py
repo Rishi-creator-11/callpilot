@@ -230,6 +230,54 @@ def advertised_prices(text: str) -> tuple[dict, dict]:
     return by_description, by_name
 
 
+def extract_faqs(text: str) -> list[dict]:
+    """Question lines followed by their answer, as callers will ask them."""
+    lines = [clean(line) for line in text.splitlines() if clean(line)]
+    faqs, seen = [], set()
+    for i, line in enumerate(lines):
+        if not (line.endswith("?") and 8 <= len(line) <= 160) or line.casefold() in seen:
+            continue
+        if re.match(r"(ready (to|when)|have .{0,30}already|want to|looking for|need help|start your)", line, re.I):
+            continue  # calls to action, not questions callers ask
+        answer = []
+        for follow in lines[i + 1:i + 6]:
+            if follow.endswith("?") or (len(follow) <= 40 and not follow.endswith((".", "!"))) or len(" ".join(answer)) > 700:
+                break
+            answer.append(follow)
+        text_answer = clean(" ".join(answer), 800)
+        if len(text_answer) >= 25:
+            seen.add(line.casefold())
+            faqs.append({"question": line, "answer": text_answer})
+    return faqs[:20]
+
+
+_PHRASE = re.compile(r"((?:packages|plans|projects|starting)\s+(?:from|at)\s+|from\s+)?(\$\s*\d[\d,]*(?:\.\d{1,2})?)(\s*/\s*[A-Za-z]+)?", re.I)
+
+
+def price_phrases(text: str, products: list[dict]) -> None:
+    """Prices with units or wording ('$75/hr', 'Packages from $499') the product record does not carry."""
+    lines = [clean(line) for line in text.splitlines() if clean(line)]
+    for line in lines:
+        lowered = line.casefold()
+        for product in products:
+            name = product["name"].casefold()
+            if not lowered.startswith(name):
+                continue
+            matches = list(_PHRASE.finditer(line))
+            if not matches:
+                continue
+            prefix, amount, unit = matches[-1].groups()
+            amount = re.sub(r"\s+", "", amount) + re.sub(r"\s+", "", unit or "")
+            if not unit and not (prefix and prefix.strip().lower().split()[0] in {"packages", "plans", "projects"}):
+                continue
+            wording = (prefix or "Starting at ").strip().capitalize() + " "
+            if wording.lower().startswith("from"):
+                wording = "From "
+            product["from_price"] = amount
+            product["price_note"] = f"{wording}{amount}. " + re.sub(r"^Starting at \$[\d,.]+\.\s*", "", product["price_note"]).strip()
+            product["price_note"] = product["price_note"].strip()
+
+
 # ------------------------------------------------------------------ discovery and crawling
 def page_kind(path: str) -> str:
     if path in ("", "/"):
@@ -367,6 +415,8 @@ def read_site(raw_url: str, *, max_pages: int = MAX_PAGES, budget: float = BUDGE
             product["from_price"] = price
             product["price_note"] = (f"Starting at {price}. " + note).strip()
     texts = "\n".join(page["text"] for page in pages if page["kind"] in ("home", "key"))
+    price_phrases(texts, products)
+    faqs = extract_faqs(texts)
     contact_text = "\n".join(page["text"] for page in pages if "contact" in page["path"].lower()) or texts
     link_blob = " ".join(href for page in pages[:3] for href, _ in page["links"])
     emails = list(dict.fromkeys(EMAIL.findall(contact_text + " " + link_blob)))
@@ -380,6 +430,6 @@ def read_site(raw_url: str, *, max_pages: int = MAX_PAGES, budget: float = BUDGE
         "pages": [{"url": p["url"], "title": p["title"], "kind": p["kind"], "chars": len(p["text"])} for p in pages],
         "text": {kind: "\n".join(f"{p['title']}\n{p['text']}" for p in pages if p["kind"] == kind) for kind in ("home", "key", "policy")},
         "products": products[:MAX_PRODUCTS], "email": emails[0] if emails else "", "phone": phones[0] if phones else "",
-        "hours": hours, "policies": policies[:8],
+        "hours": hours, "policies": policies[:8], "faqs": faqs,
         "stats": {"pages_read": len(pages), "products": len(products), "seconds": round(time.monotonic() - started, 1)},
     }

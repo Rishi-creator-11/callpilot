@@ -141,6 +141,8 @@ body.ta-open{overflow:hidden}
 #channelShare .cp-panel-heading{display:none}
 .qs-plist{display:grid;gap:8px;max-height:340px;overflow:auto;margin:8px 0 14px;padding-right:4px}
 .qs-plist .qs-goal{padding:10px 14px;font-weight:500;font-size:14px}
+.qs-knowtest{border:1px solid var(--cp-border);border-radius:14px;padding:14px 16px;margin:0 0 16px;background:#f6f8fa}
+.qs-knowtest h4{margin:0 0 6px}.qs-knowtest p{margin:0 0 6px}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
@@ -852,6 +854,11 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
    <label class="cp-studio-check"><input id="qsProductsAll" type="checkbox" checked> Include everything</label>
    <div id="qsProducts" class="qs-plist"></div>
   </div>
+  <div id="qsFaqsBox" hidden>
+   <h4 id="qsFaqsTitle">Questions we found</h4>
+   <p class="muted">Your agent will answer these the way your website does.</p>
+   <div id="qsFaqs" class="qs-plist"></div>
+  </div>
   <div id="qsPoliciesBox" hidden>
    <h4>Policies we found</h4>
    <div id="qsPolicies" class="qs-plist"></div>
@@ -867,6 +874,11 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <p id="qsStatusR" role="status" class="muted"></p>
  </div>
  <div id="qsStep2" class="cp-section-box" hidden>
+  <div id="qsKnowTest" class="qs-knowtest" hidden>
+   <h4>What your agent knows</h4>
+   <p id="qsKnowSummary" role="status"></p>
+   <details id="qsKnowMisses" hidden><summary>Questions it missed</summary><ul id="qsKnowList" class="qs-list"></ul></details>
+  </div>
   <h3>What should your agent do?</h3>
   <p>Pick everything that applies. You can change this any time.</p>
   <div id="qsGoals" class="qs-goals" role="group" aria-label="Agent abilities"></div>
@@ -3526,7 +3538,7 @@ $("capiSync").addEventListener("click",async event=>{
 const QS_ICONS={info:"💬",messages:"📝",quotes:"🧾",orders:"📦",booking:"📅",transfer:"📞"};
 const QS_HELP={info:"Answer questions about your business",messages:"Take messages and capture leads",quotes:"Collect the details for a quote",
  orders:"Take order requests for your team to review",booking:"Book appointments on your calendar",transfer:"Connect callers to a person"};
-let qsProductList=[],qsPolicyList=[];
+let qsProductList=[],qsPolicyList=[],qsFaqList=[],qsSourceUrl="";
 let qsGoals=new Set(["info","messages"]),qsSource=null,qsRecognition=null,qsKind=null,qsSubtype=null,qsInfo={kinds:{},presets:{}};
 const qsKey=oid=>"callpilot.qs."+oid;
 function qsShow(step){
@@ -3622,7 +3634,7 @@ async function qsAnalyze(payload,status){
   input.addEventListener("change",()=>label.classList.toggle("on",input.checked));
   text.textContent=price.item+" — "+price.price_text;label.append(input,text);list.append(label);
  }
-  qsProductList=r.products||[];qsPolicyList=r.policy_pages||[];
+  qsProductList=r.products||[];qsPolicyList=r.policy_pages||[];qsFaqList=r.faqs||[];qsSourceUrl=r.source_url||"";
  const rows=(items,box,render,key)=>{
   box.replaceChildren();
   items.forEach((item,index)=>{
@@ -3634,6 +3646,8 @@ async function qsAnalyze(payload,status){
  };
  rows(qsProductList,$("qsProducts"),p=>p.name+(p.from_price?" — from "+p.from_price:"")+(p.category?" · "+p.category:"")+(p.options?" · "+p.options+" options":""));
  rows(qsPolicyList,$("qsPolicies"),p=>p.title);
+ rows(qsFaqList,$("qsFaqs"),f=>f.question);
+ $("qsFaqsBox").hidden=!qsFaqList.length;$("qsFaqsTitle").textContent="Questions we found ("+qsFaqList.length+")";
  $("qsProductsBox").hidden=!qsProductList.length;$("qsPoliciesBox").hidden=!qsPolicyList.length;
  $("qsProductsAll").checked=true;
  $("qsProductsTitle").textContent="Products we found ("+qsProductList.length+")";
@@ -3727,15 +3741,37 @@ $("qsLooksGood").addEventListener("click",async event=>{
  const chosen=(box,list)=>[...box.querySelectorAll("input:checked")].map(i=>list[Number(i.dataset.index)]).filter(Boolean);
  const products=chosen($("qsProducts"),qsProductList).map(p=>({name:p.name,details:p.details,price_note:p.price_note||"",category:p.category||"",from_price:p.from_price||""}));
  const policies=chosen($("qsPolicies"),qsPolicyList).map(p=>({title:p.title,text:p.text}));
+ const faqs=chosen($("qsFaqs"),qsFaqList).map(f=>({question:f.question,answer:f.answer}));
  button.disabled=true;status.textContent="Saving what your agent will know…";
  try{
-  const r=await request("/organizations/"+oid+"/quick-setup/knowledge","POST",{overview,prices,products,policies,prices_confirmed:(prices.length>0||products.some(p=>p.price_note))&&$("qsPricesOk").checked});
+  const r=await request("/organizations/"+oid+"/quick-setup/knowledge","POST",{overview,prices,products,policies,faqs,source_url:qsSourceUrl||null,prices_confirmed:(prices.length>0||products.some(p=>p.price_note))&&$("qsPricesOk").checked});
   if(oid!==organization())return;
   status.textContent="";qsShow(2);
+  if(r.products_saved||r.faqs_saved||r.policies_saved)void qsRunKnowledgeTest(oid);
   $("qsStatus2").textContent="Saved."+(r.products_saved?" Your agent now knows "+r.products_saved+" product"+(r.products_saved===1?"":"s")+(r.policies_saved?" and "+r.policies_saved+" polic"+(r.policies_saved===1?"y":"ies"):"")+".":"")+(r.prices_saved&&r.products_saved?" It can quote their prices.":r.prices_saved?" It can quote "+r.prices_saved+" price"+(r.prices_saved===1?"":"s")+".":"");
  }catch(e){status.textContent=e.message}
  finally{button.disabled=false}
 });
+async function qsRunKnowledgeTest(oid){
+ const box=$("qsKnowTest"),summary=$("qsKnowSummary");
+ box.hidden=false;$("qsKnowMisses").hidden=true;
+ summary.textContent="Testing what your agent knows with real caller questions…";
+ try{
+  const r=await request("/organizations/"+oid+"/quick-setup/self-test","POST");
+  if(oid!==organization())return;
+  if(!r.total){summary.textContent="Nothing to test yet.";return}
+  const names={product:"products",options:"sizes and options",price:"prices",category:"what you sell",faq:"your FAQs and policies",unknown:"things you do not sell"};
+  const parts=Object.entries(r.groups).map(([g,v])=>(names[g]||g)+" "+v.passed+"/"+v.total).join(" · ");
+  summary.textContent="Your agent answered "+r.passed+" of "+r.total+" test questions correctly. "+parts+".";
+  const list=$("qsKnowList");list.replaceChildren();
+  for(const miss of r.results){
+   const li=document.createElement("li");
+   li.textContent="“"+miss.question+"” → "+(miss.answer||"(no answer)");
+   list.append(li);
+  }
+  $("qsKnowMisses").hidden=!r.results.length;
+ }catch(e){summary.textContent="We could not run the knowledge test: "+e.message}
+}
 $("qsBack2").addEventListener("click",()=>qsShow("R"));
 $("qsBuild").addEventListener("click",async event=>{
  const button=event.currentTarget,oid=organization();

@@ -304,6 +304,10 @@ class Understanding(BaseModel):
     prices: list[PriceItem] = Field(default_factory=list, max_length=20)
 
 
+def clean_tagline(line: str) -> str:
+    return " · ".join(part.strip() for part in _squash(line).split("·") if part.strip() and not MONEY.search(part))[:200]
+
+
 def _squash(text: str) -> str:
     return " ".join(str(text).split())
 
@@ -383,6 +387,8 @@ def overview_text(data: dict) -> str:
         lines.append("Service: " + service["name"] + detail)
     for policy in data.get("policies", []):
         lines.append("Good to know: " + policy)
+    if data.get("highlights"):
+        lines.append("What customers can count on: " + data["highlights"] + ".")
     for label, key in (("Hours", "hours"), ("Phone", "phone"), ("Email", "email"), ("Address", "address")):
         if data.get(key):
             lines.append(label + ": " + data[key])
@@ -448,15 +454,19 @@ def analyze(oid: UUID, body: Analyze, user=Depends(current_user)):
         products = [{"name": p["name"], "category": p["category"], "from_price": p["from_price"], "details": p["details"],
                      "price_note": p["price_note"], "options": sum(len(o["values"]) for o in p["options"])} for p in site["products"]]
         policies = [{"title": item["title"], "text": item["text"]} for item in site["policies"]]
+        faqs = [{"question": f["question"], "answer": f["answer"]} for f in site.get("faqs", [])]
+        tagline = next((line for line in site["text"]["home"].splitlines() if line.count("·") >= 2 and len(line) < 160), "")
+        if tagline:
+            data["highlights"] = clean_tagline(tagline)
         stats = site["stats"]
     else:
         data = llm_understanding(text, kind, subtype) or deterministic_understanding(text)
         data["prices"] = verified_prices(data.get("prices", []), text)
-        products, policies, stats = [], [], None
+        products, policies, faqs, stats = [], [], [], None
     if not data.get("summary"):
         data["summary"] = deterministic_understanding(text)["summary"]
     return {"understanding": data, "overview": overview_text(data), "source_url": source_url,
-            "products": products, "policy_pages": policies, "stats": stats}
+            "products": products, "policy_pages": policies, "faqs": faqs, "stats": stats}
 
 
 class PriceChoice(BaseModel):
@@ -477,12 +487,19 @@ class PolicyChoice(BaseModel):
     text: str = Field(min_length=20, max_length=1800)
 
 
+class FaqChoice(BaseModel):
+    question: str = Field(min_length=8, max_length=300)
+    answer: str = Field(min_length=15, max_length=1200)
+
+
 class SaveKnowledge(BaseModel):
     overview: str = Field(min_length=20, max_length=4000)
     prices: list[PriceChoice] = Field(default_factory=list, max_length=12)
     prices_confirmed: bool = False
     products: list[ProductChoice] = Field(default_factory=list, max_length=120)
     policies: list[PolicyChoice] = Field(default_factory=list, max_length=8)
+    faqs: list[FaqChoice] = Field(default_factory=list, max_length=20)
+    source_url: str | None = Field(default=None, max_length=2048)
 
 
 OVERVIEW_TITLE = "Business overview"
@@ -563,6 +580,9 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
     for row in api("knowledge_documents", params={"organization_id": "eq." + workspace, "title": "eq." + OVERVIEW_TITLE, "select": "id"}):
         api("knowledge_facts", "DELETE", params={"organization_id": "eq." + workspace, "source_document_id": "eq." + row["id"]}, prefer="return=minimal")
         api("knowledge_documents", "DELETE", params={"organization_id": "eq." + workspace, "id": "eq." + row["id"]}, prefer="return=minimal")
+    if body.source_url:  # The unapproved raw copy of this website is replaced by the structured knowledge below.
+        api("knowledge_documents", "DELETE", params={"organization_id": "eq." + workspace, "source_url": "eq." + body.source_url,
+                                                     "approved_at": "is.null"}, prefer="return=minimal")
     doc = create_description(workspace, BusinessDescription(title=OVERVIEW_TITLE, content=body.overview.strip()), user)
     approve_description(workspace, doc["id"], user)
     saved_prices = 0
@@ -579,7 +599,7 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
             fact = create_fact(workspace, FactCreate(question=question, answer=answer), user)
             approve_fact(workspace, fact["id"], user)
             saved_prices += 1
-    if body.products or body.policies:
+    if body.products or body.policies or body.faqs:
         pricing_on = bool(body.prices_confirmed and has_price_notes)
         if pricing_on:
             set_verified_pricing(workspace, PricingCapabilities(enabled=True, owner_confirms_prices_are_verified=True), user)
@@ -591,6 +611,10 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
                         else "Tell me about %s. What options and sizes do you have for %s?") % (item.name.strip(), item.name.strip())
             entries.append((question[:500], answer[:2500], "product"))
         entries += category_overviews(body.products, pricing_on)
+        for item in body.faqs:
+            answer = item.answer if pricing_on else without_money(item.answer)
+            if len(answer) >= 15:
+                entries.append((item.question.strip()[:500], answer[:2400], "faq"))
         for item in body.policies:
             text = without_money(item.text) if not pricing_on else item.text
             if len(text) >= 20:
@@ -601,4 +625,76 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
         saved_prices = saved_prices or (saved_products if pricing_on else 0)
         add_keyterms(workspace, [item.name for item in body.products])
     return {"overview_saved": True, "prices_saved": saved_prices, "prices_enabled": bool(saved_prices),
-            "products_saved": saved_products, "policies_saved": saved_policies}
+            "products_saved": saved_products, "policies_saved": saved_policies,
+            "faqs_saved": sum(1 for e in entries[:published] if e[2] == "faq") if (body.products or body.policies or body.faqs) else 0}
+
+
+# ---------------------------------------------------------------------------------------------
+# Knowledge self-test: ask caller-style questions through the same lookup a call uses, and score them.
+# ---------------------------------------------------------------------------------------------
+_test_hits: deque = deque()
+
+
+def test_cases(facts: list[dict], pricing_on: bool) -> list[dict]:
+    cases = []
+    products = [f for f in facts if f["question"].startswith("Tell me about ")]
+    step = max(1, len(products) // 24)
+    for fact in products[::step][:24]:
+        name = fact["question"][len("Tell me about "):].split(".")[0].strip()
+        if not name:
+            continue
+        cases.append({"question": "Do you do %s?" % name, "expect": name.casefold(), "group": "product"})
+        if "Options —" in fact["answer"]:
+            cases.append({"question": "What sizes and options do you have for %s?" % name, "expect": "options", "group": "options"})
+        if pricing_on and "$" in fact["answer"]:
+            cases.append({"question": "How much are %s?" % name, "expect": "$", "group": "price"})
+    for fact in facts:
+        match = re.match(r"What (.+) do you offer\?", fact["question"])
+        if match:
+            cases.append({"question": "What %s do you have?" % match.group(1), "expect": "we offer", "group": "category"})
+    if any(f["question"].startswith("What do you sell?") for f in facts):
+        cases.append({"question": "What do you guys sell?", "expect": "categories", "group": "category"})
+    plain = [f for f in facts if not f["question"].startswith(("Tell me about ", "What do you sell?"))
+             and not re.match(r"What .+ do you offer\?", f["question"])]
+    for fact in plain[:20]:
+        cases.append({"question": fact["question"], "expect": _squash(fact["answer"])[:28].casefold(), "group": "faq"})
+    cases.append({"question": "Do you sell live elephants?", "expect": "don't have verified information", "group": "unknown"})
+    return cases[:90]
+
+
+def run_case(workspace: str, case: dict) -> dict:
+    from app.account import answer_question
+    try:
+        answer = _squash(answer_question(workspace, case["question"]).get("answer", ""))
+    except HTTPException as exc:
+        answer = "(error: %s)" % exc.detail
+    return {**case, "answer": answer[:200], "passed": case["expect"] in answer.casefold().replace("’", "'")}
+
+
+@router.post("/self-test")
+def self_test(oid: UUID, user=Depends(current_user)):
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    now = monotonic()
+    with _analyze_lock:
+        while _test_hits and _test_hits[0][0] <= now - 3600:
+            _test_hits.popleft()
+        if sum(1 for _, who in _test_hits if who == workspace) >= 10:
+            raise HTTPException(429, "Please wait a little before testing again.")
+        _test_hits.append((now, workspace))
+    from app.account import tenant_prices_enabled
+    facts = api("knowledge_facts", params={"organization_id": "eq." + workspace, "approved_at": "not.is.null",
+                                           "select": "question,answer", "order": "created_at.asc", "limit": 400})
+    cases = test_cases(facts, tenant_prices_enabled(workspace))
+    if not cases:
+        return {"total": 0, "passed": 0, "results": [], "groups": {}}
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(lambda case: run_case(workspace, case), cases))
+    groups: dict[str, dict] = {}
+    for item in results:
+        g = groups.setdefault(item["group"], {"passed": 0, "total": 0})
+        g["total"] += 1
+        g["passed"] += int(item["passed"])
+    return {"total": len(results), "passed": sum(1 for r in results if r["passed"]), "groups": groups,
+            "results": [r for r in results if not r["passed"]][:25]}

@@ -122,3 +122,36 @@ def test_hostile_page_data_cannot_make_parsing_slow_or_crash():
     started = time.monotonic()
     assert sr.product_objects(junk) == []
     assert time.monotonic() - started < 6
+
+
+def test_faqs_are_captured_with_answers_and_calls_to_action_are_skipped():
+    text = ("Questions\nGood to know\nHow fast will my order be ready?\nMost print products move to production within one business day of artwork approval.\n"
+            "Can you design my artwork?\nYes, a designer will contact you within 1 business day.\nThe flat fee is shown before you add to cart.\n"
+            "Ready to start your project?\nSubmit a quote request and our team will follow up with you soon.\nShop online\n")
+    faqs = sr.extract_faqs(text)
+    assert [f["question"] for f in faqs] == ["How fast will my order be ready?", "Can you design my artwork?"]
+    assert "one business day" in faqs[0]["answer"] and "flat fee" in faqs[1]["answer"] and "Shop online" not in faqs[1]["answer"]
+
+
+def test_prices_keep_their_units_and_wording():
+    products = [{"name": "Graphic Design Services", "from_price": "$75", "price_note": "Starting at $75."},
+                {"name": "Branding", "from_price": "$499", "price_note": "Starting at $499."},
+                {"name": "Flyers", "from_price": "$42.49", "price_note": "Starting at $42.49."}]
+    sr.price_phrases("Graphic Design ServicesProfessional design.Starting at $75/hr\nBrandingComplete packages.Packages from $499\nFlyers Eye-catching.From $42.49", products)
+    assert products[0]["from_price"] == "$75/hr" and products[0]["price_note"].startswith("Starting at $75/hr.")
+    assert products[1]["from_price"] == "$499" and products[1]["price_note"].startswith("Packages from $499.")
+    assert products[2]["from_price"] == "$42.49" and products[2]["price_note"] == "Starting at $42.49."
+
+
+def test_inline_elements_no_longer_glue_words_together():
+    page = sr.wi.PageText()
+    page.feed("<html><head><title>T</title></head><body><a href='/x'><span>Business Cards</span><span>Standard, premium cards</span><span>12 products</span></a></body></html>")
+    page.close()
+    assert page.result("x.com")[1] == "Business Cards Standard, premium cards 12 products"
+
+
+def test_accordion_question_buttons_are_kept():
+    page = sr.wi.PageText()
+    page.feed("<html><head><title>T</title></head><body><button>How fast will my order be ready?</button><p>Within one business day of approval.</p></body></html>")
+    page.close()
+    assert "How fast will my order be ready?" in page.result("x.com")[1]

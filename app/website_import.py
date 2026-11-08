@@ -68,7 +68,7 @@ def public_addresses(host, port):
 
 class PageText(HTMLParser):
     SKIP = {"script", "style", "noscript", "svg", "template", "head", "nav", "iframe", "footer", "aside",
-            "form", "button", "select", "option", "dialog"}
+            "form", "select", "option", "dialog"}
     BLOCK = {"p", "div", "br", "li", "section", "article", "h1", "h2", "h3", "h4", "tr"}
 
     def __init__(self):
@@ -91,7 +91,11 @@ class PageText(HTMLParser):
         if not self.skipped and tag in self.BLOCK:
             self.body.append("\n")
 
+    INLINE = {"span", "a", "strong", "b", "em", "i", "small", "label", "td", "th", "button", "time", "cite"}
+
     def handle_endtag(self, tag):
+        if tag in self.INLINE and not self.skipped:
+            self.body.append(" ")
         if tag == "a" and self._link:
             self.links.append((self._link[0], " ".join("".join(self._link[1]).split())))
             self._link = None

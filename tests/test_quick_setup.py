@@ -219,7 +219,7 @@ def test_confirmed_prices_enable_pricing_and_become_approved_facts(make, monkeyp
     body = {"overview": "We print business cards and signs for local shops.", "prices_confirmed": True,
             "prices": [{"item": "Business cards", "price_text": "$24.99"}]}
     result = client.post(URL + "/knowledge", json=body).json()
-    assert result == {"overview_saved": True, "prices_saved": 1, "prices_enabled": True, "products_saved": 0, "policies_saved": 0}
+    assert result == {"overview_saved": True, "prices_saved": 1, "prices_enabled": True, "products_saved": 0, "policies_saved": 0, "faqs_saved": 0}
     assert ("pricing", True) in k.calls and ("fact", "How much is Business cards?", "Business cards: $24.99") in k.calls
 
 
@@ -459,3 +459,64 @@ def test_saving_publishes_category_overviews_too(make, monkeypatch):
     kinds = [kind for _, _, kind in pub.entries]
     assert kinds.count("product") == 2 and kinds.count("category") == 2 and result["products_saved"] == 2
     assert any("Flyers from $42.49" in answer for _, answer, kind in pub.entries if kind == "category")
+
+
+FACTS = [
+    {"question": "Tell me about Flyers. What options, sizes and prices do you have for Flyers?",
+     "answer": "Flyers (Print Materials). Eye-catching. Options — Size: 4x6. Starting at $42.49."},
+    {"question": "Tell me about Banners. What options and sizes do you have for Banners?", "answer": "Banners (Large Format). Strong."},
+    {"question": "What Print Materials do you offer? Tell me about your Print Materials.", "answer": "We offer 2 Print Materials: Flyers, Menus."},
+    {"question": "What do you sell? What products and services do you offer?", "answer": "We offer products and services in these categories: Print Materials (2)."},
+    {"question": "How fast will my order be ready?", "answer": "Most print products move to production within one business day."},
+]
+
+
+def test_test_questions_cover_products_options_prices_categories_faqs_and_unknowns():
+    cases = mod.test_cases(FACTS, pricing_on=True)
+    questions = [c["question"] for c in cases]
+    assert "Do you do Flyers?" in questions and "What sizes and options do you have for Flyers?" in questions
+    assert "How much are Flyers?" in questions and "How much are Banners?" not in questions
+    assert "What Print Materials do you have?" in questions and "What do you guys sell?" in questions
+    assert "How fast will my order be ready?" in questions and "Do you sell live elephants?" in questions
+    assert "How much are Flyers?" not in [c["question"] for c in mod.test_cases(FACTS, pricing_on=False)]
+
+
+def test_scoring_marks_answers_that_contain_what_was_expected(monkeypatch):
+    answers = {"Do you do Flyers?": "Yes, Flyers (Print Materials). Eye-catching.", "How much are Flyers?": "I can take details for a quote instead.",
+               "Do you sell live elephants?": "I don’t have verified information about that."}
+    monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": answers.get(question, "")})
+    assert mod.run_case("w", {"question": "Do you do Flyers?", "expect": "flyers", "group": "product"})["passed"] is True
+    assert mod.run_case("w", {"question": "How much are Flyers?", "expect": "$", "group": "price"})["passed"] is False
+    assert mod.run_case("w", {"question": "Do you sell live elephants?", "expect": "don't have verified information", "group": "unknown"})["passed"] is True
+
+
+def test_the_self_test_endpoint_reports_a_score_and_only_the_misses(make, monkeypatch):
+    make()
+    inner = mod.api
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: FACTS if table == "knowledge_facts" else inner(table, method, params=params, **kw))
+    monkeypatch.setattr(mod, "_test_hits", mod.deque())
+    monkeypatch.setattr("app.account.tenant_prices_enabled", lambda oid: False)
+    monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": "Flyers. We offer Flyers, categories. Within one business day. Options. I don’t have verified information about that." if "elephants" in question or "Flyers" in question or "sell" in question or "have" in question else "nothing"})
+    result = client.post(URL + "/self-test").json()
+    assert result["total"] > 5 and 0 < result["passed"] <= result["total"] and set(result["groups"]) >= {"product", "category", "unknown"}
+    assert all(not item["passed"] for item in result["results"])
+
+
+def test_saving_publishes_faqs_and_strips_amounts_until_prices_are_confirmed(make, monkeypatch):
+    make()
+    pub = Publish(); pub.install(monkeypatch)
+    faqs = [{"question": "Can you design my artwork?", "answer": "Yes. A designer will help. Business cards are $30 flat."}]
+    result = client.post(URL + "/knowledge", json={"overview": "We print business cards and flyers for shops.", "faqs": faqs}).json()
+    assert result["faqs_saved"] == 1
+    question, answer, kind = [e for e in pub.entries if e[2] == "faq"][0]
+    assert question == "Can you design my artwork?" and "$" not in answer and "A designer will help." in answer
+
+
+def test_saving_replaces_the_unapproved_raw_copy_of_the_website(make, monkeypatch):
+    make()
+    pub = Publish(); pub.install(monkeypatch)
+    deletions = []
+    inner = mod.api
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: deletions.append((table, params)) if method == "DELETE" and table == "knowledge_documents" and "source_url" in (params or {}) else inner(table, method, params=params, **kw))
+    client.post(URL + "/knowledge", json={"overview": "We print business cards and flyers for shops.", "source_url": "https://shop.example.com/"})
+    assert deletions == [("knowledge_documents", {"organization_id": "eq.00000000-0000-0000-0000-00000000000a", "source_url": "eq.https://shop.example.com/", "approved_at": "is.null"})]
