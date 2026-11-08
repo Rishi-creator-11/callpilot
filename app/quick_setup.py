@@ -640,6 +640,7 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
 # Knowledge self-test: ask caller-style questions through the same lookup a call uses, and score them.
 # ---------------------------------------------------------------------------------------------
 _test_hits: deque = deque()
+TEST_QUESTIONS_PER_HOUR = 240
 
 
 def test_cases(facts: list[dict], pricing_on: bool) -> list[dict]:
@@ -689,19 +690,19 @@ def self_test(oid: UUID, body: SelfTest | None = None, user=Depends(current_user
     body = body or SelfTest()
     workspace = str(oid)
     membership(workspace, user, ("owner", "admin"))
-    if body.offset == 0:
-        now = monotonic()
-        with _analyze_lock:
-            while _test_hits and _test_hits[0][0] <= now - 3600:
-                _test_hits.popleft()
-            if sum(1 for _, who in _test_hits if who == workspace) >= 10:
-                raise HTTPException(429, "Please wait a little before testing again.")
-            _test_hits.append((now, workspace))
     from app.account import tenant_prices_enabled
     facts = api("knowledge_facts", params={"organization_id": "eq." + workspace, "approved_at": "not.is.null",
                                            "select": "question,answer", "order": "created_at.asc", "limit": 400})
     cases = test_cases(facts, tenant_prices_enabled(workspace))
     window = cases[body.offset:body.offset + body.limit]
+    # Every question asked is charged, so skipping or repeating slices cannot get around the hourly limit.
+    now = monotonic()
+    with _analyze_lock:
+        while _test_hits and _test_hits[0][0] <= now - 3600:
+            _test_hits.popleft()
+        if sum(count for _, who, count in _test_hits if who == workspace) + len(window) > TEST_QUESTIONS_PER_HOUR:
+            raise HTTPException(429, "Please wait a little before testing again.")
+        _test_hits.append((now, workspace, len(window)))
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(lambda case: run_case(workspace, case), window))

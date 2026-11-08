@@ -508,17 +508,17 @@ def test_the_self_test_runs_in_slices_with_a_total_and_a_next_offset(make, monke
     assert len(seen) == first["total"]
 
 
-def test_only_the_first_slice_counts_toward_the_hourly_test_limit(make, monkeypatch):
+def test_every_question_counts_toward_the_hourly_limit_whatever_the_offset(make, monkeypatch):
     make()
     inner = mod.api
     monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: FACTS if table == "knowledge_facts" else inner(table, method, params=params, **kw))
     monkeypatch.setattr(mod, "_test_hits", mod.deque())
+    monkeypatch.setattr(mod, "TEST_QUESTIONS_PER_HOUR", 6)
     monkeypatch.setattr("app.account.tenant_prices_enabled", lambda oid: False)
     monkeypatch.setattr("app.account.answer_question", lambda oid, question: {"answer": "x"})
-    for _ in range(10):
-        assert client.post(URL + "/self-test", json={"offset": 0, "limit": 1}).status_code == 200
-    assert client.post(URL + "/self-test", json={"offset": 0, "limit": 1}).status_code == 429
-    assert client.post(URL + "/self-test", json={"offset": 1, "limit": 1}).status_code == 200
+    assert client.post(URL + "/self-test", json={"offset": 5, "limit": 3}).status_code == 200
+    assert client.post(URL + "/self-test", json={"offset": 5, "limit": 3}).status_code == 200
+    assert client.post(URL + "/self-test", json={"offset": 6, "limit": 1}).status_code == 429
 
 
 def test_saving_publishes_faqs_and_strips_amounts_until_prices_are_confirmed(make, monkeypatch):
