@@ -551,3 +551,17 @@ def test_category_names_get_speech_keyword_priority_over_individual_products(mon
     terms = patches[0]["speech_keyterms"]
     assert terms[:3] == ["Business Cards", "Print Materials", "Metro"] and len(terms) == 25
     assert terms.count("Flags") == 1 or "Flags" in terms
+
+
+def test_agent_chat_talks_to_the_workspace_assistant_and_is_limited(make, monkeypatch):
+    make()
+    sent = []
+    monkeypatch.setattr("app.call_intel.agent_config", lambda oid: {"provider_agent_id": "asst-1"})
+    monkeypatch.setattr("app.call_intel.vapi", lambda method, path, **kw: sent.append((path, kw["body"])) or
+                        {"id": "chat-9", "output": [{"role": "assistant", "content": "Hi! We make business cards."}]})
+    monkeypatch.setattr(mod, "_chat_hits", mod.deque())
+    ok = client.post(URL + "/agent-chat", json={"message": "hello", "chat_id": "chat-1"})
+    assert ok.status_code == 200 and ok.json()["reply"].startswith("Hi!") and ok.json()["chat_id"] == "chat-9"
+    assert sent[0] == ("/chat", {"assistantId": "asst-1", "input": "hello", "previousChatId": "chat-1"})
+    monkeypatch.setattr(mod, "CHAT_MESSAGES_PER_HOUR", 1)
+    assert client.post(URL + "/agent-chat", json={"message": "again"}).status_code == 429

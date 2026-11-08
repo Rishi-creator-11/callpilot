@@ -713,3 +713,46 @@ def self_test(oid: UUID, body: SelfTest | None = None, user=Depends(current_user
         results = list(pool.map(lambda case: run_case(workspace, case), window))
     end = body.offset + len(window)
     return {"total": len(cases), "offset": body.offset, "next_offset": end if end < len(cases) else None, "results": results}
+
+
+class AgentChat(BaseModel):
+    message: str = Field(min_length=1, max_length=400)
+    chat_id: str | None = Field(default=None, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+CHAT_MESSAGES_PER_HOUR = 60
+_chat_hits: deque = deque()
+
+
+@router.post("/agent-chat")
+def agent_chat(oid: UUID, body: AgentChat, user=Depends(current_user)):
+    """Talk to this workspace's real assistant (same prompt, same tools) by text. Owners only, rate limited."""
+    from app.call_intel import agent_config, vapi
+    workspace = str(oid)
+    membership(workspace, user, ("owner", "admin"))
+    assistant = agent_config(workspace).get("provider_agent_id")
+    if not assistant:
+        raise HTTPException(409, "Build your agent first.")
+    now = monotonic()
+    with _analyze_lock:
+        while _chat_hits and _chat_hits[0][0] <= now - 3600:
+            _chat_hits.popleft()
+        if sum(1 for _, who in _chat_hits if who == workspace) >= CHAT_MESSAGES_PER_HOUR:
+            raise HTTPException(429, "Please wait a little before chatting again.")
+        _chat_hits.append((now, workspace))
+    request = {"assistantId": assistant, "input": body.message}
+    if body.chat_id:
+        request["previousChatId"] = body.chat_id
+    result = vapi("POST", "/chat", body=request)
+    reply, steps = [], []
+    for item in result.get("output", []) if isinstance(result, dict) else []:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if isinstance(content, str) and item.get("role") == "assistant" and content.strip():
+            reply.append(content.strip())
+        if item.get("tool_calls"):
+            steps += [str((call.get("function") or {}).get("name")) for call in item["tool_calls"] if isinstance(call, dict)]
+        if item.get("role") == "tool":
+            steps.append("result: " + _squash(str(content))[:160])
+    return {"chat_id": result.get("id") if isinstance(result, dict) else None, "reply": " ".join(reply), "steps": steps[:12]}

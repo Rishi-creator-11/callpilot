@@ -89,3 +89,12 @@ def test_a_bare_category_gets_its_overview_even_when_its_products_tie(monkeypatc
         assert best is rows[2] and meta["reason"] == "category_overview"
     best, _ = semantic.retrieve("org", "Tell me about standard business cards")
     assert best is rows[0]
+
+
+def test_a_product_named_exactly_beats_longer_names_that_contain_it(monkeypatch):
+    rows = [{"question": "Tell me about Pull Up Banners. What options?", "similarity": 0.86, "answer": "Pull Up Banners."},
+            {"question": "Tell me about X Frame Banners. What options?", "similarity": 0.86, "answer": "X Frame Banners."},
+            {"question": "Tell me about Banners. What options?", "similarity": 0.85, "answer": "Banners. Options: vinyl."}]
+    _fake_rows(monkeypatch, rows)
+    best, meta = semantic.retrieve("org", "Do you print banners?")
+    assert best is rows[2] and meta["reason"] == "exact_product_name"

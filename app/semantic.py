@@ -244,6 +244,10 @@ def retrieve(organization_id:str,question:str):
     filler={"buy","want","order","get","need","sell","make","print","have","offer","kind","type","like","looking",
             "interested","purchase","wanna","gonna","do","you","guys","some","any","your","product","service"}
     extra_terms=query_terms-brand_terms-filler
+    for entry in ranked:  # "Do you print banners?" means the product literally called Banners, not Pull Up Banners
+        product=re.match(r"Tell me about (.+?)[.]",entry[1]["question"])
+        if product and extra_terms and _terms(product.group(1))==extra_terms and entry[2]>=0.75:
+            return entry[1],{"reason":"exact_product_name","similarity":round(entry[2],3)}
     for entry in ranked:
         named=re.match(r"What (.+?) do you offer\?",entry[1]["question"])
         group=_terms(named.group(1)) if named else set()
