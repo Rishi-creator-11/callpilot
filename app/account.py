@@ -230,6 +230,33 @@ def create_description(oid:str,body:BusinessDescription,user=Depends(current_use
         "content":content},prefer="return=representation")
     return {"id":rows[0]["id"],"approved":False}
 
+@router.post("/organizations/{oid}/descriptions/import-website/preview")
+async def preview_website(oid: str, body: WebsiteImport, user=Depends(current_user)):
+    """Read the full website for review; never mutate knowledge or publish prices.
+
+    This is deliberately an authenticated, workspace-scoped preview rather than an
+    anonymous demo. An owner may inspect imported prices before approving them.
+    """
+    await run_in_threadpool(membership, oid, user, ("owner", "admin"))
+    from app.site_reader import read_site
+    result = await run_in_threadpool(read_site, body.url)
+    return {
+        "source_url": result["source_url"],
+        "title": result["title"],
+        "description": result["description"],
+        "stats": result["stats"],
+        "products": result["products"],
+        "pages": result["pages"],
+        "phone": result["phone"],
+        "email": result["email"],
+        "hours": result["hours"],
+        "policies": result["policies"],
+        "faqs": result["faqs"],
+        "requires_review": True,
+        "saved": False,
+    }
+
+
 @router.post("/organizations/{oid}/descriptions/import-website")
 def import_website(oid: str, body: WebsiteImport, user=Depends(current_user)):
     membership(oid, user, ("owner", "admin"))
