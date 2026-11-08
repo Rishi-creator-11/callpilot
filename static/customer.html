@@ -143,6 +143,10 @@ body.ta-open{overflow:hidden}
 .qs-plist .qs-goal{padding:10px 14px;font-weight:500;font-size:14px}
 .qs-knowtest{border:1px solid var(--cp-border);border-radius:14px;padding:14px 16px;margin:0 0 16px;background:#f6f8fa}
 .qs-knowtest h4{margin:0 0 6px}.qs-knowtest p{margin:0 0 6px}
+#receptionist [data-rc-service]{display:grid;grid-template-columns:minmax(0,1fr) 90px 110px auto;gap:8px;align-items:center;margin:6px 0}
+#receptionist [data-rc-day]{display:grid;grid-template-columns:100px 140px 140px;gap:8px;align-items:center;margin:4px 0}
+#receptionist [data-rc-service] input,#receptionist [data-rc-day] input{width:100%!important;min-width:0;margin:0}
+@media(max-width:640px){#receptionist [data-rc-service]{grid-template-columns:1fr 1fr}#receptionist [data-rc-day]{grid-template-columns:80px 1fr 1fr}}
 </style><style id="callpilot-design-system">
 /* CallPilot 2.0 — systematic light workspace / dark navigation */
 :root{color-scheme:light;--cp-bg:#f5f7fb;--cp-panel:#fff;--cp-border:#e6eaf2;--cp-muted:#667085;--cp-text:#182034;--cp-ink:#101629;--cp-primary:#6258e8;--cp-hover:#5146d1;--cp-shadow:0 14px 44px rgba(30,42,77,.055)}
