@@ -259,6 +259,12 @@ def retrieve(organization_id:str,question:str):
     if not content_terms and not intent_match and not (
         query_terms and query_terms & _terms(best["question"])):
         return None,{"reason":"insufficient_topic_evidence","similarity":round(similarity,3)}
+    # "Do you sell X?" must find X itself in the approved passage. A category overview that merely
+    # lists other things is not evidence that an unlisted item (say, live elephants) is offered.
+    if re.search(r"\b(do you|do y'all|are you|can i|can you|have you got)\b.*\b(sell|carry|stock|have|offer|make|print|provide)\b",normalized.casefold()):
+        wanted=specific-{"live","new","good","custom","cheap","best"}
+        if wanted and not (wanted & (_terms(best["question"])|_terms(best["answer"]))):
+            return None,{"reason":"item_not_listed","similarity":round(similarity,3)}
     # Owner-written passages are grounded answers, not FAQ prompts.
     # They have more detailed text than a short query; allow retrieval when
     # a strong vector match and a supported topic align. Still reject unrelated

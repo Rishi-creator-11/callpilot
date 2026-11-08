@@ -32,3 +32,37 @@ def test_voice_pricing_policy_overrides_retrieval(monkeypatch):
        json={"message":{"type":"tool-calls","toolCallList":[{"id":"call-2","function":{"name":"lookup_approved_knowledge","arguments":{"question":"How much is the container?"}}}]}})
     assert r.status_code==200
     assert "don't have a verified price" in r.json()["results"][0]["result"].lower()
+
+
+def _fake_rows(monkeypatch, rows):
+    class Response:
+        status_code = 200
+        def json(self): return rows
+    class Http:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def post(self, *a, **k): return Response()
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "x")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.test")
+    monkeypatch.setattr(semantic.httpx, "Client", Http)
+    monkeypatch.setattr(semantic, "embeddings", lambda texts: [[0.0] * 3 for _ in texts])
+    monkeypatch.setattr(semantic, "to_pgvector", lambda v: "[0,0,0]")
+    monkeypatch.setattr(semantic, "_approved_policy_fallback", lambda *a: (None, {}))
+    monkeypatch.setattr(semantic, "_normalize_spoken_name", lambda oid, q: (q, set()))
+
+
+OVERVIEW = {"question": "What do you sell?", "similarity": 0.9,
+            "answer": "We offer products and services in these categories: Business Cards, Flyers and Banners."}
+
+
+def test_unlisted_item_is_not_answered_from_a_category_overview(monkeypatch):
+    _fake_rows(monkeypatch, [OVERVIEW])
+    best, meta = semantic.retrieve("org", "Do you sell live elephants?")
+    assert best is None and meta["reason"] in ("item_not_listed", "topic_not_supported")
+
+
+def test_listed_item_is_still_answered_from_a_category_overview(monkeypatch):
+    _fake_rows(monkeypatch, [OVERVIEW])
+    best, _ = semantic.retrieve("org", "Do you sell flyers?")
+    assert best is not None and "Flyers" in best["answer"]
