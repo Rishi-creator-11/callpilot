@@ -176,7 +176,7 @@ def test_a_call_without_a_phone_number_gets_a_plain_instruction(monkeypatch):
 def _store(monkeypatch, **extra):
     writes = []
     monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: flags(**extra))
-    monkeypatch.setattr(voice_actions, "api", lambda table, method="GET", **kw: writes.append((table, kw.get("data"))) or [{"id": "new-id"}])
+    monkeypatch.setattr(voice_actions, "api", lambda table, method="GET", **kw: (writes.append((table, kw.get("data"))) or [{"id": "new-id"}]) if method == "POST" else [])
     return writes
 
 
@@ -205,8 +205,25 @@ def test_appointment_request_is_saved_unconfirmed_when_no_calendar_is_connected(
         "service": "Consultation", "preferred_time": when, "caller_name": "Dana Lee",
         "caller_contact": "5555550123", "notes": ""})
     table, data = writes[0]
-    assert table == "appointment_requests" and data["status"] == "requested" and "NOT confirmed" in result
+    assert table == "appointment_requests" and data["status"] == "preferred" and "NOT confirmed" in result
     with pytest.raises(ValueError):
         voice_actions.request_appointment(OID, CALL, {
             "service": "Consultation", "preferred_time": "2020-01-01T10:00:00+00:00", "caller_name": "Dana Lee",
             "caller_contact": "5555550123", "notes": ""})
+
+
+def test_a_request_never_blocks_a_slot_and_is_refused_when_real_booking_is_on(monkeypatch):
+    when = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    args = {"service": "Consultation", "preferred_time": when, "caller_name": "Dana Lee",
+            "caller_contact": "5555550123", "notes": ""}
+    _store(monkeypatch, voice_leads_enabled=True, voice_booking_enabled=True)
+    with pytest.raises(ValueError):
+        voice_actions.request_appointment(OID, CALL, args)
+    monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: flags(voice_leads_enabled=True))
+    monkeypatch.setattr(voice_actions, "api", lambda *a, **k: [{"id": "1"}, {"id": "2"}, {"id": "3"}])
+    with pytest.raises(ValueError):
+        voice_actions.request_appointment(OID, CALL, args)
+    far = {**args, "preferred_time": (datetime.now(timezone.utc) + timedelta(days=400)).isoformat()}
+    monkeypatch.setattr(voice_actions, "api", lambda *a, **k: [])
+    with pytest.raises(ValueError):
+        voice_actions.request_appointment(OID, CALL, far)

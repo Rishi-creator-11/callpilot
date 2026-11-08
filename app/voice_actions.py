@@ -529,24 +529,33 @@ def capture_order_request(oid: str, message: dict, args: dict) -> str:
 
 def request_appointment(oid: str, message: dict, args: dict) -> str:
     call_id, _ = _call_context(oid, message)
-    if not feature_flags(oid).get("voice_leads_enabled"):
+    flags = feature_flags(oid)
+    if not flags.get("voice_leads_enabled"):
         raise ValueError("Requests are not enabled")
+    if flags.get("voice_booking_enabled"):
+        raise ValueError("Use the calendar tools to check and book a real time")
     service = _text(args.get("service", ""), maximum=150, minimum=2)
     name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
     contact = _contact(args.get("caller_contact", ""))
     raw = _text(args.get("preferred_time", ""), maximum=70, minimum=10)
     try:
         when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if when.tzinfo is None or when <= datetime.now(timezone.utc):
+        if when.tzinfo is None or not datetime.now(timezone.utc) < when <= datetime.now(timezone.utc) + timedelta(days=180):
             raise ValueError
     except ValueError as exc:
         raise ValueError("Ask for the exact day and a future time the caller prefers.") from exc
     key = hashlib.sha256("|".join((oid, call_id, "request", when.astimezone(timezone.utc).isoformat(),
                                    service.casefold())).encode()).hexdigest()
+    # A request is a wish, not a hold. It uses its own status so it can never block a real booking slot,
+    # and one call can save only a few.
+    earlier = api("appointment_requests", params={"organization_id": "eq." + oid, "provider_call_id": "eq." + call_id,
+                                                  "status": "eq.preferred", "select": "id", "limit": 3})
+    if isinstance(earlier, list) and len(earlier) >= 3:
+        raise ValueError("Enough requests are already saved for this call. Tell the caller the team will be in touch.")
     rows = api("appointment_requests", "POST", params={"on_conflict": "organization_id,idempotency_key"},
                data={"organization_id": oid, "provider_call_id": call_id, "idempotency_key": key,
                      "caller_name": name, "caller_contact": contact, "service": service,
-                     "requested_time": when.isoformat(), "duration_minutes": 30, "status": "requested"},
+                     "requested_time": when.isoformat(), "duration_minutes": 30, "status": "preferred"},
                prefer="resolution=ignore-duplicates,return=representation")
     if not rows:
         return "That appointment request is already saved. Do not save it again."
