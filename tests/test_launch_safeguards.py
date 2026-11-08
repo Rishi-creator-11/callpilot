@@ -74,3 +74,35 @@ def test_vapi_errors_use_fixed_messages_and_never_echo_the_provider_or_the_key(m
     text = str(caught.value.detail)
     assert text.startswith("Vapi request failed (HTTP 401).") and "platform operator" in text
     assert "sk-secret-value" not in text and "tenant-data" not in text
+
+
+def test_web_calls_use_the_public_key_and_fall_back_to_the_private_key(monkeypatch):
+    import httpx
+    from app import call_intel
+    seen = []
+    real = httpx.Client
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(call_intel.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler)))
+    monkeypatch.setenv("VAPI_API_KEY", "private-1")
+    monkeypatch.delenv("VAPI_PUBLIC_KEY", raising=False)
+    call_intel.vapi("POST", "/call/web", body={}, key_env="VAPI_PUBLIC_KEY")
+    monkeypatch.setenv("VAPI_PUBLIC_KEY", "public-1")
+    call_intel.vapi("POST", "/call/web", body={}, key_env="VAPI_PUBLIC_KEY")
+    call_intel.vapi("GET", "/assistant/a")
+    assert seen == ["Bearer private-1", "Bearer public-1", "Bearer private-1"]
+
+
+def test_a_rejected_web_call_tells_the_operator_which_key_to_set(monkeypatch):
+    import httpx
+    from app import call_intel
+    real = httpx.Client
+    monkeypatch.setenv("VAPI_API_KEY", "private-1")
+    monkeypatch.setattr(call_intel.httpx, "Client", lambda **kw: real(
+        transport=httpx.MockTransport(lambda request: httpx.Response(401, json={"message": "Invalid Key."}))))
+    with pytest.raises(Exception) as caught:
+        call_intel.vapi("POST", "/call/web", body={}, key_env="VAPI_PUBLIC_KEY")
+    assert "VAPI_PUBLIC_KEY" in str(caught.value.detail) and "private-1" not in str(caught.value.detail)

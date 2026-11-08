@@ -366,3 +366,34 @@ def test_confirmed_prices_enable_pricing_and_are_added_to_each_product_answer(ma
 
 def test_without_money_drops_only_the_sentences_with_amounts():
     assert mod.without_money("Flyers are great. They start at $5. Ask about sizes.") == "Flyers are great. Ask about sizes."
+
+
+def test_every_analysis_attempt_is_counted_before_any_download(make, monkeypatch):
+    make()
+    reads = []
+    monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
+    monkeypatch.setattr("app.site_reader.read_site", lambda url: reads.append(url) or FAKE_SITE)
+    monkeypatch.setattr(mod, "allow_analyze", lambda workspace: False)
+    inner = mod.api
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: (
+        [{"content": "x" * 50, "source_url": "https://shop.example.com/", "title": "Shop"}] if table == "knowledge_documents" else inner(table, method, params=params, **kw)))
+    response = client.post(URL + "/analyze", json={"document_id": "00000000-0000-0000-0000-000000000001"})
+    assert response.status_code == 429 and reads == []
+
+
+def test_only_a_few_crawls_run_at_once(make, monkeypatch):
+    make()
+    reads = []
+    monkeypatch.setattr(mod, "_analyze_hits", mod.deque())
+    monkeypatch.setattr("app.site_reader.read_site", lambda url: reads.append(url) or FAKE_SITE)
+    monkeypatch.setattr(mod, "llm_understanding", lambda text, kind=None, subtype=None: None)
+    slots = mod.BoundedSemaphore(1)
+    slots.acquire()
+    monkeypatch.setattr(mod, "CRAWL_SLOTS", slots)
+    inner = mod.api
+    monkeypatch.setattr(mod, "api", lambda table, method="GET", params=None, **kw: (
+        [{"content": "x" * 50, "source_url": "https://shop.example.com/", "title": "Shop"}] if table == "knowledge_documents" else inner(table, method, params=params, **kw)))
+    response = client.post(URL + "/analyze", json={"document_id": "00000000-0000-0000-0000-000000000001"})
+    assert response.status_code == 429 and reads == []
+    slots.release()
+    assert client.post(URL + "/analyze", json={"document_id": "00000000-0000-0000-0000-000000000001"}).status_code == 200

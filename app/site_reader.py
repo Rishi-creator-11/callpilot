@@ -53,19 +53,19 @@ _STARTS = ('{"id":', '{"title":', '{"name":', '{"slug":')
 def embedded_documents(html: str) -> tuple[list, str]:
     """JSON-LD documents, plus the decoded Next.js page data as one string."""
     documents = []
-    for raw in _LD.findall(html):
+    for raw in _LD.findall(html)[:20]:
         try:
-            documents.append(json.loads(raw))
-        except ValueError:
+            documents.append(json.loads(raw[:200_000]))
+        except (ValueError, RecursionError):
             continue
     flight = ""
     pieces = []
-    for chunk in _FLIGHT.findall(html):
+    for chunk in _FLIGHT.findall(html)[:400]:
         try:
             pieces.append(json.loads(chunk))
-        except ValueError:
+        except (ValueError, RecursionError):
             continue
-    flight = "".join(pieces)
+    flight = "".join(pieces)[:2_000_000]
     next_data = _NEXT_DATA.search(html)
     if next_data:
         flight += next_data.group(1)
@@ -76,23 +76,25 @@ def product_objects(flight: str) -> list[dict]:
     """Find product records in page data by anchoring on keys only a product carries."""
     decoder = json.JSONDecoder()
     found, seen = [], set()
+    hits, started = 0, time.monotonic()
     for anchor in _ANCHORS:
         key_name = anchor.strip('"')
         position = 0
         while True:
             at = flight.find(anchor, position)
-            if at < 0:
+            hits += 1
+            if at < 0 or hits > 300 or time.monotonic() - started > 3:
                 break
             position = at + len(anchor)
             end = at
-            for _ in range(60):  # walk back through candidate starts until one decodes to an object that owns this key
+            for _ in range(40):  # walk back through candidate starts until one decodes to an object that owns this key
                 start = max((flight.rfind(marker, max(0, at - 8000), end) for marker in _STARTS), default=-1)
                 if start < 0:
                     break
                 end = start
                 try:
-                    obj, _ = decoder.raw_decode(flight[start:])
-                except ValueError:
+                    obj, _ = decoder.raw_decode(flight[start:start + 60_000])
+                except (ValueError, RecursionError):
                     continue
                 if isinstance(obj, dict) and key_name in obj and (obj.get("title") or obj.get("name")):
                     identity = str(obj.get("slug") or obj.get("title") or obj.get("name")).lower()

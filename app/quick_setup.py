@@ -262,6 +262,8 @@ def build(oid: UUID, body: QuickSetup, user=Depends(current_user)):
 # Understanding the business: summary, offerings, hours, contact and prices, for the owner to confirm.
 # ---------------------------------------------------------------------------------------------
 PRICE_TEXT = re.compile(r"\$\s*\d[\d,]*(?:\.\d{1,2})?")
+from threading import BoundedSemaphore
+CRAWL_SLOTS = BoundedSemaphore(2)
 _analyze_hits: deque = deque()
 _analyze_lock = Lock()
 
@@ -404,6 +406,8 @@ def analyze(oid: UUID, body: Analyze, user=Depends(current_user)):
     if bool(body.document_id) == bool(body.text):
         raise HTTPException(422, "Send either an imported source or some text.")
     source_url, site = None, None
+    if not allow_analyze(workspace):  # Count every attempt first, before any download or model work.
+        raise HTTPException(429, "Please wait a little before analyzing again.")
     if body.document_id:
         rows = api("knowledge_documents", params={"organization_id": "eq." + workspace, "id": "eq." + str(body.document_id),
                                                    "select": "content,source_url,title", "limit": 1})
@@ -412,16 +416,18 @@ def analyze(oid: UUID, body: Analyze, user=Depends(current_user)):
         text, source_url = rows[0]["content"], rows[0].get("source_url")
         if source_url and source_url.startswith("http"):
             from app.site_reader import read_site
+            if not CRAWL_SLOTS.acquire(blocking=False):
+                raise HTTPException(429, "Other websites are being read right now. Try again in a minute.")
             try:  # Read the live site again so old or partial imports never limit what the agent learns.
                 site = read_site(source_url)
             except HTTPException:
                 site = None
+            finally:
+                CRAWL_SLOTS.release()
     else:
         text = _squash(body.text) if "\n" not in body.text else "\n".join(_squash(l) for l in body.text.splitlines() if l.strip())
     if not site and len(text.strip()) < 20:
         raise HTTPException(422, "There is not enough text yet. Tell us a bit more about your business.")
-    if not allow_analyze(workspace):
-        raise HTTPException(429, "Please wait a little before analyzing again.")
     kind = body.kind if body.kind in BUSINESS_KINDS else None
     subtype = body.subtype if kind and body.subtype in BUSINESS_KINDS[kind]["types"] else None
     if site:

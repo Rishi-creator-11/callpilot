@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api/account/organizations/{oid}", tags=["call-intell
 VALID_STAGES = {"hot","warm","general","not_qualified","needs_review"}
 VALID_FOLLOW_UP = {"none","todo","in_progress","done"}
 
-def vapi(method:str, path:str, *, params=None, body=None):
-    key=os.getenv("VAPI_API_KEY","")
+def vapi(method:str, path:str, *, params=None, body=None, key_env:str="VAPI_API_KEY"):
+    key=os.getenv(key_env,"") or os.getenv("VAPI_API_KEY","")
     if not key: raise HTTPException(503,"Vapi connection is not configured")
     try:
         with httpx.Client(timeout=22) as client:
@@ -39,7 +39,8 @@ def vapi(method:str, path:str, *, params=None, body=None):
         __import__("logging").getLogger("callpilot").warning("vapi_request_failed method=%s path=%s status=%s reason=%s",
             method,path.split("?")[0],response.status_code,reason)
         status=response.status_code
-        hint={401:" The server's Vapi connection was rejected. The platform operator needs to check it.",
+        hint={401:(" Web calls need the Vapi public key (VAPI_PUBLIC_KEY) on the server. The platform operator needs to set it." if path.split("?")[0]=="/call/web"
+                   else " The server's Vapi connection was rejected. The platform operator needs to check it."),
               403:" The server's Vapi connection was rejected. The platform operator needs to check it.",
               404:" The item was not found at Vapi.",429:" Vapi is rate limiting requests. Try again shortly."}.get(status,"")
         raise HTTPException(502,"Vapi request failed (HTTP "+str(status)+")."+hint)

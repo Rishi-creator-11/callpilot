@@ -110,3 +110,15 @@ def test_the_advertised_listing_price_wins_over_the_cheapest_matrix_row(monkeypa
     monkeypatch.setattr(sr.wi, "_download", download)
     flyers = sr.read_site("https://shop.example.com/")["products"][0]
     assert flyers["from_price"] == "$42.49" and flyers["price_note"].startswith("Starting at $42.49.") and "$110" in flyers["price_note"]
+
+
+def test_hostile_page_data_cannot_make_parsing_slow_or_crash():
+    nested = "[" * 100000 + "]" * 100000
+    html = f"<script type='application/ld+json'>{nested}</script><script>self.__next_f.push([1,{json.dumps(nested)}])</script>"
+    documents, flight = sr.embedded_documents(html)
+    assert documents == [] and isinstance(flight, str)
+    junk = '{"id":"a",' * 50000 + '"options_schema":1' * 5000
+    import time
+    started = time.monotonic()
+    assert sr.product_objects(junk) == []
+    assert time.monotonic() - started < 6

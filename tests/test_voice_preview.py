@@ -36,7 +36,7 @@ def test_start_preview_only_creates_read_only_web_assistant(preview_client, monk
         assert args == {"p_organization_id": OID, "p_user_id": OTHER, "p_daily_cap": 100}
         return True
 
-    def provider(method, path, *, body):
+    def provider(method, path, *, body, key_env=None):
         assert (method, path) == ("POST", "/call/web")
         assert body["roomDeleteOnUserLeaveEnabled"] is True
         assert "customer" not in body and "phoneNumberId" not in body and "assistantId" not in body
@@ -113,7 +113,7 @@ def test_live_test_calls_the_workspaces_real_assistant_only(preview_client, monk
     monkeypatch.setattr(voice_preview, "rpc", lambda name, args: True)
     calls = []
 
-    def provider(method, path, *, body=None):
+    def provider(method, path, *, body=None, key_env=None):
         calls.append((method, path, body))
         if method == "GET":
             return {"id": "asst_1"}
@@ -169,7 +169,7 @@ def test_a_failed_call_does_not_use_up_the_allowance(preview_client, monkeypatch
     monkeypatch.setattr(voice_preview, "api", api)
     monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: True)
     from fastapi import HTTPException
-    def provider(method, path, *, body=None):
+    def provider(method, path, *, body=None, key_env=None):
         if method == "GET":
             return {"id": "asst_1"}
         raise HTTPException(502, "Vapi request failed (HTTP 401)")

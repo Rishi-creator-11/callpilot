@@ -132,7 +132,7 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
 
 
 def create_preview_room(assistant: dict) -> dict:
-    result = vapi("POST", "/call/web", body={"assistant": assistant, "roomDeleteOnUserLeaveEnabled": True})
+    result = vapi("POST", "/call/web", body={"assistant": assistant, "roomDeleteOnUserLeaveEnabled": True}, key_env="VAPI_PUBLIC_KEY")
     return validated_room(result)
 
 
@@ -177,7 +177,7 @@ def start_live_test(oid: UUID, response: Response, user=Depends(current_user)):
     try:
         result = vapi("POST", "/call/web", body={
             "assistantId": assistant_id, "roomDeleteOnUserLeaveEnabled": True,
-            "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20}})
+            "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20}}, key_env="VAPI_PUBLIC_KEY")
         return validated_room(result)
     except HTTPException:
         release(workspace, user["id"])
