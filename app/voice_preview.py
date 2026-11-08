@@ -32,6 +32,19 @@ def workspace_enabled(oid: str) -> bool:
     return enabled()
 
 
+def daily_cap() -> int:
+    """Shared daily cap on browser voice calls across all workspaces (VOICE_TEST_DAILY_CAP, default 100)."""
+    try:
+        return max(1, min(int(os.getenv("VOICE_TEST_DAILY_CAP", "100")), 5000))
+    except ValueError:
+        return 100
+
+
+def reserve(workspace: str, user_id: str) -> bool:
+    return rpc("reserve_voice_preview", {"p_organization_id": workspace, "p_user_id": user_id,
+                                         "p_daily_cap": daily_cap()}) is True
+
+
 def preview_token(oid: str) -> str:
     return hmac.new(os.environ["VAPI_WEBHOOK_TOKEN"].encode(),
                     ("callpilot-preview:" + oid).encode(), hashlib.sha256).hexdigest()
@@ -96,7 +109,7 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
     if not workspace_enabled(workspace):
         raise HTTPException(503, "Browser voice practice is not enabled.")
     assistant = preview_assistant(workspace)
-    if rpc("reserve_voice_preview", {"p_organization_id": workspace, "p_user_id": user["id"]}) is not True:
+    if not reserve(workspace, user["id"]):
         raise HTTPException(429, "Practice limit reached. Wait a few minutes, or try again tomorrow.")
     response.headers["Cache-Control"] = "no-store"
     return create_preview_room(assistant)
@@ -142,7 +155,7 @@ def start_live_test(oid: UUID, response: Response, user=Depends(current_user)):
     from app.call_intel import owns_assistant
     if not owns_assistant(vapi("GET", "/assistant/" + assistant_id), workspace):
         raise HTTPException(409, "This assistant is not managed by this workspace.")
-    if rpc("reserve_voice_preview", {"p_organization_id": workspace, "p_user_id": user["id"]}) is not True:
+    if not reserve(workspace, user["id"]):
         raise HTTPException(429, "Test call limit reached. Wait a few minutes, or try again tomorrow.")
     response.headers["Cache-Control"] = "no-store"
     result = vapi("POST", "/call/web", body={

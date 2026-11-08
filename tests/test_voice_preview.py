@@ -33,7 +33,7 @@ def preview_client(monkeypatch):
 def test_start_preview_only_creates_read_only_web_assistant(preview_client, monkeypatch):
     def reserve(name, args):
         assert name == "reserve_voice_preview"
-        assert args == {"p_organization_id": OID, "p_user_id": OTHER}
+        assert args == {"p_organization_id": OID, "p_user_id": OTHER, "p_daily_cap": 100}
         return True
 
     def provider(method, path, *, body):
@@ -145,3 +145,14 @@ def test_live_test_needs_an_agent_ownership_and_quota_before_contacting_the_prov
 def test_live_test_is_off_when_voice_calls_are_disabled(preview_client, monkeypatch):
     monkeypatch.setenv("VOICE_PREVIEW_ENABLED", "false")
     assert preview_client.post(LIVE).status_code == 503
+
+
+def test_the_shared_daily_cap_is_configurable_and_bounded(monkeypatch):
+    monkeypatch.delenv("VOICE_TEST_DAILY_CAP", raising=False)
+    assert voice_preview.daily_cap() == 100
+    monkeypatch.setenv("VOICE_TEST_DAILY_CAP", "250")
+    assert voice_preview.daily_cap() == 250
+    monkeypatch.setenv("VOICE_TEST_DAILY_CAP", "999999")
+    assert voice_preview.daily_cap() == 5000
+    monkeypatch.setenv("VOICE_TEST_DAILY_CAP", "nonsense")
+    assert voice_preview.daily_cap() == 100
