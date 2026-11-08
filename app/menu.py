@@ -14,7 +14,8 @@ MARKET = re.compile(r"^(?:(.*?)\s+)?(MP|Market Price)$", re.I)
 
 
 def money(value: str) -> str:
-    return "$" + value
+    whole, _, cents = value.partition(".")
+    return "$" + whole + ("." + cents.ljust(2, "0") if cents else "")
 
 
 def parse(text: str) -> list[dict]:

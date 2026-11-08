@@ -220,3 +220,9 @@ def test_section_heading_without_ingredients_is_not_a_dish():
     names = {s["name"]: [i["name"] for i in s["items"]] for s in sections}
     assert names["Sides"] == ["Braised Red Cabbage", "Roasted Carrots"]
     assert all(i["name"] != "Sides" for s in sections for i in s["items"])
+
+
+def test_decimal_prices_keep_two_places():
+    from app.menu import parse
+    items = [i for s in parse("Beverages\nAmerican Coffee\n2.5\nLatte\n4.50\n") for i in s["items"]]
+    assert [i["price"] for i in items] == ["$2.50", "$4.50"]
