@@ -29,7 +29,15 @@ def vapi(method:str, path:str, *, params=None, body=None):
     except httpx.RequestError:
         raise HTTPException(503,"Vapi is unavailable. Try refreshing later.")
     if response.status_code>=400:
-        raise HTTPException(502,"Vapi request failed (HTTP "+str(response.status_code)+")")
+        # Vapi's own reason (for example "Invalid Key") helps the owner fix setup. It never contains our key.
+        reason=""
+        try:
+            detail=response.json().get("message")
+            if isinstance(detail,list):detail=" ".join(str(item) for item in detail)
+            if isinstance(detail,str):reason=" ".join(detail.split())[:140]
+        except (ValueError,AttributeError):pass
+        __import__("logging").getLogger("callpilot").warning("vapi_request_failed method=%s path=%s status=%s",method,path.split("?")[0],response.status_code)
+        raise HTTPException(502,"Vapi request failed (HTTP "+str(response.status_code)+")"+(": "+reason if reason else ""))
     return response.json() if response.content else {}
 
 def owns_assistant(assistant,oid:str)->bool:

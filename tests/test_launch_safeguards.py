@@ -60,3 +60,16 @@ def test_zero_minutes_stays_zero(monkeypatch):
     x=usage.compute_usage("org_test")
     assert x["minutes_remaining"]==0
     assert x["alert"]=="exhausted"
+
+
+def test_vapi_errors_include_the_providers_reason_but_never_the_key(monkeypatch):
+    import httpx
+    from app import call_intel
+    monkeypatch.setenv("VAPI_API_KEY", "sk-secret-value")
+    real = httpx.Client
+    monkeypatch.setattr(call_intel.httpx, "Client", lambda **kw: real(
+        transport=httpx.MockTransport(lambda request: httpx.Response(401, json={"message": "Invalid Key."}))))
+    with pytest.raises(Exception) as caught:
+        call_intel.vapi("GET", "/assistant/abc")
+    text = str(caught.value.detail)
+    assert text == "Vapi request failed (HTTP 401): Invalid Key." and "sk-secret-value" not in text
