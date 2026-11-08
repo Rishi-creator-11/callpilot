@@ -162,3 +162,12 @@ def test_incomplete_callback_numbers_are_refused_with_a_helpful_message(value):
 @pytest.mark.parametrize("value", ["9144460465", "(914) 446-0465", "+1 914 446 0465", "+44 20 7946 0958"])
 def test_complete_callback_numbers_are_accepted(value):
     assert voice_actions._phone(value) == value
+
+
+def test_a_call_without_a_phone_number_gets_a_plain_instruction(monkeypatch):
+    monkeypatch.setattr(voice_actions, "feature_flags", lambda oid: {"voice_leads_enabled": True, "provider_agent_id": "asst"})
+    monkeypatch.setattr(voice_actions, "_call_context", lambda oid, message: ("call-1", {"customer": {}}))
+    monkeypatch.setattr(voice_actions, "api", lambda *a, **k: [])
+    with pytest.raises(ValueError, match="don't have their number from this call"):
+        voice_actions.capture_customer_lead("o", {}, {"caller_name": "Rishi", "interest": "200 business cards",
+                                                      "callback_phone": "", "callback_requested": True})

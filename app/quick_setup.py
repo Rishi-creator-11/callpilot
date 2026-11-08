@@ -468,6 +468,8 @@ class ProductChoice(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     details: str = Field(min_length=5, max_length=1400)
     price_note: str = Field(default="", max_length=900)
+    category: str = Field(default="", max_length=60)
+    from_price: str = Field(default="", max_length=20)
 
 
 class PolicyChoice(BaseModel):
@@ -490,6 +492,28 @@ def without_money(text: str) -> str:
     """Drop sentences that state an amount. Amounts are only published after the owner confirms prices."""
     sentences = re.split(r"(?<=[.!?])\s+", _squash(text))
     return " ".join(sentence for sentence in sentences if not MONEY.search(sentence) and not PRICE_TEXT.search(sentence))
+
+
+def category_overviews(products, pricing_on: bool) -> list[tuple]:
+    """Short 'what do you offer' answers, so a caller who asks about a whole category hears the options first."""
+    groups: dict[str, list] = {}
+    for item in products:
+        groups.setdefault(_squash(item.category) or "", []).append(item)
+    entries, summary = [], []
+    for category, items in groups.items():
+        if not category:
+            continue
+        parts = []
+        for item in items[:14]:
+            parts.append(item.name.strip() + (" from " + item.from_price if pricing_on and item.from_price else ""))
+        more = " and %d more" % (len(items) - 14) if len(items) > 14 else ""
+        entries.append(("What %s do you offer? Tell me about your %s." % (category, category),
+                        ("We offer %d %s: " % (len(items), category) + ", ".join(parts) + more + ".")[:2400], "category"))
+        summary.append("%s (%d)" % (category, len(items)))
+    if summary:
+        entries.append(("What do you sell? What products and services do you offer?",
+                        ("We offer products and services in these categories: " + ", ".join(summary) + ".")[:2400], "category"))
+    return entries
 
 
 def add_keyterms(workspace: str, names: list[str]) -> None:
@@ -566,12 +590,13 @@ def save_knowledge(oid: UUID, body: SaveKnowledge, user=Depends(current_user)):
             question = ("Tell me about %s. What options, sizes and prices do you have for %s?" if pricing_on
                         else "Tell me about %s. What options and sizes do you have for %s?") % (item.name.strip(), item.name.strip())
             entries.append((question[:500], answer[:2500], "product"))
+        entries += category_overviews(body.products, pricing_on)
         for item in body.policies:
             text = without_money(item.text) if not pricing_on else item.text
             if len(text) >= 20:
                 entries.append(("What is your %s?" % item.title.strip(), text[:2500], "policy"))
         published = publish_facts(workspace, doc["id"], entries, user["id"])
-        saved_products = sum(1 for e in entries[:published] if e[2] == "product")
+        saved_products = sum(1 for e in entries[:published] if e[2] == "product")  # category overviews are counted separately
         saved_policies = sum(1 for e in entries[:published] if e[2] == "policy")
         saved_prices = saved_prices or (saved_products if pricing_on else 0)
         add_keyterms(workspace, [item.name for item in body.products])

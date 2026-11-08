@@ -187,7 +187,8 @@ def capture_customer_lead(oid: str, message: dict, args: dict) -> str:
     if args.get("callback_requested") is not True:
         raise ValueError("The caller has not agreed to a callback")
     if not number:
-        raise ValueError("Ask the caller for a callback number first")
+        raise ValueError("No phone number is available from this call. Tell the caller you don't have their number from this "
+                         "call and ask them to say all ten digits, area code first.")
     existing = api("call_insights", params={
         "organization_id": "eq." + oid, "provider_call_id": "eq." + call_id,
         "select": "id,lead_source,caller_name,caller_phone,product_interest", "limit": 1,

@@ -428,6 +428,34 @@ def test_the_agent_prompt_teaches_a_smooth_callback_flow(monkeypatch):
     monkeypatch.setattr("app.voice_actions.feature_flags", lambda oid: {"voice_leads_enabled": True, "call_instructions": ""})
     text = cloud.receptionist_prompt("00000000-0000-0000-0000-00000000000a", "Metro Print", "Alex")
     for phrase in ("never repeat it", "Is the number you're calling from the best one", "do not ask for digits",
-                   "ten digits", "has already agreed to a callback", "sounds annoyed", "Sound warm and human", "offer a team quote"):
+                   "ten digits", "has already agreed to a callback", "sounds annoyed", "Sound warm and human", "Offer a team quote",
+                   "do not ask them to describe it first", "very briefly what you offer", "don't have their number from this call"):
         assert phrase in text
     assert "repeat them back" not in text
+
+
+def test_category_overviews_list_the_options_briefly_and_only_show_prices_when_confirmed():
+    items = [mod.ProductChoice(name="Standard Business Cards", details="x" * 10, category="Business Cards", from_price="$20"),
+             mod.ProductChoice(name="Premium Business Cards", details="x" * 10, category="Business Cards", from_price="$25.49"),
+             mod.ProductChoice(name="Flyers", details="x" * 10, category="Print Materials", from_price="$42.49"),
+             mod.ProductChoice(name="Loose item", details="x" * 10)]
+    with_prices = mod.category_overviews(items, True)
+    questions = [q for q, _, _ in with_prices]
+    assert questions[0].startswith("What Business Cards do you offer?") and questions[-1].startswith("What do you sell?")
+    assert "2 Business Cards: Standard Business Cards from $20, Premium Business Cards from $25.49." in with_prices[0][1]
+    assert "Business Cards (2), Print Materials (1)" in with_prices[-1][1] and all(kind == "category" for _, _, kind in with_prices)
+    without = mod.category_overviews(items, False)
+    assert all("$" not in answer for _, answer, _ in without) and "Standard Business Cards, Premium Business Cards" in without[0][1]
+    assert mod.category_overviews([mod.ProductChoice(name="Solo", details="x" * 10)], True) == []
+
+
+def test_saving_publishes_category_overviews_too(make, monkeypatch):
+    make()
+    pub = Publish(); pub.install(monkeypatch)
+    products = [{"name": "Flyers", "details": "Flyers. Great.", "price_note": "Starting at $42.49.", "category": "Print Materials", "from_price": "$42.49"},
+                {"name": "Menus", "details": "Menus. Great.", "price_note": "", "category": "Print Materials", "from_price": ""}]
+    result = client.post(URL + "/knowledge", json={"overview": "We print business cards and flyers for shops.", "products": products,
+                                                    "prices_confirmed": True}).json()
+    kinds = [kind for _, _, kind in pub.entries]
+    assert kinds.count("product") == 2 and kinds.count("category") == 2 and result["products_saved"] == 2
+    assert any("Flyers from $42.49" in answer for _, answer, kind in pub.entries if kind == "category")

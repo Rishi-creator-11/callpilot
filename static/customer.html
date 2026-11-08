@@ -3725,7 +3725,7 @@ $("qsLooksGood").addEventListener("click",async event=>{
  const prices=[...$("qsPrices").querySelectorAll("input:checked")].map(i=>({item:i.dataset.item,price_text:i.dataset.price}));
  if(prices.length&&!$("qsPricesOk").checked){status.textContent="Confirm the prices are correct, or untick them.";return}
  const chosen=(box,list)=>[...box.querySelectorAll("input:checked")].map(i=>list[Number(i.dataset.index)]).filter(Boolean);
- const products=chosen($("qsProducts"),qsProductList).map(p=>({name:p.name,details:p.details,price_note:p.price_note||""}));
+ const products=chosen($("qsProducts"),qsProductList).map(p=>({name:p.name,details:p.details,price_note:p.price_note||"",category:p.category||"",from_price:p.from_price||""}));
  const policies=chosen($("qsPolicies"),qsPolicyList).map(p=>({title:p.title,text:p.text}));
  button.disabled=true;status.textContent="Saving what your agent will know…";
  try{
