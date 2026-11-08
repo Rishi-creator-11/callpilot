@@ -269,7 +269,7 @@ def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
         listing = "Here is our full price list: " + menu + "."
         key = "What are your prices?"
         if key in existing:
-            call("PATCH", "/knowledge/%s" % existing[key], business=biz, body={"answer": listing})
+            call("PATCH", "/knowledge/%s" % existing[key], business=biz, body={"content": listing})
         else:
             call("POST", "/knowledge", business=biz, body={"type": "faq", "question": key, "answer": listing})
     if body.hours:
