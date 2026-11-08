@@ -76,3 +76,16 @@ def test_a_buying_question_gets_the_category_answer_not_the_long_business_overvi
     _fake_rows(monkeypatch, [overview, category])
     best, _ = semantic.retrieve("org", "I want to buy business cards")
     assert best is category
+
+
+def test_a_bare_category_gets_its_overview_even_when_its_products_tie(monkeypatch):
+    rows = [{"question": "Tell me about Standard Business Cards. What options?", "similarity": 0.86, "answer": "Standard Business Cards. Options: matte."},
+            {"question": "Tell me about Magnetic Business Cards. What options?", "similarity": 0.86, "answer": "Magnetic Business Cards. Options: round."},
+            {"question": "What Business Cards do you offer? Tell me about your Business Cards.", "similarity": 0.84,
+             "answer": "We offer 12 Business Cards: Standard, Magnetic and more."}]
+    _fake_rows(monkeypatch, rows)
+    for question in ("business cards", "I want to buy business cards"):
+        best, meta = semantic.retrieve("org", question)
+        assert best is rows[2] and meta["reason"] == "category_overview"
+    best, _ = semantic.retrieve("org", "Tell me about standard business cards")
+    assert best is rows[0]

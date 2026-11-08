@@ -215,7 +215,7 @@ def retrieve(organization_id:str,question:str):
         with httpx.Client(timeout=12) as c:
             response=c.post(base+"/rest/v1/rpc/match_callpilot_knowledge",
                 headers={"apikey":secret,"Content-Type":"application/json"},
-                json={"p_org_id":organization_id,"p_embedding":to_pgvector(vector),"p_limit":10})
+                json={"p_org_id":organization_id,"p_embedding":to_pgvector(vector),"p_limit":20})
     except httpx.RequestError:raise HTTPException(503,"Semantic database search unavailable")
     if response.status_code!=200:
         raise HTTPException(503,"Semantic database search failed (HTTP "+str(response.status_code)+")")
@@ -239,6 +239,16 @@ def retrieve(organization_id:str,question:str):
                + 0.025*question_overlap + 0.006*min(answer_overlap,3))
         ranked.append((score,row,similarity,question_overlap,answer_overlap,intent_match))
     ranked.sort(key=lambda entry:entry[0],reverse=True)
+    # A caller naming only a category ("business cards", "I want to buy stickers") wants the overview of
+    # that category. Its dozen product answers all tie, so without this the guard below would discard them all.
+    filler={"buy","want","order","get","need","sell","make","print","have","offer","kind","type","like","looking",
+            "interested","purchase","wanna","gonna","do","you","guys","some","any","your","product","service"}
+    extra_terms=query_terms-brand_terms-filler
+    for entry in ranked:
+        named=re.match(r"What (.+?) do you offer\?",entry[1]["question"])
+        group=_terms(named.group(1)) if named else set()
+        if group and extra_terms and extra_terms<=group and entry[2]>=0.75:
+            return entry[1],{"reason":"category_overview","similarity":round(entry[2],3)}
     score,best,similarity,question_overlap,answer_overlap,intent_match=ranked[0]
     # Require strong semantic evidence AND the requested topic or recognized
     # conversational intent. Entity names alone are not evidence that an
