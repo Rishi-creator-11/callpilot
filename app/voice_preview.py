@@ -45,6 +45,18 @@ def reserve(workspace: str, user_id: str) -> bool:
                                          "p_daily_cap": daily_cap()}) is True
 
 
+def release(workspace: str, user_id: str) -> None:
+    """A call that never started must not use up the person's allowance."""
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+    try:
+        api("voice_preview_attempts", "DELETE", params={
+            "organization_id": "eq." + workspace, "user_id": "eq." + user_id, "created_at": "gte." + since},
+            prefer="return=minimal")
+    except Exception:  # noqa: BLE001 - best effort
+        pass
+
+
 def preview_token(oid: str) -> str:
     return hmac.new(os.environ["VAPI_WEBHOOK_TOKEN"].encode(),
                     ("callpilot-preview:" + oid).encode(), hashlib.sha256).hexdigest()
@@ -112,7 +124,11 @@ def start_preview(oid: UUID, response: Response, user=Depends(current_user)):
     if not reserve(workspace, user["id"]):
         raise HTTPException(429, "Practice limit reached. Wait a few minutes, or try again tomorrow.")
     response.headers["Cache-Control"] = "no-store"
-    return create_preview_room(assistant)
+    try:
+        return create_preview_room(assistant)
+    except HTTPException:
+        release(workspace, user["id"])
+        raise
 
 
 def create_preview_room(assistant: dict) -> dict:
@@ -158,10 +174,14 @@ def start_live_test(oid: UUID, response: Response, user=Depends(current_user)):
     if not reserve(workspace, user["id"]):
         raise HTTPException(429, "Test call limit reached. Wait a few minutes, or try again tomorrow.")
     response.headers["Cache-Control"] = "no-store"
-    result = vapi("POST", "/call/web", body={
-        "assistantId": assistant_id, "roomDeleteOnUserLeaveEnabled": True,
-        "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20}})
-    return validated_room(result)
+    try:
+        result = vapi("POST", "/call/web", body={
+            "assistantId": assistant_id, "roomDeleteOnUserLeaveEnabled": True,
+            "assistantOverrides": {"maxDurationSeconds": 150, "silenceTimeoutSeconds": 20}})
+        return validated_room(result)
+    except HTTPException:
+        release(workspace, user["id"])
+        raise
 
 
 @router.post("/webhooks/vapi-preview/{oid}")

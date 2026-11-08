@@ -156,3 +156,23 @@ def test_the_shared_daily_cap_is_configurable_and_bounded(monkeypatch):
     assert voice_preview.daily_cap() == 5000
     monkeypatch.setenv("VOICE_TEST_DAILY_CAP", "nonsense")
     assert voice_preview.daily_cap() == 100
+
+
+def test_a_failed_call_does_not_use_up_the_allowance(preview_client, monkeypatch):
+    released = []
+    monkeypatch.setattr(voice_preview, "rpc", lambda name, args: True)
+    def api(table, method="GET", params=None, **kw):
+        if method == "DELETE":
+            released.append((table, params["organization_id"], params["user_id"]))
+            return []
+        return [{"provider_agent_id": "asst_1"}]
+    monkeypatch.setattr(voice_preview, "api", api)
+    monkeypatch.setattr("app.call_intel.owns_assistant", lambda assistant, oid: True)
+    from fastapi import HTTPException
+    def provider(method, path, *, body=None):
+        if method == "GET":
+            return {"id": "asst_1"}
+        raise HTTPException(502, "Vapi request failed (HTTP 401)")
+    monkeypatch.setattr(voice_preview, "vapi", provider)
+    assert preview_client.post(LIVE).status_code == 502
+    assert released == [("voice_preview_attempts", OID, OTHER)]
