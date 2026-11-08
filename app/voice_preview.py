@@ -24,8 +24,12 @@ def enabled() -> bool:
 
 
 def workspace_enabled(oid: str) -> bool:
-    allowlist = {item.strip() for item in os.getenv("VOICE_PREVIEW_WORKSPACES", "").split(",") if item.strip()}
-    return enabled() and (not allowlist or oid in allowlist)
+    """Voice calls are available to every workspace once the server switch is on.
+
+    Cost is bounded per user and per workspace by the reserve_voice_preview quota, so the old
+    per-workspace allowlist (VOICE_PREVIEW_WORKSPACES) is no longer consulted.
+    """
+    return enabled()
 
 
 def preview_token(oid: str) -> str:

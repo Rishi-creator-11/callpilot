@@ -97,10 +97,11 @@ def test_preview_webhook_is_tenant_bound_and_has_no_action_tools(preview_client,
     assert "Only approved knowledge" in results[1]["error"]
 
 
-def test_preview_can_be_limited_to_selected_workspaces(preview_client, monkeypatch):
-    monkeypatch.setenv("VOICE_PREVIEW_WORKSPACES", OTHER)
+def test_voice_is_available_to_every_workspace_when_the_server_switch_is_on(preview_client, monkeypatch):
+    monkeypatch.setenv("VOICE_PREVIEW_WORKSPACES", OTHER)  # a leftover allowlist no longer limits anyone
+    assert preview_client.get(START).json() == {"available": True}
+    monkeypatch.setenv("VOICE_PREVIEW_ENABLED", "false")
     assert preview_client.get(START).json() == {"available": False}
-    assert preview_client.post(START).status_code == 503
 
 
 LIVE = f"/api/account/organizations/{OID}/voice-test"

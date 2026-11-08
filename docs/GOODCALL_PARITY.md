@@ -87,5 +87,5 @@ Baseline inspected November 7, 2026. Goodcall evidence distinguishes what was ob
 ### Voice practice verification checkpoint
 
 - Apply the voice preview migration before deploying the application. The provider flag defaults to off.
-- When usage is authorized, set `VOICE_PREVIEW_ENABLED=true` on Render. Use `VOICE_PREVIEW_WORKSPACES` with comma-separated workspace IDs to limit the initial rollout. The service also requires `VAPI_API_KEY` and `VAPI_WEBHOOK_TOKEN` through its existing secret configuration.
+- When usage is authorized, set `VOICE_PREVIEW_ENABLED=true` on Render. Voice is available to every workspace once that switch is on; per-user and per-workspace quotas bound the cost, and `VOICE_PREVIEW_WORKSPACES` is no longer used.
 - In the Metro Print CallPilot workspace, open Test assistant, choose Start voice practice, and allow microphone access. Ask one approved factual question in English and one in Spanish in the same session. Verify the assistant changes language, answers only from approved knowledge, and ends without a production action or recording. Use a real caller only with consent.
