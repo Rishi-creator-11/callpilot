@@ -175,4 +175,4 @@ def test_a_failed_call_does_not_use_up_the_allowance(preview_client, monkeypatch
         raise HTTPException(502, "Vapi request failed (HTTP 401)")
     monkeypatch.setattr(voice_preview, "vapi", provider)
     assert preview_client.post(LIVE).status_code == 502
-    assert released == [("voice_preview_attempts", OID, OTHER)]
+    assert released == [("voice_preview_attempts", "eq." + OID, "eq." + OTHER)]
