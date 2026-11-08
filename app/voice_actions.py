@@ -145,7 +145,7 @@ def voice_tool_definitions(oid: str, credential: str, flags: dict) -> list:
                 "quantity": s("How many, as the caller said it."),
                 "details": s("Size, material, finish, design, pickup or delivery and anything else they specified."),
                 "caller_name": s("Customer-stated name."),
-                "caller_contact": s("Customer-confirmed phone number or email."),
+                "caller_contact": s("Phone number or email the caller gave. If they said to use the number they are calling from, pass an empty string."),
                 "confirmed": {"type": "boolean", "description": "True only after the caller agreed to the read-back."},
             },
             ["product", "quantity", "details", "caller_name", "caller_contact", "confirmed"], oid, credential,
@@ -491,7 +491,16 @@ def submit_order_request(oid: str,message: dict,args: dict) -> str:
     return "Order request "+str(found[0]["id"])+" already submitted. Do not submit it again."
 
 
-def _contact(value) -> str:
+def _contact(value, call: dict | None = None) -> str:
+    """The number to reach the caller. "This number", "same line" or nothing means the caller ID, if the call has one."""
+    text = value.strip() if isinstance(value, str) else ""
+    if not re.search(r"[0-9@]", text):
+        customer = (call or {}).get("customer") if isinstance((call or {}).get("customer"), dict) else {}
+        inbound = _phone(_text(customer.get("number", ""), maximum=28)) if customer.get("number") else ""
+        if inbound:
+            return inbound
+        raise ValueError("No phone number is available from this call. Tell the caller you don't see their number "
+                         "on this call and ask them to say all ten digits, area code first.")
     contact = _text(value, maximum=100, minimum=3)
     if "@" in contact:
         if not re.fullmatch(r"[^@ ]+@[^@ ]+[.][^@ ]+", contact):
@@ -502,7 +511,7 @@ def _contact(value) -> str:
 
 
 def capture_order_request(oid: str, message: dict, args: dict) -> str:
-    call_id, _ = _call_context(oid, message)
+    call_id, call = _call_context(oid, message)
     if not feature_flags(oid).get("voice_order_requests_enabled"):
         raise ValueError("Order requests are not enabled")
     if args.get("confirmed") is not True:
@@ -511,7 +520,7 @@ def capture_order_request(oid: str, message: dict, args: dict) -> str:
     quantity = _text(args.get("quantity", ""), maximum=60, minimum=1)
     details = _text(args.get("details", ""), maximum=800)
     name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
-    contact = _contact(args.get("caller_contact", ""))
+    contact = _contact(args.get("caller_contact", ""), call)
     key = hashlib.sha256("|".join((oid, call_id, "free", product.casefold(), quantity.casefold(),
                                    contact.casefold())).encode()).hexdigest()
     digits = re.search(r"\d+", quantity)
@@ -528,7 +537,7 @@ def capture_order_request(oid: str, message: dict, args: dict) -> str:
 
 
 def request_appointment(oid: str, message: dict, args: dict) -> str:
-    call_id, _ = _call_context(oid, message)
+    call_id, call = _call_context(oid, message)
     flags = feature_flags(oid)
     if not flags.get("voice_leads_enabled"):
         raise ValueError("Requests are not enabled")
@@ -536,7 +545,7 @@ def request_appointment(oid: str, message: dict, args: dict) -> str:
         raise ValueError("Use the calendar tools to check and book a real time")
     service = _text(args.get("service", ""), maximum=150, minimum=2)
     name = _text(args.get("caller_name", ""), maximum=100, minimum=2)
-    contact = _contact(args.get("caller_contact", ""))
+    contact = _contact(args.get("caller_contact", ""), call)
     raw = _text(args.get("preferred_time", ""), maximum=70, minimum=10)
     try:
         when = datetime.fromisoformat(raw.replace("Z", "+00:00"))

@@ -66,3 +66,13 @@ def test_listed_item_is_still_answered_from_a_category_overview(monkeypatch):
     _fake_rows(monkeypatch, [OVERVIEW])
     best, _ = semantic.retrieve("org", "Do you sell flyers?")
     assert best is not None and "Flyers" in best["answer"]
+
+
+def test_a_buying_question_gets_the_category_answer_not_the_long_business_overview(monkeypatch):
+    overview = {"question": "Business description — Business overview: MetroPrint Marketing premium business cards, print, signage",
+                "similarity": 0.84, "answer": "MetroPrint Marketing: premium business cards, fast turnaround, free design review."}
+    category = {"question": "What Business Cards do you offer? Tell me about your Business Cards.", "similarity": 0.83,
+                "answer": "We offer 12 Business Cards: Standard, Kraft Paper, Magnetic and more."}
+    _fake_rows(monkeypatch, [overview, category])
+    best, _ = semantic.retrieve("org", "I want to buy business cards")
+    assert best is category

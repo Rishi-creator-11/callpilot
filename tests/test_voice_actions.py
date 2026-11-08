@@ -227,3 +227,14 @@ def test_a_request_never_blocks_a_slot_and_is_refused_when_real_booking_is_on(mo
     monkeypatch.setattr(voice_actions, "api", lambda *a, **k: [])
     with pytest.raises(ValueError):
         voice_actions.request_appointment(OID, CALL, far)
+
+
+def test_same_line_uses_the_caller_id_and_a_web_call_asks_for_digits(monkeypatch):
+    writes = _store(monkeypatch, voice_order_requests_enabled=True)
+    args = {"product": "Standard business cards", "quantity": "200", "details": "matte, own design",
+            "caller_name": "Rishi", "caller_contact": "", "confirmed": True}
+    voice_actions.capture_order_request(OID, CALL, args)
+    assert writes[0][1]["caller_contact"].endswith("5550100")
+    webcall = {"call": {**CALL["call"], "customer": {}}}
+    with pytest.raises(ValueError, match="all ten digits"):
+        voice_actions.capture_order_request(OID, webcall, {**args, "caller_contact": "this number"})

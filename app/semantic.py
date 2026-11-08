@@ -234,7 +234,8 @@ def retrieve(organization_id:str,question:str):
         candidate_intent=_question_intent(row["question"])
         intent_match=bool(intent and candidate_intent==intent)
         intent_conflict=bool(intent and candidate_intent and candidate_intent!=intent)
-        score=(similarity + 0.055*int(intent_match) - 0.03*int(intent_conflict)
+        broad=row["question"].startswith("Business description — ") and intent!="overview"
+        score=(similarity + 0.055*int(intent_match) - 0.03*int(intent_conflict) - 0.05*int(broad)
                + 0.025*question_overlap + 0.006*min(answer_overlap,3))
         ranked.append((score,row,similarity,question_overlap,answer_overlap,intent_match))
     ranked.sort(key=lambda entry:entry[0],reverse=True)
