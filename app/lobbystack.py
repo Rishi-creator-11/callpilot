@@ -384,7 +384,15 @@ def import_menu(oid: str, body: Menu, user=Depends(current_user)):
     for entry in listing("/knowledge", biz):
         if entry.get("title") and entry["title"] not in existing:
             existing[entry["title"]] = entry
-    added = updated = 0
+    added = updated = removed = 0
+    wanted = {question for question, _ in pairs}
+    tail = " on the %s?" % body.title.lower()
+    section_mark = "do you have on the %s?" % body.title.lower()
+    # Re-importing a menu replaces it: answers that belong to this menu but are no longer in it are removed.
+    for title_, entry in existing.items():
+        if title_ not in wanted and sections and (title_.endswith(tail) or section_mark in title_):
+            call("DELETE", "/knowledge/%s" % entry["id"], business=biz)
+            removed += 1
     for question, answer in pairs:
         found = existing.get(question)
         if found is None:
@@ -393,7 +401,7 @@ def import_menu(oid: str, body: Menu, user=Depends(current_user)):
         elif found.get("content") != answer:
             call("PATCH", "/knowledge/%s" % found["id"], business=biz, body={"content": answer})
             updated += 1
-    return {"sections": [{"name": sec["name"], "dishes": len(sec["items"])} for sec in sections], "added": added, "updated": updated}
+    return {"sections": [{"name": sec["name"], "dishes": len(sec["items"])} for sec in sections], "added": added, "updated": updated, "removed": removed}
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/calendar/connect")

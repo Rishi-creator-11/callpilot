@@ -212,3 +212,11 @@ def test_same_dish_on_two_menus_keeps_both_prices(monkeypatch):
     assert dinner["How much is the tricolore salad on the dinner menu?"].endswith("$18. It comes with Radicchio.")
     assert "$16" in lunch["How much is the tricolore salad on the lunch menu?"]
     assert not set(dinner) & set(lunch)
+
+
+def test_section_heading_without_ingredients_is_not_a_dish():
+    from app.menu import parse
+    sections = parse("Entrees\nSalmon\nLentils, Dill\n38\nSides\nBraised Red Cabbage\n12\nRoasted Carrots\n12\n")
+    names = {s["name"]: [i["name"] for i in s["items"]] for s in sections}
+    assert names["Sides"] == ["Braised Red Cabbage", "Roasted Carrots"]
+    assert all(i["name"] != "Sides" for s in sections for i in s["items"])

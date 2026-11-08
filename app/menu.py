@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import re
 
-PRICE = re.compile(r"^\$?\s*(\d{1,3}(?:\.\d{2})?)$")
+HEADER = re.compile(r"^(appetizers?|starters?|small plates|salads?|soups?|sides?|entrees?|mains?|pastas?|sandwiches|burgers?|sweets?|desserts?|eggs|beverages?|drinks?|cocktails?|wines?|beers?|brunch|lunch|dinner|kids|specials?)\b", re.I)
+PRICE = re.compile(r"^\$?\s*(\d{1,3}(?:\.\d{1,2})?)$")
 MARKET = re.compile(r"^(?:(.*?)\s+)?(MP|Market Price)$", re.I)
 
 
@@ -38,6 +39,11 @@ def parse(text: str) -> list[dict]:
                 title, pending = pending[:-2], pending[-2:]
                 current = {"name": " ".join(title), "items": []}
                 sections.append(current)
+            elif len(pending) == 2 and HEADER.match(pending[0]) and len(pending[0].split()) <= 4 and "," not in pending[0]:
+                # A short section heading followed by a dish with no ingredient line, such as "Sides".
+                current = {"name": pending[0], "items": []}
+                sections.append(current)
+                pending = pending[1:]
             name, description = (pending[0], pending[1]) if len(pending) == 2 else (pending[0], "")
             if current is None:
                 current = {"name": "Menu", "items": []}
