@@ -187,9 +187,15 @@ class Style(BaseModel):
     business_name: str | None = Field(default=None, min_length=2, max_length=120)
 
 
+class Fact(BaseModel):
+    question: str = Field(min_length=5, max_length=300)
+    answer: str = Field(min_length=3, max_length=1500)
+
+
 class Menu(BaseModel):
     title: str = Field(min_length=2, max_length=60)
-    text: str = Field(min_length=20, max_length=30000)
+    text: str = Field(default="", max_length=30000)
+    facts: list[Fact] = Field(default_factory=list, max_length=20)
 
 
 class Reschedule(BaseModel):
@@ -368,8 +374,8 @@ def import_menu(oid: str, body: Menu, user=Depends(current_user)):
     """Save pasted menu text as one exact answer per dish and one spoken list per section. Safe to repeat."""
     writer(oid, user)
     biz = require_link(oid)["business_id"]
-    sections = parse(body.text)
-    pairs = answers(body.title, sections)
+    sections = parse(body.text) if body.text.strip() else []
+    pairs = answers(body.title, sections) + [(fact.question, fact.answer) for fact in body.facts]
     if not pairs:
         raise HTTPException(422, "No dishes with prices were found. Paste each dish's name, then its price on its own line.")
     if len(pairs) > 120:

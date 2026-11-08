@@ -182,8 +182,8 @@ def test_menu_parser_reads_sections_dishes_and_market_price():
     assert items["Jumbo Lump Crab Cake"] == "$27" and items["Duck Croquettes"] == "$21"
     assert items["Daily Crudo"] == "market price" and items["Truffle-Roasted Organic Half Chicken"] == "$35"
     faq = dict(answers("Dinner menu", sections))
-    assert faq["How much is the jumbo lump crab cake?"].startswith("The Jumbo Lump Crab Cake is $27.")
-    assert "ask the team" in faq["How much is the daily crudo?"]
+    assert faq["How much is the jumbo lump crab cake on the dinner menu?"].startswith("On the dinner menu, the Jumbo Lump Crab Cake is $27.")
+    assert "ask the team" in faq["How much is the daily crudo on the dinner menu?"]
 
 
 def test_menu_import_is_idempotent_and_rejects_text_without_prices(monkeypatch):
@@ -203,3 +203,12 @@ def test_menu_import_is_idempotent_and_rejects_text_without_prices(monkeypatch):
     with pytest.raises(HTTPException) as e:
         mod.import_menu(W1, mod.Menu(title="Dinner menu", text="We serve food. Come visit us any day of the week."), {"id": "u"})
     assert e.value.status_code == 422
+
+
+def test_same_dish_on_two_menus_keeps_both_prices(monkeypatch):
+    from app.menu import parse, answers
+    dinner = dict(answers("Dinner menu", parse("Salads\nTricolore Salad\nRadicchio\n18\n")))
+    lunch = dict(answers("Lunch menu", parse("Salads\nTricolore Salad\nRadicchio\n16\n")))
+    assert dinner["How much is the tricolore salad on the dinner menu?"].endswith("$18. It comes with Radicchio.")
+    assert "$16" in lunch["How much is the tricolore salad on the lunch menu?"]
+    assert not set(dinner) & set(lunch)

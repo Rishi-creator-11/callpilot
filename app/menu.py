@@ -63,5 +63,7 @@ def answers(menu_title: str, sections: list[dict]) -> list[tuple[str, str]]:
         for item in section["items"]:
             cost = "market price, so ask the team for today's" if item["price"] == "market price" else item["price"]
             detail = (" It comes with " + item["description"].rstrip(".") + ".") if item["description"] else ""
-            out.append(("How much is the %s?" % item["name"].lower(), "The %s is %s.%s" % (item["name"], cost, detail)))
+            # The menu name is part of the question because the same dish can cost differently on another menu.
+            out.append(("How much is the %s on the %s?" % (item["name"].lower(), menu_title.lower()),
+                        "On the %s, the %s is %s.%s" % (menu_title.lower(), item["name"], cost, detail)))
     return out
