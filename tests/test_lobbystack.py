@@ -304,3 +304,17 @@ def test_cleanup_clears_only_the_exact_injected_prompt(db, monkeypatch):
 def test_cleanup_does_nothing_without_a_platform_key(monkeypatch):
     monkeypatch.delenv("LOBBYSTACK_PLATFORM_KEY", raising=False)
     assert mod.clear_injected_style() == 0
+
+
+def test_dashboard_hides_the_invited_email_from_read_only_members(db, monkeypatch):
+    mod._dashboard_cache.update(at=0.0, url="https://app.callpilot.example")
+    db.businesses["biz1"]["owner_invited_email"] = "owner@example.com"
+    app.dependency_overrides[current_user] = lambda: {"id": "u2", "email": "viewer@example.com"}
+    try:
+        for role, expected in (("viewer", None), ("admin", "owner@example.com"), ("owner", "owner@example.com")):
+            monkeypatch.setattr(mod, "membership", lambda *a, _r=role, **k: _r)
+            body = client.get("/api/account/organizations/%s/lobbystack/dashboard" % W1).json()
+            assert body["owner_invited_email"] == expected and body["owner_invited"] is True
+    finally:
+        app.dependency_overrides.clear()
+        mod._dashboard_cache.update(at=0.0, url="")

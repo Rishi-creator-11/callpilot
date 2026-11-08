@@ -276,10 +276,12 @@ def dashboard_url():
 @router.get("/api/account/organizations/{oid}/lobbystack/dashboard")
 def hosted_dashboard(oid: str, user=Depends(current_user)):
     UUID(oid)
-    membership(oid, user)
+    role = membership(oid, user)
     saved = require_link(oid)
+    invited = saved.get("owner_invited_email")
+    # The invited address is only for the people who run the workspace, never read-only members.
     return {"dashboard_url": dashboard_url(), "business_id": saved["business_id"],
-            "owner_invited_email": saved.get("owner_invited_email"), "owner_invited": bool(saved.get("owner_invited_email"))}
+            "owner_invited_email": invited if role in WRITERS else None, "owner_invited": bool(invited)}
 
 
 def public_status(oid):
