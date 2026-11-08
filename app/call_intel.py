@@ -29,15 +29,20 @@ def vapi(method:str, path:str, *, params=None, body=None):
     except httpx.RequestError:
         raise HTTPException(503,"Vapi is unavailable. Try refreshing later.")
     if response.status_code>=400:
-        # Vapi's own reason (for example "Invalid Key") helps the owner fix setup. It never contains our key.
+        # The provider's own wording stays in the server log only. Users see a fixed message.
         reason=""
         try:
             detail=response.json().get("message")
             if isinstance(detail,list):detail=" ".join(str(item) for item in detail)
-            if isinstance(detail,str):reason=" ".join(detail.split())[:140]
+            if isinstance(detail,str):reason=" ".join(detail.split())[:160]
         except (ValueError,AttributeError):pass
-        __import__("logging").getLogger("callpilot").warning("vapi_request_failed method=%s path=%s status=%s",method,path.split("?")[0],response.status_code)
-        raise HTTPException(502,"Vapi request failed (HTTP "+str(response.status_code)+")"+(": "+reason if reason else ""))
+        __import__("logging").getLogger("callpilot").warning("vapi_request_failed method=%s path=%s status=%s reason=%s",
+            method,path.split("?")[0],response.status_code,reason)
+        status=response.status_code
+        hint={401:" The server's Vapi connection was rejected. The platform operator needs to check it.",
+              403:" The server's Vapi connection was rejected. The platform operator needs to check it.",
+              404:" The item was not found at Vapi.",429:" Vapi is rate limiting requests. Try again shortly."}.get(status,"")
+        raise HTTPException(502,"Vapi request failed (HTTP "+str(status)+")."+hint)
     return response.json() if response.content else {}
 
 def owns_assistant(assistant,oid:str)->bool:
