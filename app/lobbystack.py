@@ -103,6 +103,26 @@ class Website(BaseModel):
     url: str = Field(min_length=4, max_length=500)
 
 
+class ServiceIn(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    duration_minutes: int = Field(ge=5, le=480)
+    price_text: str = Field(min_length=1, max_length=40)
+    description: str | None = Field(default=None, max_length=300)
+
+
+class Hours(BaseModel):
+    day: str = Field(pattern="^(sunday|monday|tuesday|wednesday|thursday|friday|saturday)$")
+    open: str = Field(pattern="^[0-2][0-9]:[0-5][0-9]$")
+    close: str = Field(pattern="^[0-2][0-9]:[0-5][0-9]$")
+
+
+class Profile(BaseModel):
+    """What the owner reviewed and approved. Prices are only saved here, never guessed by the receptionist."""
+    services: list[ServiceIn] = Field(max_length=40)
+    hours: list[Hours] = Field(default_factory=list, max_length=7)
+    booking_mode: str = Field(default="request", pattern="^(off|request|instant)$")
+
+
 class Reschedule(BaseModel):
     starts_at: str = Field(min_length=10, max_length=40)
 
@@ -161,6 +181,28 @@ def review(oid: str, user=Depends(current_user)):
     biz = require_link(oid)["business_id"]
     return {name: call("GET", path, business=biz).get("data", []) for name, path in
             (("sources", "/knowledge/sources"), ("services", "/services"), ("rules", "/rules"), ("knowledge", "/knowledge"))}
+
+
+@router.post("/api/account/organizations/{oid}/lobbystack/profile")
+def apply_profile(oid: str, body: Profile, user=Depends(current_user)):
+    """Save reviewed services, prices, hours and booking mode through LobbyStack's native settings. Safe to repeat."""
+    writer(oid, user)
+    biz = require_link(oid)["business_id"]
+    existing = {item.get("question") for item in call("GET", "/knowledge", business=biz).get("data", [])}
+    have = {item["name"].lower(): item for item in call("GET", "/services", business=biz).get("data", [])}
+    made = []
+    for item in body.services:
+        saved = have.get(item.name.lower()) or call("POST", "/services", business=biz, idem="svc-%s-%s" % (oid, hashlib.sha1(item.name.lower().encode()).hexdigest()[:16]), body={
+            "name": item.name, "duration_minutes": item.duration_minutes, **({"description": item.description} if item.description else {})})["data"]
+        question = "How much is a %s and how long does it take?" % item.name.lower()
+        if question not in existing:
+            call("POST", "/knowledge", business=biz, body={"type": "faq", "question": question, "answer": "A %s is %s and takes about %s minutes." % (
+                item.name.lower(), item.price_text, item.duration_minutes)})
+        made.append({"id": saved["id"], "name": saved["name"], "duration_minutes": saved["duration_minutes"], "price": item.price_text})
+    if body.hours:
+        call("PATCH", "/business", business=biz, body={"hours": [h.model_dump() for h in body.hours]})
+    call("PATCH", "/receptionist", business=biz, body={"booking_mode": body.booking_mode})
+    return {"services": made, "booking_mode": body.booking_mode}
 
 
 @router.post("/api/account/organizations/{oid}/lobbystack/calendar/connect")
