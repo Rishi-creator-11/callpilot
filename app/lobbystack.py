@@ -139,7 +139,24 @@ Caller: 'It's Sam, nine one four...'
 You: 'Thanks Sam, you're all set for eleven thirty tomorrow. Anything else?'
 
 Rules you never break: only say a booking is confirmed after the booking system confirms it. Quote prices and durations only from the business's saved services. If you don't know something, say so simply and offer to take a message. Do not say you are an AI unless asked directly."""
-DEFAULT_STYLE = {"tone": "warm, casual and quick, like a friendly person answering the business phone", "voice": "marin", "voice_instructions": HUMAN_STYLE}
+
+
+def clear_injected_style():
+    """One-time clean-up: remove only the exact prompt CallPilot used to inject into new businesses.
+
+    Owners' own edits never match it, so they are left alone. Safe to run on every start."""
+    if not os.getenv("LOBBYSTACK_PLATFORM_KEY"):
+        return 0
+    cleared = 0
+    for row in api("lobbystack_businesses", params={"select": "business_id"}):
+        try:
+            current = (call("GET", "/receptionist", business=row["business_id"]).get("data") or {})
+            if str(current.get("voice_instructions") or "").strip() == HUMAN_STYLE.strip():
+                call("PATCH", "/receptionist", business=row["business_id"], body={"voice_instructions": None})
+                cleared += 1
+        except HTTPException as exc:
+            log.warning("lobbystack_style_cleanup_failed business=%s detail=%s", row.get("business_id"), exc.detail)
+    return cleared
 
 
 class Provision(BaseModel):
@@ -209,24 +226,60 @@ def writer(oid, user):
 
 @router.post("/api/account/organizations/{oid}/lobbystack/provision")
 def provision(oid: str, body: Provision, user=Depends(current_user)):
-    writer(oid, user)
+    UUID(oid)
+    role = membership(oid, user, WRITERS)
     if link(oid):
         return public_status(oid)
     org = org_or_404(oid)
-    request = {"name": org["name"], "timezone": org.get("timezone") or "America/New_York", "locale": "en"}
+    request = {"name": org["name"], "timezone": org.get("timezone") or "America/New_York", "locale": "en", "access_level": "full"}
     if body.website_url:
         request["website_url"] = body.website_url
+    # The workspace owner is invited to LobbyStack's own dashboard, where its onboarding, knowledge,
+    # services, calendars and phone number are managed as LobbyStack ships them. Nothing is preset here.
+    owner_email = (user.get("email") or "").strip().lower() if role == "owner" else ""
+    if owner_email:
+        request["owner_email"] = owner_email
     # Same workspace always sends the same key, so a retry cannot create a second business.
-    created = call("POST", "/businesses", body=request, idem="callpilot-" + oid)["data"]
-    # Every new business starts with the same natural, short-greeting style; owners can change it later.
-    call("PATCH", "/receptionist", business=created["id"], body={**DEFAULT_STYLE, "greeting": "%s, how can I help?" % org["name"]})
+    created = call("POST", "/businesses", body=request, idem="callpilot-v2-" + oid)["data"]
     base = os.getenv("PUBLIC_BASE_URL", "https://callpilot-internal.onrender.com").rstrip("/")
     hook = call("POST", "/webhooks", business=created["id"], body={
         "url": base + "/webhooks/lobbystack", "events": list(EVENTS), "description": "CallPilot dashboard"})["data"]
-    api("lobbystack_businesses", "POST", params={"on_conflict": "organization_id"}, prefer="resolution=ignore-duplicates", data={
-        "organization_id": oid, "business_id": created["id"], "webhook_id": hook["id"],
-        "webhook_secret_ciphertext": cipher().encrypt(hook["secret"].encode()).decode()})
+    row = {"organization_id": oid, "business_id": created["id"], "webhook_id": hook["id"],
+           "webhook_secret_ciphertext": cipher().encrypt(hook["secret"].encode()).decode()}
+    if owner_email:
+        row["owner_invited_email"] = owner_email
+        row["owner_invited_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    api("lobbystack_businesses", "POST", params={"on_conflict": "organization_id"}, prefer="resolution=ignore-duplicates", data=row)
     return public_status(oid)
+
+
+_dashboard_cache = {"at": 0.0, "url": ""}
+
+
+def dashboard_url():
+    """Where owners sign in to LobbyStack: the partner's own address, else LobbyStack's."""
+    configured = os.getenv("LOBBYSTACK_DASHBOARD_URL", "").strip().rstrip("/")
+    if configured.startswith("https://"):
+        return configured
+    if _dashboard_cache["url"] and time.time() - _dashboard_cache["at"] < 600:
+        return _dashboard_cache["url"]
+    try:
+        url = str((call("GET", "/partner").get("data") or {}).get("dashboard_url") or "").rstrip("/")
+        if url.startswith("https://"):
+            _dashboard_cache.update(at=time.time(), url=url)
+            return url
+    except HTTPException:
+        pass
+    return "https://app.lobbystack.com"
+
+
+@router.get("/api/account/organizations/{oid}/lobbystack/dashboard")
+def hosted_dashboard(oid: str, user=Depends(current_user)):
+    UUID(oid)
+    membership(oid, user)
+    saved = require_link(oid)
+    return {"dashboard_url": dashboard_url(), "business_id": saved["business_id"],
+            "owner_invited_email": saved.get("owner_invited_email"), "owner_invited": bool(saved.get("owner_invited_email"))}
 
 
 def public_status(oid):

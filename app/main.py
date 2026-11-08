@@ -802,6 +802,19 @@ from app.quick_setup import router as quick_setup_router
 app.include_router(quick_setup_router)
 from app.lobbystack import router as lobbystack_router
 app.include_router(lobbystack_router)
+
+
+@app.on_event("startup")
+def clear_lobbystack_injected_style():
+    """Runs off the request path; failures are logged and never block startup."""
+    import threading, logging
+    def run():
+        try:
+            from app.lobbystack import clear_injected_style
+            logging.getLogger("uvicorn.error").info("lobbystack_style_cleanup cleared=%s", clear_injected_style())
+        except Exception as exc:
+            logging.getLogger("uvicorn.error").warning("lobbystack_style_cleanup_error type=%s", type(exc).__name__)
+    threading.Thread(target=run, daemon=True).start()
 app.include_router(custom_apis_router)
 from app.enterprise import router as enterprise_router
 app.include_router(enterprise_router)

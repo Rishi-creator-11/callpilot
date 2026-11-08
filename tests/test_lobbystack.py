@@ -95,26 +95,82 @@ def test_body_tampering_fails_signature(db):
     assert client.post("/webhooks/lobbystack", content=raw.replace(b"call9", b"call8"), headers=headers).status_code == 401
 
 
-def test_provision_uses_stable_idempotency_key_and_requires_owner(db, monkeypatch):
+def provision_with(db, monkeypatch, role="owner", email="Owner@Example.com"):
     calls = []
     def fake(method, path, **kw):
-        calls.append((method, path, kw.get("idem"), kw.get("business")))
+        calls.append((method, path, kw.get("idem"), kw.get("business"), kw.get("body")))
         return {"data": {"id": "biz9", "secret": SECRET}}
     monkeypatch.setattr(mod, "call", fake)
     monkeypatch.setattr(mod, "org_or_404", lambda o: {"name": "Barbers", "timezone": "America/New_York"})
-    app.dependency_overrides[current_user] = lambda: {"id": "u1"}
-    monkeypatch.setattr(mod, "membership", lambda *a, **k: "owner")
+    app.dependency_overrides[current_user] = lambda: {"id": "u1", "email": email}
+    monkeypatch.setattr(mod, "membership", lambda *a, **k: role)
+    return calls
+
+
+def test_provision_invites_the_owner_to_lobbystack_and_presets_nothing(db, monkeypatch):
+    calls = provision_with(db, monkeypatch)
+    wid = "00000000-0000-0000-0000-0000000000a3"
     try:
-        r = client.post("/api/account/organizations/%s/lobbystack/provision" % "00000000-0000-0000-0000-0000000000a3", json={})
+        r = client.post("/api/account/organizations/%s/lobbystack/provision" % wid, json={})
         assert r.status_code == 200 and r.json()["connected"] is True
-        assert calls[0] == ("POST", "/businesses", "callpilot-00000000-0000-0000-0000-0000000000a3", None)
-        assert calls[1][:2] == ("PATCH", "/receptionist") and calls[1][3] == "biz9"
-        assert calls[2][1] == "/webhooks" and calls[2][3] == "biz9"
+        method, path, idem, biz, body = calls[0]
+        assert (method, path, idem, biz) == ("POST", "/businesses", "callpilot-v2-" + wid, None)
+        assert body["owner_email"] == "owner@example.com" and body["access_level"] == "full"
+        # LobbyStack's own defaults stay in force: no style, greeting or prompt is pushed to the receptionist.
+        assert not any(path.startswith("/receptionist") or path.startswith("/knowledge") for _, path, *_ in calls)
+        assert calls[1][1] == "/webhooks" and calls[1][3] == "biz9"
+        saved = db.businesses["biz9"]
+        assert saved["owner_invited_email"] == "owner@example.com"
         def deny(*a, **k): raise HTTPException(404, "Workspace not found")
         monkeypatch.setattr(mod, "membership", deny)
         assert client.post("/api/account/organizations/%s/lobbystack/provision" % W1, json={}).status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+def test_only_the_workspace_owner_is_invited_never_an_admin(db, monkeypatch):
+    calls = provision_with(db, monkeypatch, role="admin", email="admin@example.com")
+    try:
+        r = client.post("/api/account/organizations/%s/lobbystack/provision" % "00000000-0000-0000-0000-0000000000a4", json={})
+        assert r.status_code == 200
+        assert "owner_email" not in calls[0][4]
+        assert "owner_invited_email" not in db.businesses["biz9"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dashboard_endpoint_returns_the_partner_dashboard_address(db, monkeypatch):
+    monkeypatch.delenv("LOBBYSTACK_DASHBOARD_URL", raising=False)
+    mod._dashboard_cache.update(at=0.0, url="")
+    db.businesses["biz1"]["owner_invited_email"] = "owner@example.com"
+    monkeypatch.setattr(mod, "call", lambda method, path, **kw: {"data": {"dashboard_url": "https://app.callpilot.example"}})
+    app.dependency_overrides[current_user] = lambda: {"id": "u1", "email": "owner@example.com"}
+    monkeypatch.setattr(mod, "membership", lambda *a, **k: "owner")
+    try:
+        r = client.get("/api/account/organizations/%s/lobbystack/dashboard" % W1)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["dashboard_url"] == "https://app.callpilot.example" and body["owner_invited"] is True
+        assert set(body) == {"dashboard_url", "business_id", "owner_invited_email", "owner_invited"}  # no secrets
+    finally:
+        app.dependency_overrides.clear()
+        mod._dashboard_cache.update(at=0.0, url="")
+
+
+def test_dashboard_address_falls_back_to_lobbystack_and_rejects_non_https(monkeypatch):
+    mod._dashboard_cache.update(at=0.0, url="")
+    monkeypatch.delenv("LOBBYSTACK_DASHBOARD_URL", raising=False)
+    monkeypatch.setattr(mod, "call", lambda *a, **k: {"data": {"dashboard_url": "http://evil.example"}})
+    assert mod.dashboard_url() == "https://app.lobbystack.com"
+    def down(*a, **k): raise HTTPException(503, "down")
+    monkeypatch.setattr(mod, "call", down)
+    assert mod.dashboard_url() == "https://app.lobbystack.com"
+
+
+def test_receptionist_screen_hands_off_to_the_hosted_dashboard():
+    page = client.get("/app").text
+    assert 'id="rcHosted"' in page and "Open your receptionist" in page
+    assert "#rcMain.rc-hosted>article:not(#rcHosted):not(#rcCallsCard){display:none}" in page
 
 
 def test_missing_platform_key_is_a_clear_503(monkeypatch):
@@ -226,3 +282,25 @@ def test_decimal_prices_keep_two_places():
     from app.menu import parse
     items = [i for s in parse("Beverages\nAmerican Coffee\n2.5\nLatte\n4.50\n") for i in s["items"]]
     assert [i["price"] for i in items] == ["$2.50", "$4.50"]
+
+
+def test_cleanup_clears_only_the_exact_injected_prompt(db, monkeypatch):
+    monkeypatch.setenv("LOBBYSTACK_PLATFORM_KEY", "k")
+    db.businesses["biz1"]["business_id"] = "biz1"
+    patched, current = [], {"biz1": mod.HUMAN_STYLE, "biz2": "An owner wrote this themselves."}
+    def fake(method, path, **kw):
+        if method == "GET": return {"data": {"voice_instructions": current[kw["business"]]}}
+        patched.append((kw["business"], kw["body"])); return {"data": {}}
+    monkeypatch.setattr(mod, "call", fake)
+    monkeypatch.setattr(mod, "api", lambda table, **kw: [{"business_id": "biz1"}, {"business_id": "biz2"}])
+    assert mod.clear_injected_style() == 1
+    assert patched == [("biz1", {"voice_instructions": None})]
+    assert mod.clear_injected_style() == 1  # a second run finds nothing new only once LobbyStack reports it cleared
+    current["biz1"] = None
+    patched.clear()
+    assert mod.clear_injected_style() == 0 and patched == []
+
+
+def test_cleanup_does_nothing_without_a_platform_key(monkeypatch):
+    monkeypatch.delenv("LOBBYSTACK_PLATFORM_KEY", raising=False)
+    assert mod.clear_injected_style() == 0

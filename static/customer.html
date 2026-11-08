@@ -706,7 +706,8 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
 .settings-subnav button,.connection-filters button{background:transparent;color:#344e65;box-shadow:none;padding:8px 11px}
 .settings-subnav button[aria-current="page"],.connection-filters button[aria-pressed="true"]{background:#dcefe7;color:#145a4a}
 .connection-filters{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
-</style></head><body data-app-state="loading">
+</style><style id="cp-hosted-receptionist">#rcMain.rc-hosted>article:not(#rcHosted):not(#rcCallsCard){display:none}</style>
+</head><body data-app-state="loading">
 <a href="#cpMainContent" id="cpSkipLink" class="cp-skip-link">Skip to main content</a><div class="shell"><div id="cpBootSplash" role="status" aria-live="polite"><div class="cp-loading-symbol" aria-hidden="true">✦</div><div class="cp-loading-title">CallPilot</div><p>Opening your workspace…</p></div>
 <nav><a class="brand" href="/" aria-label="CallPilot home" style="text-decoration:none">✦ Call<span>Pilot</span></a><div class="row">
 <span class="pill">Business workspace</span><button id="topHelp" class="cp-top-link" style="display:none" onclick="window.section('help')">Help</button>
@@ -816,6 +817,11 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
  <p><button id="rcCreateBtn" type="button">Create receptionist</button></p>
 </div>
 <div id="rcMain" hidden>
+ <article id="rcHosted" class="card" hidden><h2>Your receptionist</h2>
+  <p class="muted">Your receptionist runs on LobbyStack. Setup, knowledge, services, calendars, phone numbers and test calls all live in its dashboard.</p>
+  <p id="rcHostedNote" class="muted"></p>
+  <p><button id="rcOpen" type="button">Open your receptionist</button></p>
+ </article>
  <article class="card"><h2>1. Review what we learned</h2>
   <p id="rcSources" class="muted"></p>
   <p class="muted">Check each service. Prices and times are exactly what callers will hear. Remove anything wrong.</p>
@@ -840,7 +846,7 @@ body.cp-assistant-full .assistant-composer{width:100%;margin:0 auto;position:sti
   <label for="rcVoice">Voice</label><select id="rcVoice"></select>
   <p><button id="rcStyle" type="button" class="secondary">Save voice and greeting</button> <span id="rcStyled" class="muted" role="status"></span></p>
  </article>
- <article class="card"><h2>What happened on calls</h2>
+ <article id="rcCallsCard" class="card"><h2>What happened on calls</h2>
   <div id="rcCalls" class="muted">No calls yet.</div>
  </article>
 </div>
@@ -2135,6 +2141,15 @@ const pageMeta={
 const RC_VOICES=["marin","cedar","coral","sage","ballad","verse","alloy","ash","echo","shimmer"];
 const RC_DAYS=["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
 function rcBase(){return "/organizations/"+organization()+"/lobbystack"}
+async function rcShowHosted(){
+ try{
+  const d=await request(rcBase()+"/dashboard");
+  if(!/^https:\/\//.test(d.dashboard_url||""))return;
+  $("rcMain").classList.add("rc-hosted");$("rcHosted").hidden=false;
+  $("rcHostedNote").textContent=d.owner_invited?("LobbyStack emailed an invitation to "+d.owner_invited_email+". Accept it once, then sign in to manage your receptionist."):"Sign in to LobbyStack and open this business to manage your receptionist.";
+  $("rcOpen").onclick=()=>window.open(d.dashboard_url,"_blank","noopener");
+ }catch(e){}
+}
 function rcRow(service){
  const row=document.createElement("div");row.className="cp-inline-actions";row.dataset.rcService="1";
  const name=document.createElement("input");name.placeholder="Service";name.value=service.name||"";name.maxLength=80;name.setAttribute("aria-label","Service name");
@@ -2163,6 +2178,7 @@ async function loadReceptionist(){
  const info=await request(rcBase());
  if(!info.connected){status.textContent="Your receptionist isn't set up yet.";$("rcCreate").hidden=false;return;}
  $("rcMain").hidden=false;
+ rcShowHosted();
  status.textContent="Receptionist connected"+(info.webhook_verified?" · updates from calls are arriving.":" · waiting for the first call update.");
  const voices=$("rcVoice");if(!voices.options.length)for(const v of RC_VOICES){const o=document.createElement("option");o.value=v;o.textContent=v;voices.append(o)}
  if(!$("rcHours").children.length)rcHoursRows();
@@ -2190,7 +2206,7 @@ $("rcCreateBtn").addEventListener("click",async event=>{
  try{
   await request(rcBase()+"/provision","POST",{website_url:site||null});
   if(site){$("rcStatus").textContent="Reading your website…";await request(rcBase()+"/website","POST",{url:site})}
-  msg("Receptionist created. Review what it learned.");
+  msg("Receptionist created. Check your email for the LobbyStack invitation.");
   await loadReceptionist();
  }catch(e){$("rcStatus").textContent=e.message}finally{button.disabled=false}
 });
